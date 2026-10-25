@@ -87,6 +87,10 @@ export const PALETTE = {
   mushroomSpot: '#f6e3c4',
   mushroomStem: '#efe6d2',
   mushroomStemShade: '#cfc3a8',
+  brambleStem: '#7a3a46',
+  brambleStemDark: '#52242e',
+  thorn: '#efd9b4',
+  brambleFlower: '#f6d6e4',
 
   flameCore: '#fff3b0',
   flame: '#ffc94d',

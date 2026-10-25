@@ -219,5 +219,23 @@ export function itemIcons(): Sprite[] {
         }
       }
     }),
+    icon('axe', (s) => {
+      // Handle on a diagonal, a chipped stone head lashed on with leaf cord.
+      for (let i = 0; i <= 10; i++) {
+        s.set(3 + i, 14 - i, P.woodLight);
+        s.set(4 + i, 14 - i, P.wood);
+        s.set(4 + i, 15 - i, P.woodDark);
+      }
+      for (let y = 1; y <= 8; y++) {
+        for (let x = 6; x <= 11; x++) {
+          const d = Math.hypot((x + 0.5 - 8.5) / 3, (y + 0.5 - 4.5) / 4);
+          if (d > 1) continue;
+          const l = (-(x - 8) * 0.7 - (y - 4) * 0.6) / 3;
+          s.set(x, y, l > 0.4 ? P.stoneLight : l > -0.3 ? P.stone : P.stoneDark);
+        }
+      }
+      for (const [x, y] of [[10, 5], [11, 4], [11, 6], [12, 5]]) s.set(x, y, P.leafDark);
+      s.set(10, 4, P.leaf);
+    }),
   ];
 }

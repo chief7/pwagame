@@ -1,6 +1,6 @@
 import { characterSet } from './characters';
 import { animalSet, itemIcons, raft } from './creatures';
-import { berryBush, berryBushEmpty, bush, mushroom, treeBroadleaf, treePine } from './forest';
+import { berryBush, berryBushEmpty, bramble, bush, mushroom, treeBroadleaf, treePine } from './forest';
 import { campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
@@ -22,7 +22,7 @@ export function spriteGroups(): SpriteGroup[] {
   return [
     { title: 'Characters', sprites: [...characterSet('male'), ...characterSet('female')] },
     { title: 'Palm trees', sprites: [palmTall(), palmLeaning(), palmYoung(), palmTallBare(), palmLeaningBare()] },
-    { title: 'Forest', sprites: [treeBroadleaf(), treePine(), bush(), berryBush(), berryBushEmpty(), mushroom()] },
+    { title: 'Forest', sprites: [treeBroadleaf(), treePine(), bush(), berryBush(), berryBushEmpty(), mushroom(), bramble()] },
     { title: 'Grass', sprites: [grass(), grassFlowers(), ...grassEdgeSet()] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
