@@ -19,3 +19,10 @@ identifiers. Keep these as they are.
 
 This rule applies to answers in the conversation. Code, code comments, commit
 messages and in-game text keep their usual style.
+
+## No copyrighted material
+
+Never add copyrighted material to the repository. This includes images,
+sprites, fonts, sounds, music, text and code made by other people, whatever
+their source. Make all game content yourself (for example, draw sprites in
+code). If a task seems to need outside material, stop and ask the user first.
