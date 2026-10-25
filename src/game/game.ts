@@ -414,6 +414,7 @@ export class Game {
     if (dog && this.dogAt(nx, ny)) {
       // Walking into your dog swaps places, so it never blocks the way.
       this.emit({ type: 'move', id: dog.id, fromX: dog.x, fromY: dog.y, toX: p.x, toY: p.y });
+      this.turnDog(dog, p.x - dog.x);
       dog.x = p.x;
       dog.y = p.y;
       this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
@@ -811,7 +812,7 @@ export class Game {
     this.inventory.take(item);
     this.animals = this.animals.filter((other) => other !== a);
     this.dog = {
-      id: a.id, x: a.x, y: a.y, facing: a.facing,
+      id: a.id, x: a.x, y: a.y, facing: a.x > p.x ? 'left' : 'right',
       food: Math.min(100, DOG_START_FOOD + this.dogFoodValue(item)), water: DOG_START_WATER, tired: false,
     };
     this.emit({ type: 'sparkle', x: a.x, y: a.y });
@@ -1007,6 +1008,7 @@ export class Game {
         Math.max(Math.abs(a.x - dog.x), Math.abs(a.y - dog.y)) <= DOG_BARK_RANGE,
     );
     if (!scared) return;
+    this.turnDog(dog, scared.x - dog.x);
     this.emit({ type: 'lunge', id: dog.id, x: dog.x, y: dog.y, targetX: scared.x, targetY: scared.y });
     this.message({ key: 'dogBark', animal: scared.kind }, 'good');
     // One bark sends off every small nuisance close by.
@@ -1016,6 +1018,11 @@ export class Game {
         a.chase = 0;
       }
     }
+  }
+
+  /** The dog's sprite only looks left or right: it keeps its side when it moves straight up or down. */
+  private turnDog(dog: Dog, dx: number): void {
+    if (dx) dog.facing = dx < 0 ? 'left' : 'right';
   }
 
   private dogCanStand(x: number, y: number): boolean {
@@ -1037,7 +1044,7 @@ export class Game {
       }
     }
     if (!best) return;
-    dog.facing = facingFor(best[0] - dog.x, best[1] - dog.y, dog.facing);
+    this.turnDog(dog, best[0] - dog.x);
     this.emit({ type: 'move', id: dog.id, fromX: dog.x, fromY: dog.y, toX: best[0], toY: best[1] });
     [dog.x, dog.y] = best;
   }

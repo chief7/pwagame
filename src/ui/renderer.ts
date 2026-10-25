@@ -182,7 +182,8 @@ export class Renderer {
     const dog = game.dog;
     if (dog && map.isVisible(dog.x, dog.y)) {
       const pose = anim.pose(dog.id, dog.x, dog.y, now);
-      actors.push({ id: dog.id, name: dog.tired ? 'dog_rest' : 'dog', pose, bob: pose.hop || dog.tired ? 0 : anim.idleBob(dog.id, now) });
+      const name = `${dog.tired ? 'dog_rest' : 'dog'}${dog.facing === 'left' ? '_left' : ''}`;
+      actors.push({ id: dog.id, name, pose, bob: pose.hop || dog.tired ? 0 : anim.idleBob(dog.id, now) });
     }
     actors.push({
       id: player.id,

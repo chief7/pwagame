@@ -933,8 +933,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 - A wild animal only checks the distance from home when it appears. It can
   wander closer to camp later.
 - Animals have no walk frames. They hop when they move. They always face down.
-  The dog always faces right, and a tired dog shows its resting sprite also
-  while it walks.
+  The dog only faces left or right (`dog_left`, `dog_rest_left` are the
+  mirrored sprites); when it walks straight up or down it keeps its side. A
+  tired dog shows its resting sprite also while it walks.
 - The dog does not lie down while the player sleeps.
 - Only one dog: after the first is adopted, no other stray dog appears.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.

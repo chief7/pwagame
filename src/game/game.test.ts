@@ -378,6 +378,16 @@ describe('Game: the dog', () => {
       game.move(1, 0);
       expect(near(game)).toBeLessThanOrEqual(1);
     }
+    expect(game.dog!.facing).toBe('right');
+    game.dog!.x = game.player.x + 3;
+    game.dog!.y = game.player.y;
+    game.wait();
+    expect(game.dog!.facing).toBe('left');
+    // Straight up or down, it keeps looking the same way.
+    game.dog!.x = game.player.x;
+    game.dog!.y = game.player.y + 3;
+    game.wait();
+    expect(game.dog!.facing).toBe('left');
     const dog = { x: game.dog!.x, y: game.dog!.y };
     const from = { x: game.player.x, y: game.player.y };
     expect(game.move(dog.x - from.x, dog.y - from.y)).toBe(true);

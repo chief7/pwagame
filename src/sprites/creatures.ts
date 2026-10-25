@@ -321,6 +321,12 @@ export function dogRest(): Sprite {
   ], DOG_KEY, 7);
 }
 
+/** The adopted dog's sprites, facing right and (mirrored) left. */
+export function dogFacings(): Sprite[] {
+  const [dog, rest] = [companionDog(), dogRest()];
+  return [dog, dog.mirrored('dog_left'), rest, rest.mirrored('dog_rest_left')];
+}
+
 export function raft(): Sprite {
   return fromRows('raft', [
     '................',
@@ -343,7 +349,7 @@ export function raft(): Sprite {
 }
 
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), companionDog(), dogRest()];
+  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), ...dogFacings()];
 }
 
 // ---- Item icons -------------------------------------------------------------------
