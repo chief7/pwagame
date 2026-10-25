@@ -28,7 +28,7 @@ const CATCH_XP = 2;
 /** Chance that a fish bites, without and with the Patient angler skill. */
 const BITE_CHANCE = 0.4;
 const PATIENT_BITE_CHANCE = 0.7;
-/** How fast needs drop with the Survival skills (1 is normal). */
+/** How fast needs drop with the Explorer skills (1 is normal). */
 const SMALL_SIPS = 0.8;
 const SMALL_APPETITE = 0.8;
 const THICK_SKIN = 0.7;

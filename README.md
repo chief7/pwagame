@@ -44,9 +44,9 @@ npm run preview   # serve the build (service worker is only active here)
   bats keep their distance, turtles don't mind you.
 - **Skills:** gathering, building and fishing give XP. XP earns skill points
   (the first at 10 XP, each next one 5 XP more), which you spend in the
-  Skills panel on three paths: Survival (needs drop slower), Crafting
-  (fishing rod, better catches, cheaper building) and Explorer (faster
-  regrowth, night eyes, animal friend). Each path is learned in order.
+  Skills panel on three paths: Building (fishing rod, cheaper building),
+  Explorer (needs drop slower, night eyes) and Improving (faster regrowth,
+  better catches, animal friend). Each path is learned in order.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
   campfire (Build panel).

@@ -1,9 +1,10 @@
-// What the explorer can learn with skill points. Skills sit on three paths;
-// each skill needs the one before it on its path. The effects live where
-// they apply (needs, gathering, sight, animals, recipes); this file only
-// says what exists and what it costs. Names live in src/i18n/.
+// What the explorer can learn with skill points. Skills sit on three paths:
+// building things, the explorer themself, and making things better. Each
+// skill needs the one before it on its path. The effects live where they
+// apply (needs, gathering, sight, animals, recipes); this file only says
+// what exists and what it costs. Names live in src/i18n/.
 
-export type PathId = 'survival' | 'craft' | 'explorer';
+export type PathId = 'build' | 'explorer' | 'improve';
 
 export type SkillId =
   | 'small_sips' | 'small_appetite' | 'thick_skin'
@@ -19,14 +20,15 @@ export interface SkillDef {
 
 /** Each path's skills, in the order they must be learned. */
 export const PATHS: Record<PathId, SkillId[]> = {
-  survival: ['small_sips', 'small_appetite', 'thick_skin'],
-  craft: ['fishing_rod', 'patient_angler', 'handy_builder'],
-  explorer: ['green_thumb', 'night_eyes', 'animal_friend'],
+  build: ['fishing_rod', 'handy_builder'],
+  explorer: ['small_sips', 'small_appetite', 'thick_skin', 'night_eyes'],
+  improve: ['green_thumb', 'patient_angler', 'animal_friend'],
 };
 
 export const PATH_IDS = Object.keys(PATHS) as PathId[];
 
-const COSTS = [1, 1, 2];
+/** Cost by place on the path. */
+const COSTS = [1, 1, 2, 2];
 
 export const SKILLS = Object.fromEntries(
   PATH_IDS.flatMap((path) => PATHS[path].map((id, i) => [id, { id, path, cost: COSTS[i] }])),

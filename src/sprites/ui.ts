@@ -101,25 +101,25 @@ export function skillIcons(): Sprite[] {
     }
   }
   star.outline();
-  const drop = fromRows('ui_path_survival', [
+  const arrow = fromRows('ui_path_improve', [
     '................',
-    '.......w........',
-    '.......w........',
-    '......wwr.......',
-    '......wwr.......',
-    '.....wgwrr......',
-    '....wggwwrr.....',
-    '....wgwwwrr.....',
-    '...wwwwwwwrr....',
-    '...wwwwwwwrr....',
-    '...wwwwwwrrr....',
-    '...rwwwwwrrr....',
-    '....rrwwrrr.....',
-    '.....rrrrr......',
+    '.......LG.......',
+    '......LLGG......',
+    '.....LLLGGG.....',
+    '....LLLLGGGG....',
+    '...LLLLLGGGGG...',
+    '..LLLLLLGGGGGG..',
+    '..DDDDLLGGDDDD..',
+    '......LGGD......',
+    '......LGGD......',
+    '......LGGD......',
+    '......LGGD......',
+    '......LGGD......',
+    '......LGGD......',
+    '......DDDD......',
     '................',
-    '................',
-  ], { '.': null, w: P.water, g: P.waterGlint, r: P.waterDeep }).outline();
-  const hammer = fromRows('ui_path_craft', [
+  ], { '.': null, L: P.leafLight, G: P.leaf, D: P.leafDark }).outline();
+  const hammer = fromRows('ui_path_build', [
     '................',
     '................',
     '...LSSSSSs......',
@@ -155,5 +155,5 @@ export function skillIcons(): Sprite[] {
     '................',
     '................',
   ], { '.': null, G: P.gold, g: P.goldLight, D: P.goldDark, f: P.compassFace, N: P.compassNeedle, s: P.stoneDark, o: P.outline }).outline();
-  return [star, drop, hammer, compass];
+  return [star, hammer, compass, arrow];
 }

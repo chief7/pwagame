@@ -372,19 +372,21 @@ more than the one before: 10, 25, 45, 70, 100 XP in total
 points = points earned from XP − cost of the learned skills. When a point is
 earned, the log says so (`skillPoint`) and the player sparkles.
 
-**Skills.** Three paths with three skills each. In a path, a skill needs the
-skill before it. The first two skills cost 1 point, the third costs 2.
+**Skills.** Three paths: Building (skills to build things), Explorer (skills
+that change the explorer) and Improving (skills that make things work
+better). In a path, a skill needs the skill before it. The first two skills
+on a path cost 1 point, the third and fourth cost 2.
 
 | Path | Skill | Effect | Where |
 |---|---|---|---|
-| Survival | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
+| Building | Fishing rod | Unlocks the fishing rod recipe | `recipes.ts` (`skill`) |
+| | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
+| Explorer | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
 | | Small appetite | Food drops 20% slower | `needs.ts` (`hunger`) |
 | | Thick skin | Warmth drops 30% slower | `needs.ts` (`chill`) |
-| Crafting | Fishing rod | Unlocks the fishing rod recipe | `recipes.ts` (`skill`) |
-| | Patient angler | Bite chance 40% → 70% | `Game.fish()` |
-| | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
-| Explorer | Green thumb | Plants regrow in 70% of the time | `Game.interact()` |
 | | Night eyes | Up to 2 more cells of sight at night | `Game.sightRadius` |
+| Improving | Green thumb | Plants regrow in 70% of the time | `Game.interact()` |
+| | Patient angler | Bite chance 40% → 70% | `Game.fish()` |
 | | Animal friend | Crabs do not pinch, monkeys do not take food | `Game.animalAct()` |
 
 The Skills panel shows the free points, an XP bar to the next point, and each
@@ -524,7 +526,7 @@ must be next to a campfire).
 
 `src/game/defs/skills.ts` has `PATHS` (each path's skills, in order) and the
 skill point thresholds. A skill's cost comes from its place in the path
-(1, 1, 2). The effect of a skill is code where it applies: check it with
+(1, 1, 2, 2). The effect of a skill is code where it applies: check it with
 `game.has(id)`. Names and descriptions are in `src/i18n/` (`skills`,
 `paths`). The path icons are `ui_path_<path>`.
 
@@ -544,7 +546,7 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 | Items | coconut, berries, mushroom, cooked fish (food); wood, leaves, stone, fish (materials; fish is raw); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions) |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
-| Skills | Survival: small sips, small appetite, thick skin. Crafting: fishing rod, patient angler, handy builder. Explorer: green thumb, night eyes, animal friend |
+| Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend |
 | Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves) |
 
 ---

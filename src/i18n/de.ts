@@ -170,7 +170,7 @@ export const de: Strings = {
     fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
   },
-  paths: { survival: 'Überleben', craft: 'Handwerk', explorer: 'Entdecker' },
+  paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
   skills: {
     small_sips: { name: 'Kleine Schlucke', description: 'Dein Wasser sinkt 20 % langsamer.' },
     small_appetite: { name: 'Kleiner Hunger', description: 'Dein Essen sinkt 20 % langsamer.' },

@@ -396,7 +396,7 @@ describe('Game: experience and skills', () => {
     expect(game.log.at(-1)?.msg).toEqual({ key: 'needPoints' });
   });
 
-  it('survival skills make water, food and warmth drop slower', () => {
+  it('explorer skills make water, food and warmth drop slower', () => {
     const plain = sandbox(22);
     const skilled = sandbox(22);
     skilled.skills = new Set(['small_sips', 'small_appetite', 'thick_skin']);

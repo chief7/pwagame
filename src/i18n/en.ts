@@ -111,7 +111,7 @@ export const en: Strings = {
     fishing_rod: { name: 'Fishing rod', description: 'Walk into the sea with it to catch fish.' },
     cooked_fish: { name: 'Cook a fish', description: 'Stand next to a campfire. Cooked fish is tasty food.' },
   },
-  paths: { survival: 'Survival', craft: 'Crafting', explorer: 'Explorer' },
+  paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
   skills: {
     small_sips: { name: 'Small sips', description: 'Your water goes down 20% slower.' },
     small_appetite: { name: 'Small appetite', description: 'Your food goes down 20% slower.' },
