@@ -269,7 +269,8 @@ function run(cmd: Command): void {
 
 type SheetKind = 'bag' | 'build' | 'skills' | 'sail' | 'end';
 let sheetKind: SheetKind = 'bag';
-let confirmNewIsland = false;
+/** The footer button that waits for a second tap before it starts over. */
+let confirming: 'island' | 'reset' | null = null;
 const icons = new Map<string, string>();
 
 function icon(name: string): string {
@@ -280,7 +281,7 @@ function icon(name: string): string {
 function openSheet(kind: SheetKind): void {
   stopAuto();
   sheetKind = kind;
-  confirmNewIsland = false;
+  confirming = null;
   ui.sheet.hidden = false;
   renderSheet();
   ui.sheetClose.focus();
@@ -360,20 +361,32 @@ function renderSheet(): void {
       closeSheet();
       ui.picker.hidden = false;
     });
-    const fresh = el('button', { type: 'button', textContent: confirmNewIsland ? words.ui.confirmNewIsland : words.ui.newIsland });
-    fresh.addEventListener('click', () => {
-      if (!confirmNewIsland) {
-        confirmNewIsland = true;
-        renderSheet();
-        return;
-      }
-      startNewIsland();
-    });
+    const fresh = confirmButton('island', words.ui.newIsland, startNewIsland);
     const lang = el('button', { type: 'button', className: 'wide lang-switch' }, langButtonLabel());
     lang.addEventListener('click', switchLang);
-    foot.append(change, fresh, lang);
+    const reset = confirmButton('reset', words.ui.resetProgress, resetProgress);
+    reset.classList.add('wide');
+    foot.append(change, fresh, lang, reset);
   }
   ui.sheetBody.replaceChildren(rows, foot);
+}
+
+/** A button that asks for a second tap before it does something that can't be undone. */
+function confirmButton(kind: 'island' | 'reset', label: string, action: () => void): HTMLButtonElement {
+  const button = el('button', { type: 'button', textContent: confirming === kind ? t().ui.confirmNewIsland : label });
+  button.addEventListener('click', () => {
+    if (confirming === kind) return action();
+    confirming = kind;
+    renderSheet();
+  });
+  return button;
+}
+
+/** Forget everything: the island, skills and the chosen explorer. The language stays. */
+function resetProgress(): void {
+  writeStore(BODY_KEY, null);
+  startNewIsland();
+  ui.picker.hidden = false;
 }
 
 function startNewIsland(): void {

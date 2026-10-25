@@ -438,6 +438,16 @@ describe('Game: no harsh endings', () => {
     expect(game.needs.water).toBe(30);
     expect(game.phase).toBe('dawn');
     expect(game.log.some((m) => m.msg.key === 'wakeAtCamp')).toBe(true);
+    // Warmth climbs back up in the daytime, so only these were empty at the end.
+    expect(game.log.at(-1)!.msg).toEqual({ key: 'faintWhy', empty: ['food', 'water', 'energy'] });
+  });
+
+  it('after fainting from animal bites, the hint says so', () => {
+    const game = sandbox(9);
+    // Not fed well enough to heal, but nothing has run out.
+    game.needs = { health: 0, food: 40, water: 40, energy: 90, warmth: 100 };
+    game.wait();
+    expect(game.log.at(-1)!.msg).toEqual({ key: 'faintWhy', empty: [] });
   });
 
   it('a grumpy crab pinches when you linger, but never fatally', () => {

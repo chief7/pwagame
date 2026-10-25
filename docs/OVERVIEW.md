@@ -223,6 +223,8 @@ When Health is 0 at the end of a turn:
 4. Needs become: Health 50, Food at least 25, Water at least 30, Energy 70,
    Warmth 80.
 5. All items stay in the bag.
+6. The log gives a hint (`faintWhy`): which needs ran out, with a tip for
+   each. If no need was empty, wild animals did it.
 
 **Home** is the last shelter or cave where the player slept. At the start,
 home is the start point on the beach.
@@ -711,7 +713,9 @@ Auto-walk (travel and hold) stops when:
   English text and become `legacy` messages.
 - The chosen explorer (female or male) is saved as `pwagame.body`.
 - The language is saved as `pwagame.lang`.
-- The Bag panel has "New island" (tap two times to confirm).
+- The Bag panel has "New island" and "Reset all progress" (tap two times to
+  confirm each). Reset also forgets the chosen explorer and shows the
+  explorer picker again. The language stays.
 
 **Test a special situation in the browser.** You can start the game in any
 state: edit a save and load it before the game starts. The game saves on

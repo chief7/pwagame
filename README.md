@@ -25,7 +25,8 @@ npm run preview   # serve the build (service worker is only active here)
   run down as time passes, Energy while awake, and Warmth drops at night out
   in the open. An empty need slowly drains Health.
 - **No harsh endings:** when Health runs out you faint and wake up at home
-  the next morning with everything you carried. Animals can't be hurt;
+  the next morning with everything you carried. A hint tells you why you
+  fainted. Animals can't be hurt;
   bumping one shoos it away.
 - **Day and night:** a day is 240 turns. Nights are dark (you see less) and
   cold; a campfire, a shelter or a cave keeps you warm.
@@ -71,7 +72,7 @@ npm run preview   # serve the build (service worker is only active here)
   what's there; tap further away to walk there along a known path; press and
   hold to keep walking towards your finger. Walking stops when something new
   comes into view. Tap your explorer to wait a turn. Buttons: Bag (eat, change
-  explorer, new island), Build, Skills (a star shows when you have points to
+  explorer, new island, reset all progress), Build, Skills (a star shows when you have points to
   spend), Sleep.
 - **Keyboard:** arrows / WASD / `hjkl` / numpad to move, `.` or `5` wait,
   `i` bag, `b` build, `p` skills, `z` sleep, `Esc` closes panels.

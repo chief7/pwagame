@@ -18,7 +18,7 @@ function everyMessage(): Msg[] {
   const msgs: Msg[] = [
     { key: 'arrive' }, { key: 'seaSalty' }, { key: 'tooFull' }, { key: 'needMaterials' }, { key: 'noRoom' },
     { key: 'notSleepy' }, { key: 'fallAsleep' }, { key: 'dozeOff' }, { key: 'notThirsty' }, { key: 'drink' },
-    { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
+    { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'faintWhy', empty: [] }, { key: 'faintWhy', empty: ['food', 'water', 'energy', 'warmth'] }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
     { key: 'needFire' }, { key: 'needPoints' }, { key: 'skillPoint' }, { key: 'catch' }, { key: 'noBite' },
     { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalReady' }, { key: 'sailAway' },
     { key: 'goalGive', given: [['wood', 1]], left: [['wood', 19], ['stone', 6]] },
@@ -29,7 +29,7 @@ function everyMessage(): Msg[] {
   }
   for (const skill of SKILL_IDS) msgs.push({ key: 'needSkill', skill }, { key: 'learn', skill });
   for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
-  for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need });
+  for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need }, { key: 'faintWhy', empty: [need] });
   for (const obj of OBJECT_KINDS) {
     msgs.push({ key: 'stepInto', obj }, { key: 'build', obj }, { key: 'fallAsleep', obj }, { key: 'look', obj }, { key: 'nothingLeft', obj });
     msgs.push({ key: 'gather', obj, got: [] }, { key: 'gather', obj, got: [['coconut', 1], ['wood', 3]] });

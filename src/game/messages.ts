@@ -39,6 +39,8 @@ export type Msg =
   | { key: 'low'; need: Exclude<NeedId, 'health'> }
   | { key: 'faint' }
   | { key: 'wakeAtCamp' }
+  /** Why the explorer fainted: the needs that ran out; none means animals hurt them. */
+  | { key: 'faintWhy'; empty: Exclude<NeedId, 'health'>[] }
   | { key: 'pinch'; animal: AnimalKind }
   /** A wild animal bites, stings, swipes at or bumps the explorer. */
   | { key: 'hurt'; animal: AnimalKind }

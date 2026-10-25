@@ -765,6 +765,7 @@ export class Game {
   /** Nobody dies here: the explorer faints and wakes up at home the next morning. */
   private faint(): void {
     this.sleeping = false;
+    const empty = WARN_NEEDS.filter((need) => this.needs[need] <= 0);
     this.message({ key: 'faint' }, 'warn');
     this.turn += turnsUntilMorning(this.turn) || TURNS_PER_DAY;
     const n = this.needs;
@@ -781,6 +782,7 @@ export class Game {
     this.warned.clear();
     this.emit({ type: 'fade' });
     this.message({ key: 'wakeAtCamp' }, 'good');
+    this.message({ key: 'faintWhy', empty }, 'warn');
   }
 
   // ---- Animals ----------------------------------------------------------------------

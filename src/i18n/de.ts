@@ -166,6 +166,7 @@ export const de: Strings = {
     changeExplorer: 'Figur wechseln',
     newIsland: 'Neue Insel',
     confirmNewIsland: 'Zum Bestätigen noch mal tippen',
+    resetProgress: 'Gesamten Fortschritt löschen',
     byFire: 'Am Feuer',
     inCave: 'In einer Höhle',
     inShelter: (kind) => `In ${obj(kind, 'dat', 'your')}`,
@@ -275,7 +276,19 @@ export const de: Strings = {
         warmth: 'Brr, dir wird kalt. Ein Feuer oder ein Unterschlupf würde helfen.',
       }[msg.need];
       case 'faint': return 'Dir wird schwummrig und du setzt dich zum Ausruhen hin …';
-      case 'wakeAtCamp': return 'Du wachst im Lager auf und fühlst dich besser. Denk daran zu essen, zu trinken und dich warm zu halten!';
+      case 'wakeAtCamp': return 'Du wachst am nächsten Morgen im Lager auf und fühlst dich besser.';
+      case 'faintWhy': {
+        if (!msg.empty.length) return 'Wilde Tiere haben dich zu oft verletzt. Halte Abstand und iss und trink gut, damit du heilst.';
+        const tips = {
+          food: 'Iss Beeren, Kokosnüsse oder Fisch.',
+          water: 'Trink an einer Quelle oder an einem Fluss.',
+          energy: 'Schlaf nachts, am besten in einem Unterschlupf.',
+          warmth: 'Bleib nachts am Feuer oder in einem Unterschlupf.',
+        };
+        const names = msg.empty.map((need) => NEEDS[need]);
+        const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names.at(-1)}` : names[0];
+        return `Du bist umgekippt, weil ${list} leer ${names.length > 1 ? 'waren' : 'war'}. ${msg.empty.map((need) => tips[need]).join(' ')}`;
+      }
       case 'pinch': return `Autsch! ${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} hat dich gezwickt.`;
       case 'hurt': return ANIMAL[msg.animal].hurt ?? `Autsch! ${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} hat dir wehgetan.`;
       case 'alert': return ANIMAL[msg.animal].alert ?? `${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} kommt auf dich zu!`;

@@ -32,6 +32,8 @@ export interface Strings {
     changeExplorer: string;
     newIsland: string;
     confirmNewIsland: string;
+    /** Start over from nothing: new island, no skills, choose the explorer again. */
+    resetProgress: string;
     byFire: string;
     inCave: string;
     /** HUD line while standing in a shelter: "In your hut". */

@@ -107,6 +107,7 @@ export const en: Strings = {
     changeExplorer: 'Change explorer',
     newIsland: 'New island',
     confirmNewIsland: 'Tap again to confirm',
+    resetProgress: 'Reset all progress',
     byFire: 'By the fire',
     inCave: 'In a cave',
     inShelter: (kind) => `In your ${obj(kind)}`,
@@ -216,7 +217,19 @@ export const en: Strings = {
         warmth: "Brr, you're getting cold. A fire or a shelter would help.",
       }[msg.need];
       case 'faint': return 'You feel woozy and sit down for a rest…';
-      case 'wakeAtCamp': return 'You wake up back at camp, feeling better. Remember to eat, drink and keep warm!';
+      case 'wakeAtCamp': return 'You wake up back at camp the next morning, feeling better.';
+      case 'faintWhy': {
+        if (!msg.empty.length) return 'Wild animals hurt you too often. Keep away from them, and eat and drink well to heal.';
+        const tips = {
+          food: 'Eat berries, coconuts or fish.',
+          water: 'Drink at a spring or a river.',
+          energy: 'Sleep at night, best in a shelter.',
+          warmth: 'At night, stay by a fire or in a shelter.',
+        };
+        const names = msg.empty.map((need) => NEEDS[need].toLowerCase());
+        const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+        return `You fainted because your ${list} ran out. ${msg.empty.map((need) => tips[need]).join(' ')}`;
+      }
       case 'pinch': return `Ouch! The ${ANIMAL[msg.animal].name} pinched you.`;
       case 'hurt': return ANIMAL[msg.animal].hurt ?? `Ouch! The ${ANIMAL[msg.animal].name} hurt you.`;
       case 'alert': return ANIMAL[msg.animal].alert ?? `The ${ANIMAL[msg.animal].name} comes after you!`;
