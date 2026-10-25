@@ -6,13 +6,15 @@ export const DIRS: readonly (readonly [number, number])[] = [
   [-1, 1], [0, 1], [1, 1],
 ];
 
+export type Passable = (x: number, y: number) => boolean;
+
 /**
- * Breadth-first distance (8-way) from (sx, sy) over walkable cells.
+ * Breadth-first distance (8-way) from (sx, sy) over passable cells.
  * Unreachable cells are -1.
  */
-export function distanceMap(map: GameMap, sx: number, sy: number): Int32Array {
+export function distanceMap(map: GameMap, sx: number, sy: number, passable: Passable): Int32Array {
   const dist = new Int32Array(map.width * map.height).fill(-1);
-  if (!map.isWalkable(sx, sy)) return dist;
+  if (!map.inBounds(sx, sy)) return dist;
   const queue = new Int32Array(map.width * map.height);
   let head = 0;
   let tail = 0;
@@ -26,7 +28,7 @@ export function distanceMap(map: GameMap, sx: number, sy: number): Int32Array {
     for (const [dx, dy] of DIRS) {
       const nx = cx + dx;
       const ny = cy + dy;
-      if (!map.isWalkable(nx, ny)) continue;
+      if (!map.inBounds(nx, ny) || !passable(nx, ny)) continue;
       const n = map.idx(nx, ny);
       if (dist[n] !== -1) continue;
       dist[n] = dist[cur] + 1;

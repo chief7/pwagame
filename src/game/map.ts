@@ -1,7 +1,8 @@
 export const Tile = {
-  Wall: 0,
-  Floor: 1,
-  Stairs: 2,
+  Water: 0,
+  Sand: 1,
+  /** The raft that carries the player to the next island. */
+  Raft: 2,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -31,22 +32,22 @@ export class GameMap {
   }
 
   get(x: number, y: number): Tile {
-    return this.inBounds(x, y) ? (this.tiles[this.idx(x, y)] as Tile) : Tile.Wall;
+    return this.inBounds(x, y) ? (this.tiles[this.idx(x, y)] as Tile) : Tile.Water;
   }
 
   set(x: number, y: number, tile: Tile): void {
     if (this.inBounds(x, y)) this.tiles[this.idx(x, y)] = tile;
   }
 
-  isWalkable(x: number, y: number): boolean {
-    return this.get(x, y) !== Tile.Wall;
-  }
-
-  isOpaque(x: number, y: number): boolean {
-    return this.get(x, y) === Tile.Wall;
+  isLand(x: number, y: number): boolean {
+    return this.get(x, y) !== Tile.Water;
   }
 
   isVisible(x: number, y: number): boolean {
     return this.inBounds(x, y) && this.visible[this.idx(x, y)] === 1;
+  }
+
+  isExplored(x: number, y: number): boolean {
+    return this.inBounds(x, y) && this.explored[this.idx(x, y)] === 1;
   }
 }

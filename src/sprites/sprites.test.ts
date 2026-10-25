@@ -15,7 +15,7 @@ describe('sprites', () => {
   it('includes the requested set', () => {
     const groups = Object.fromEntries(spriteGroups().map((g) => [g.title, g.sprites.length]));
     expect(groups['Palm trees']).toBe(3);
-    for (const title of ['Sand', 'Shores', 'Stones', 'Logs', 'Chests']) expect(groups[title]).toBeGreaterThan(0);
+    for (const title of ['Sand', 'Shores', 'Stones', 'Logs', 'Chests', 'Monsters', 'Raft']) expect(groups[title]).toBeGreaterThan(0);
   });
 
   it('terrain tiles are opaque', () => {
@@ -35,6 +35,14 @@ describe('sprites', () => {
       expect(left.get(0, 15)).toBe(right.get(15, 15));
       expect(left.pixels).toEqual(right.mirrored('x').pixels);
     }
+  });
+
+  it('has a sprite for every monster kind and prop kind', async () => {
+    const { MONSTER_TYPES } = await import('../game/actors');
+    const { PROP_KINDS } = await import('../game/props');
+    const sprites = buildSprites();
+    for (const t of MONSTER_TYPES) expect(sprites.has(`monster_${t.kind}`)).toBe(true);
+    for (const kind of PROP_KINDS) expect(sprites.has(kind)).toBe(true);
   });
 
   it('fromRows rejects ragged rows', () => {

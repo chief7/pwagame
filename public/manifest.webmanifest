@@ -1,7 +1,7 @@
 {
   "name": "pwagame",
   "short_name": "pwagame",
-  "description": "A turn-based cave-crawling roguelike.",
+  "description": "A turn-based, island-hopping roguelike.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

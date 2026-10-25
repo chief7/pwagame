@@ -1,8 +1,9 @@
-import { createMonster, createPlayer, MONSTER_TYPES, type Actor, type MonsterType } from './actors';
-import { generateCaves } from './caves';
+import { createMonster, createPlayer, facingFor, MONSTER_TYPES, type Actor, type MonsterType } from './actors';
 import { computeFov } from './fov';
+import { generateIsland } from './island';
 import { Tile, type GameMap } from './map';
 import { DIRS, distanceMap } from './pathing';
+import { isOpaqueProp, SCENERY, type PropKind } from './props';
 import { Rng } from './rng';
 
 export const MAP_WIDTH = 60;
@@ -12,6 +13,8 @@ const LOG_LIMIT = 100;
 const ALERT_TURNS = 15;
 const REGEN_EVERY = 12;
 const TONIC_HEAL = 10;
+/** Share of land cells that get scenery. */
+const SCENERY_DENSITY = 0.07;
 
 export type Tone = 'info' | 'good' | 'bad' | 'loot';
 export interface LogEntry {
@@ -19,19 +22,16 @@ export interface LogEntry {
   tone: Tone;
 }
 
-export interface Item {
-  kind: 'tonic';
-  x: number;
-  y: number;
-}
+export type TravelResult = 'moved' | 'arrived' | 'blocked';
 
 export class Game {
   readonly seed: number;
   readonly rng: Rng;
   readonly player: Actor;
   map!: GameMap;
+  /** Scenery and chests by cell index. All of them block movement. */
+  props = new Map<number, PropKind>();
   monsters: Actor[] = [];
-  items: Item[] = [];
   log: LogEntry[] = [];
   depth = 0;
   turn = 0;
@@ -44,29 +44,39 @@ export class Game {
     this.seed = seed;
     this.rng = new Rng(seed);
     this.player = createPlayer();
-    this.enterNextLevel();
-    this.message('You climb down into the dark. Find the stairs (>) to go deeper.', 'info');
+    this.enterNextIsland();
+    this.message('Washed ashore. Find the raft to sail on.', 'info');
   }
 
   get xpToNext(): number {
     return this.level * 10;
   }
 
-  get onStairs(): boolean {
-    return this.map.get(this.player.x, this.player.y) === Tile.Stairs;
+  get onRaft(): boolean {
+    return this.map.get(this.player.x, this.player.y) === Tile.Raft;
   }
 
   monsterAt(x: number, y: number): Actor | undefined {
     return this.monsters.find((m) => m.x === x && m.y === y);
   }
 
-  itemAt(x: number, y: number): Item | undefined {
-    return this.items.find((i) => i.x === x && i.y === y);
+  propAt(x: number, y: number): PropKind | undefined {
+    return this.map.inBounds(x, y) ? this.props.get(this.map.idx(x, y)) : undefined;
   }
 
-  /** Step or attack in a direction. Returns true if a turn passed. */
+  /** Land without anything standing on it. Ignores monsters. */
+  isPassable(x: number, y: number): boolean {
+    return this.map.isLand(x, y) && !this.propAt(x, y);
+  }
+
+  visibleMonsters(): Actor[] {
+    return this.monsters.filter((m) => this.map.isVisible(m.x, m.y));
+  }
+
+  /** Step, attack or open a chest in a direction. Returns true if a turn passed. */
   move(dx: number, dy: number): boolean {
     if (this.over) return false;
+    this.player.facing = facingFor(dx, dy, this.player.facing);
     const nx = this.player.x + dx;
     const ny = this.player.y + dy;
     const target = this.monsterAt(nx, ny);
@@ -75,13 +85,42 @@ export class Game {
       this.endTurn();
       return true;
     }
-    if (!this.map.isWalkable(nx, ny)) return false;
+    if (this.propAt(nx, ny) === 'chest_closed') {
+      this.openChest(nx, ny);
+      this.endTurn();
+      return true;
+    }
+    if (!this.isPassable(nx, ny)) return false;
     this.player.x = nx;
     this.player.y = ny;
-    this.pickUp();
-    if (this.onStairs) this.message('Stairs lead down from here.', 'info');
+    if (this.onRaft) this.message('A raft is tied up here. Tap Sail to set off.', 'info');
     this.endTurn();
     return true;
+  }
+
+  /**
+   * Take one step along the shortest known path to (tx, ty), through
+   * explored land only.
+   */
+  travelStep(tx: number, ty: number): TravelResult {
+    if (this.over) return 'blocked';
+    if (this.player.x === tx && this.player.y === ty) return 'arrived';
+    if (!this.isPassable(tx, ty) || !this.map.isExplored(tx, ty)) return 'blocked';
+    const dist = distanceMap(this.map, tx, ty, (x, y) => this.isPassable(x, y) && this.map.isExplored(x, y));
+    let best: readonly [number, number] | null = null;
+    let bestDist = Infinity;
+    for (const [dx, dy] of DIRS) {
+      const nx = this.player.x + dx;
+      const ny = this.player.y + dy;
+      if (!this.map.inBounds(nx, ny) || this.monsterAt(nx, ny)) continue;
+      const d = dist[this.map.idx(nx, ny)];
+      if (d >= 0 && d < bestDist) {
+        best = [dx, dy];
+        bestDist = d;
+      }
+    }
+    if (!best || !this.move(best[0], best[1])) return 'blocked';
+    return this.player.x === tx && this.player.y === ty ? 'arrived' : 'moved';
   }
 
   wait(): boolean {
@@ -90,10 +129,10 @@ export class Game {
     return true;
   }
 
-  descend(): boolean {
-    if (this.over || !this.onStairs) return false;
-    this.enterNextLevel();
-    this.message(`You descend to depth ${this.depth}.`, 'info');
+  sail(): boolean {
+    if (this.over || !this.onRaft) return false;
+    this.enterNextIsland();
+    this.message(`You sail to island ${this.depth}.`, 'info');
     return true;
   }
 
@@ -115,68 +154,80 @@ export class Game {
     return true;
   }
 
-  private enterNextLevel(): void {
+  private enterNextIsland(): void {
     this.depth++;
-    const { map, start } = generateCaves(MAP_WIDTH, MAP_HEIGHT, this.rng);
+    const { map, start, raft } = generateIsland(MAP_WIDTH, MAP_HEIGHT, this.rng);
     this.map = map;
     this.player.x = start.x;
     this.player.y = start.y;
     this.monsters = [];
-    this.items = [];
+    this.props = new Map();
 
-    const dist = distanceMap(map, start.x, start.y);
-    const spawnable: number[] = [];
-    for (let i = 0; i < map.tiles.length; i++) {
-      // Keep spawns out of the player's immediate surroundings.
-      if (map.tiles[i] === Tile.Floor && dist[i] > 6) spawnable.push(i);
+    const startDist = distanceMap(map, start.x, start.y, (x, y) => map.isLand(x, y));
+    const sand: number[] = [];
+    for (let i = 0; i < map.tiles.length; i++) if (map.tiles[i] === Tile.Sand) sand.push(i);
+    const near = (i: number, x: number, y: number, r: number) =>
+      Math.max(Math.abs((i % map.width) - x), Math.abs(Math.floor(i / map.width) - y)) <= r;
+
+    // Scenery and chests, never next to the start or the raft, and never
+    // cutting the island in two.
+    const free = sand.filter((i) => !near(i, start.x, start.y, 1) && !near(i, raft.x, raft.y, 1));
+    const chests = this.rng.int(2, 3);
+    const placements: PropKind[] = [
+      ...Array.from({ length: chests }, () => 'chest_closed' as const),
+      ...Array.from({ length: Math.round(sand.length * SCENERY_DENSITY) }, () => this.pickWeighted(SCENERY)),
+    ];
+    for (const kind of placements) {
+      for (let tries = 0; tries < 20 && free.length; tries++) {
+        const i = free.splice(this.rng.int(0, free.length - 1), 1)[0];
+        this.props.set(i, kind);
+        if (this.allLandReachable(start.x, start.y)) break;
+        this.props.delete(i);
+      }
     }
-    const takeCell = (): { x: number; y: number } | null => {
-      if (spawnable.length === 0) return null;
-      const i = spawnable.splice(this.rng.int(0, spawnable.length - 1), 1)[0];
-      return { x: i % map.width, y: Math.floor(i / map.width) };
-    };
 
+    const spawnable = free.filter((i) => startDist[i] > 6 && !this.props.has(i));
     const eligible = MONSTER_TYPES.filter((t) => t.minDepth <= this.depth);
     const monsterCount = 4 + this.depth * 2;
-    for (let n = 0; n < monsterCount; n++) {
-      const cell = takeCell();
-      if (!cell) break;
-      this.monsters.push(createMonster(this.pickWeighted(eligible), cell.x, cell.y));
-    }
-
-    const tonicCount = this.rng.int(1, 2);
-    for (let n = 0; n < tonicCount; n++) {
-      const cell = takeCell();
-      if (!cell) break;
-      this.items.push({ kind: 'tonic', ...cell });
+    for (let n = 0; n < monsterCount && spawnable.length; n++) {
+      const i = spawnable.splice(this.rng.int(0, spawnable.length - 1), 1)[0];
+      const type = this.pickWeighted(eligible.map((t) => [t, t.weight] as [MonsterType, number]));
+      this.monsters.push(createMonster(type, i % map.width, Math.floor(i / map.width)));
     }
 
     this.updateFov();
   }
 
-  private pickWeighted(types: readonly MonsterType[]): MonsterType {
-    const total = types.reduce((sum, t) => sum + t.weight, 0);
-    let roll = this.rng.next() * total;
-    for (const t of types) {
-      roll -= t.weight;
-      if (roll < 0) return t;
+  private allLandReachable(sx: number, sy: number): boolean {
+    const dist = distanceMap(this.map, sx, sy, (x, y) => this.isPassable(x, y));
+    for (let i = 0; i < this.map.tiles.length; i++) {
+      if (this.map.tiles[i] !== Tile.Water && !this.props.has(i) && dist[i] < 0) return false;
     }
-    return types[types.length - 1];
+    return true;
   }
 
-  private pickUp(): void {
-    const item = this.itemAt(this.player.x, this.player.y);
-    if (!item) return;
-    this.items = this.items.filter((i) => i !== item);
-    this.tonics++;
-    this.message('You pick up a tonic (!).', 'loot');
+  private pickWeighted<T>(options: readonly (readonly [T, number])[]): T {
+    const total = options.reduce((sum, [, w]) => sum + w, 0);
+    let roll = this.rng.next() * total;
+    for (const [option, w] of options) {
+      roll -= w;
+      if (roll < 0) return option;
+    }
+    return options[options.length - 1][0];
+  }
+
+  private openChest(x: number, y: number): void {
+    this.props.set(this.map.idx(x, y), 'chest_open');
+    const found = this.rng.chance(0.3) ? 2 : 1;
+    this.tonics += found;
+    this.message(`You open the chest and find ${found === 1 ? 'a tonic' : 'two tonics'}.`, 'loot');
   }
 
   private endTurn(): void {
     this.turn++;
     if (this.turn % REGEN_EVERY === 0 && this.player.hp < this.player.maxHp) this.player.hp++;
 
-    const dist = distanceMap(this.map, this.player.x, this.player.y);
+    const dist = distanceMap(this.map, this.player.x, this.player.y, (x, y) => this.isPassable(x, y));
     for (const m of this.monsters) {
       if (this.over) break;
       this.monsterAct(m, dist);
@@ -218,8 +269,9 @@ export class Game {
   }
 
   private tryStep(m: Actor, x: number, y: number): void {
-    if (!this.map.isWalkable(x, y) || this.monsterAt(x, y)) return;
+    if (!this.isPassable(x, y) || this.monsterAt(x, y)) return;
     if (x === this.player.x && y === this.player.y) return;
+    m.facing = facingFor(x - m.x, y - m.y, m.facing);
     m.x = x;
     m.y = y;
   }
@@ -242,7 +294,7 @@ export class Game {
     if (actor === this.player) {
       this.player.hp = 0;
       this.over = true;
-      this.message(`You die on depth ${this.depth}.`, 'bad');
+      this.message(`You die on island ${this.depth}.`, 'bad');
       return;
     }
     this.monsters = this.monsters.filter((m) => m !== actor);
@@ -270,7 +322,10 @@ export class Game {
       this.player.x,
       this.player.y,
       FOV_RADIUS,
-      (x, y) => map.isOpaque(x, y),
+      (x, y) => {
+        const prop = this.propAt(x, y);
+        return prop !== undefined && isOpaqueProp(prop);
+      },
       (x, y) => {
         if (!map.inBounds(x, y)) return;
         const i = map.idx(x, y);

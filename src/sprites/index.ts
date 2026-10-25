@@ -1,8 +1,9 @@
 import { characterSet } from './characters';
+import { creatureSet, raft } from './creatures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles } from './objects';
 import { palmLeaning, palmTall, palmYoung } from './palms';
 import type { Sprite } from './pixel';
-import { sand, sandRipples, sandShell, shoreSet, water } from './terrain';
+import { sand, sandRipples, sandShell, shoreSet, water, waterVariants } from './terrain';
 
 export { Sprite } from './pixel';
 export { shoreTileName } from './terrain';
@@ -17,10 +18,12 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Characters', sprites: [...characterSet('male'), ...characterSet('female')] },
     { title: 'Palm trees', sprites: [palmTall(), palmLeaning(), palmYoung()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
-    { title: 'Shores', sprites: [water(), ...shoreSet()] },
+    { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
     { title: 'Stones', sprites: [boulder(), pebbles(), mossyStone()] },
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
+    { title: 'Monsters', sprites: creatureSet() },
+    { title: 'Raft', sprites: [raft()] },
   ];
 }
 

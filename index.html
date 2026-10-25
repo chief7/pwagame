@@ -28,14 +28,26 @@
         <div id="actions">
           <button id="btn-wait" type="button">Wait</button>
           <button id="btn-drink" type="button">Tonic</button>
-          <button id="btn-descend" type="button">Descend</button>
+          <button id="btn-sail" type="button">Sail</button>
         </div>
       </footer>
-      <div id="game-over" hidden>
+      <div id="game-over" class="overlay" hidden>
         <div class="panel">
           <h1>You died</h1>
           <p id="game-over-text"></p>
-          <button id="btn-restart" type="button">Try again</button>
+          <div class="panel-actions">
+            <button id="btn-restart" type="button">Try again</button>
+            <button id="btn-change" type="button">Change explorer</button>
+          </div>
+        </div>
+      </div>
+      <div id="picker" class="overlay">
+        <div class="panel">
+          <h1>Choose your explorer</h1>
+          <div class="choices">
+            <button type="button" data-body="female"><canvas width="96" height="96"></canvas><span>Female</span></button>
+            <button type="button" data-body="male"><canvas width="96" height="96"></canvas><span>Male</span></button>
+          </div>
         </div>
       </div>
     </div>

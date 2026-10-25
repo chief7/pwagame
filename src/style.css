@@ -31,6 +31,8 @@ body {
 #app {
   display: grid;
   grid-template-rows: auto 1fr auto;
+  /* minmax(0, …) stops long log lines widening the page past the screen. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100dvh;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
@@ -134,12 +136,16 @@ button:disabled {
   cursor: default;
 }
 
-#btn-descend.ready {
+#btn-sail.ready {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-#game-over {
+#game-over h1 {
+  color: var(--bad);
+}
+
+.overlay {
   position: fixed;
   inset: 0;
   display: grid;
@@ -148,8 +154,32 @@ button:disabled {
   padding: 16px;
 }
 
-#game-over[hidden] {
+.overlay[hidden] {
   display: none;
+}
+
+.panel-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.choices button {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+}
+
+.choices canvas {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
 }
 
 .panel {
@@ -163,9 +193,8 @@ button:disabled {
 }
 
 .panel h1 {
-  margin: 0 0 8px;
-  font-size: 22px;
-  color: var(--bad);
+  margin: 0 0 16px;
+  font-size: 20px;
 }
 
 .panel p {

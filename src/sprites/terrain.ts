@@ -11,10 +11,10 @@ function sandPixel(x: number, y: number, seed: number): Color {
   return P.sand;
 }
 
-function waterPixel(x: number, y: number): Color {
+function waterPixel(x: number, y: number, seed = 7): Color {
   // Short two-pixel glints; wraps at the tile edge so water tiles seamlessly.
-  if (hash2(x, y, 7) < 0.018 || hash2((x + TILE - 1) % TILE, y, 7) < 0.018) return P.waterGlint;
-  return hash2(x, y, 8) < 0.1 ? P.waterDeep : P.water;
+  if (hash2(x, y, seed) < 0.018 || hash2((x + TILE - 1) % TILE, y, seed) < 0.018) return P.waterGlint;
+  return hash2(x, y, seed + 1) < 0.1 ? P.waterDeep : P.water;
 }
 
 export function sand(): Sprite {
@@ -44,7 +44,12 @@ export function sandShell(): Sprite {
 }
 
 export function water(): Sprite {
-  return new Sprite('water').paint(waterPixel);
+  return new Sprite('water').paint((x, y) => waterPixel(x, y));
+}
+
+/** Extra open-water tiles so the sea doesn't read as a grid. */
+export function waterVariants(): Sprite[] {
+  return [100, 200].map((seed, i) => new Sprite(`water_${i + 2}`).paint((x, y) => waterPixel(x, y, seed)));
 }
 
 export type Side = 'n' | 's' | 'e' | 'w';
