@@ -157,3 +157,51 @@ export function skillIcons(): Sprite[] {
   ], { '.': null, G: P.gold, g: P.goldLight, D: P.goldDark, f: P.compassFace, N: P.compassNeedle, s: P.stoneDark, o: P.outline }).outline();
   return [star, hammer, compass, arrow];
 }
+
+/** A fish on a stick over the flames; two frames where the fire flickers and steam rises. */
+function grillFrame(name: string, frame: 0 | 1): Sprite {
+  const s = fromRows(name, [
+    '................',
+    '................',
+    '.....ff.........',
+    '...LLLLmm..ff...',
+    '..LoLLLLmmfff...',
+    'ddLLLLLLmmmfwwww',
+    '..bbbbbbbmmff...',
+    '...bbbbbmm.ff...',
+    '.....ff.........',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+  ], { '.': null, L: P.fishCookedLight, m: P.fishCooked, b: P.fishCookedBelly, f: P.fishCooked, o: P.outline, w: P.woodLight, d: P.woodDark });
+  // Grill marks, as on the cooked fish.
+  for (const x0 of [4, 7]) for (let i = 0; i < 3; i++) s.set(x0 + i, 3 + i, P.fishCookedDark);
+  // Three flame tongues on a bed of embers; they swap heights between frames.
+  const heights = frame === 0 ? [3, 4, 2] : [2, 3, 4];
+  [4, 8, 12].forEach((cx, k) => {
+    const h = heights[k];
+    for (let i = 0; i < h; i++) {
+      const y = 13 - i;
+      const top = i === h - 1;
+      s.set(cx, y, top ? P.flameRed : i === 0 ? P.flameCore : P.flame);
+      if (!top) {
+        s.set(cx - 1, y, i === 0 ? P.flameOrange : P.flameRed);
+        s.set(cx + 1, y, i === 0 ? P.flameOrange : P.flameRed);
+      }
+    }
+  });
+  for (let x = 2; x <= 14; x++) s.set(x, 14, x % 3 === 0 ? P.flameOrange : x < 8 ? P.wood : P.woodDark);
+  s.outline();
+  // Steam goes on after the outline so it stays a thin, soft wisp.
+  const wisp = frame === 0 ? [[6, 1], [7, 0]] : [[8, 1], [7, 0]];
+  for (const [x, y] of wisp) s.set(x, y, P.steam);
+  return s;
+}
+
+export function grillButton(): Sprite[] {
+  return [grillFrame('ui_grill', 0), grillFrame('ui_grill_2', 1)];
+}

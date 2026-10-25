@@ -121,6 +121,7 @@ export const PALETTE = {
   fishCookedBelly: '#f0d3a0',
   fishCookedDark: '#7a4320',
   fishingLine: '#ece6d4',
+  steam: '#e2ddd2',
   bobber: '#d6334a',
   compassNeedle: '#d6334a',
   compassFace: '#f4f1e6',

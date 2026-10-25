@@ -3,7 +3,7 @@ import { animalSet, itemIcons, raft, skillItemIcons } from './creatures';
 import { berryBush, berryBushEmpty, bramble, bush, mushroom, treeBroadleaf, treePine } from './forest';
 import { boat, bridge, campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
-import { appIcon, globe, skillIcons } from './ui';
+import { appIcon, globe, grillButton, skillIcons } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
@@ -36,7 +36,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Animals', sprites: animalSet() },
     { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
     { title: 'Boat', sprites: [...boat(), raft()] },
-    { title: 'Interface', sprites: [globe(), ...skillIcons(), appIcon()] },
+    { title: 'Interface', sprites: [globe(), ...skillIcons(), ...grillButton(), appIcon()] },
   ];
 }
 
