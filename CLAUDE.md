@@ -20,9 +20,16 @@ identifiers. Keep these as they are.
 This rule applies to answers in the conversation. Code, code comments, commit
 messages and in-game text keep their usual style.
 
-## No copyrighted material
+## Copyrighted material
 
-Never add copyrighted material to the repository. This includes images,
-sprites, fonts, sounds, music, text and code made by other people, whatever
-their source. Make all game content yourself (for example, draw sprites in
-code). If a task seems to need outside material, stop and ask the user first.
+Never add copyrighted material to the repository unless we have a license
+that allows us to use it. This includes images, sprites, fonts, sounds,
+music, text and code made by other people.
+
+- Before you add outside material, check its license. Free licenses such as
+  the SIL Open Font License, CC0, CC BY and MIT are acceptable if we follow
+  their terms.
+- Add the license file next to the material (for example
+  `src/fonts/OFL.txt`) and give credit where the license requires it.
+- If the license is unclear or missing, do not add the material. Ask the
+  user first.
