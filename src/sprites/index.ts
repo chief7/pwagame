@@ -1,12 +1,12 @@
 import { characterSet } from './characters';
 import { animalSet, itemIcons, raft } from './creatures';
 import { berryBush, berryBushEmpty, bramble, bush, mushroom, treeBroadleaf, treePine } from './forest';
-import { campfire, hut, leanTo } from './structures';
+import { bridge, campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
-  caveFloor, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, rockFace, rockTop,
+  caveFloor, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, river, riverBankSet, rockFace, rockTop,
   sand, sandRipples, sandShell, shoreSet, water, waterVariants,
 } from './terrain';
 
@@ -28,6 +28,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
+    { title: 'River', sprites: [...river(), ...riverBankSet(), bridge('ns'), bridge('ew')] },
     { title: 'Stones', sprites: [boulder(), pebbles(), mossyStone()] },
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },

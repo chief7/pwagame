@@ -110,6 +110,30 @@ export function grassEdgeSet(): Sprite[] {
   });
 }
 
+function riverPixel(x: number, y: number, phase: number): Color {
+  // Fresh water: long ripple dashes drifting one step per frame. Wraps at
+  // the tile edge so river cells join up.
+  const rx = (x + phase * 4) % TILE;
+  if (hash2(rx >> 2, y, 50) < 0.12) return P.riverRipple;
+  return hash2(x, y, 51) < 0.08 ? P.water : P.river;
+}
+
+/** River water, 2 frames for a gentle flow. */
+export function river(): Sprite[] {
+  return [0, 1].map((phase) => new Sprite(phase ? 'river_2' : 'river').paint((x, y) => riverPixel(x, y, phase)));
+}
+
+/** Grass with a river along its edges: a strip of muddy bank between. */
+export function riverBankSet(): Sprite[] {
+  return transitionSet('bank', (f, x, y) => {
+    if (f < -2) return riverPixel(x, y, 0);
+    if (f < -1) return hash2(x, y, 52) < 0.3 ? P.river : P.waterShallow;
+    if (f < 0) return hash2(x, y, 53) < 0.3 ? P.mudDark : P.mud;
+    if (f < 1) return hash2(x, y, 54) < 0.5 ? P.grassEdge : P.grassDark;
+    return grassPixel(x, y, 4);
+  });
+}
+
 /**
  * Pick the transition tile for a cell from which neighbours are "other"
  * ground. Returns `plain` when none are. Strips one tile wide (other ground
