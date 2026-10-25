@@ -5,6 +5,8 @@ A gentle, kid-friendly survival game for phones, built as an installable PWA
 fed, watered, rested and warm, and build a home. No game engine: everything
 is our own TypeScript on a 2D canvas.
 
+Play it at https://chief7.github.io/pwagame/.
+
 For architecture and mechanics in detail, see [docs/OVERVIEW.md](docs/OVERVIEW.md).
 
 ## Run
