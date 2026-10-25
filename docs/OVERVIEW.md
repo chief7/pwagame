@@ -1,0 +1,557 @@
+# pwagame overview
+
+This document describes how the game is built and how its mechanics work.
+Read it before you change the code or add content. The numbers here are the
+values in the code at the time of writing; the code is the source of truth.
+
+Contents:
+
+1. [What the game is](#1-what-the-game-is)
+2. [Architecture](#2-architecture)
+3. [The turn](#3-the-turn)
+4. [Mechanics](#4-mechanics)
+5. [The world](#5-the-world)
+6. [Content registries](#6-content-registries)
+7. [Sprites and rendering](#7-sprites-and-rendering)
+8. [Input](#8-input)
+9. [Saving](#9-saving)
+10. [Tests](#10-tests)
+11. [Tuning reference](#11-tuning-reference)
+12. [Known limits](#12-known-limits)
+
+---
+
+## 1. What the game is
+
+A turn-based survival game for children, played on a phone in the browser
+(a PWA). The player washes up on an island and must keep five needs filled:
+Health, Food, Water, Energy and Warmth. The player gathers food and
+materials, builds shelters and gets through the nights.
+
+Design rules:
+
+- **No death.** When Health is zero, the player faints and wakes up at camp
+  the next morning with all items.
+- **No fighting.** Animals can be a nuisance. They cannot be hurt. Walking
+  into an animal shoos it away.
+- **Short, readable feedback.** Every action gives a log message, and most
+  give a floating text or an animation.
+- **Mobile first.** All actions work with taps. A keyboard also works.
+
+There is no game engine and no runtime dependency. The code is TypeScript,
+built with Vite. The sprites are generated in code (no image files).
+
+---
+
+## 2. Architecture
+
+The code has three layers. Each layer only depends on the layers below it.
+
+```mermaid
+flowchart TB
+  subgraph UI["UI layer (DOM, canvas)"]
+    main["main.ts<br/>HUD, panels, input, render loop, autosave"]
+    renderer["ui/renderer.ts<br/>draws the world"]
+    animator["ui/animator.ts<br/>plays events as animations"]
+    input["ui/input.ts<br/>key and direction helpers"]
+  end
+  subgraph Logic["Game layer (pure, no DOM)"]
+    game["game/game.ts<br/>Game: actions, turn, animals, save"]
+    needs["needs.ts"]
+    clock["clock.ts"]
+    inv["inventory.ts"]
+    world["worldgen.ts"]
+    support["map.ts · fov.ts · pathing.ts · rng.ts · actors.ts"]
+    defs["defs/<br/>items · objects · recipes · animals"]
+  end
+  subgraph Art["Sprite layer (pure data)"]
+    sprites["sprites/<br/>pixel art generated in code"]
+  end
+  main --> game
+  main --> renderer
+  main --> animator
+  main --> input
+  renderer --> sprites
+  renderer --> game
+  animator --> game
+  game --> needs & clock & inv & world & support & defs
+```
+
+### Responsibilities
+
+| Module | Responsibility |
+|---|---|
+| `src/game/game.ts` | The `Game` class. Holds all state. Runs actions and the turn. Sends events. Saves and loads. |
+| `src/game/defs/*.ts` | Data registries for items, world objects, recipes and animals. |
+| `src/game/needs.ts` | The five needs and how one turn changes them. |
+| `src/game/clock.ts` | Time of day, daylight, day and night phases. |
+| `src/game/inventory.ts` | What the player carries (a count per item). |
+| `src/game/worldgen.ts` | Makes a new island: terrain, caves, objects. |
+| `src/game/map.ts` | The tile grid, plus the "explored" and "visible" layers. |
+| `src/game/fov.ts` | Field of view (recursive shadowcasting). |
+| `src/game/pathing.ts` | Breadth-first distance maps (8 directions). |
+| `src/game/rng.ts` | Seeded random numbers (mulberry32). Its state can be saved. |
+| `src/game/actors.ts` | The `Player` and `Animal` shapes and facing helpers. |
+| `src/ui/renderer.ts` | Draws terrain, objects, animals, the player, night light and effects on a canvas. |
+| `src/ui/animator.ts` | Turns game events into timed animations. |
+| `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
+| `src/main.ts` | Connects everything: HUD, Bag and Build panels, touch and keys, render loop, autosave. |
+| `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
+
+### Key rule: the game layer has no DOM
+
+`src/game/` must not use `document`, `window` or the canvas. This keeps all
+rules testable with Vitest in Node. The UI reads the game state and calls
+game actions. The game tells the UI what happened through **events**.
+
+### Events
+
+Each action can send events. The UI collects them with `game.takeEvents()`
+after each action and gives them to the animator.
+
+| Event | Meaning | Animation |
+|---|---|---|
+| `move` | An actor moved one cell | Slide between cells, walk frames |
+| `lunge` | An actor reached towards a cell (gather, shoo, pinch, build) | Short push towards the target |
+| `hit` | An actor lost Health | White flash and a red number |
+| `float` | Show a short text at a cell (`+2 wood`, `+35 water`) | Text rises and fades |
+| `sparkle` | Something good happened at a cell (chest, building) | Gold sparkles |
+| `fade` | Time jumped (sleep, faint, new island) | Screen fades in from dark |
+
+Each event has a `late` flag. `late` is true for events from the animals'
+part of the turn. The animator starts late events 90 ms after the player's
+events, so the player sees cause before effect.
+
+---
+
+## 3. The turn
+
+The game is turn-based. Time only moves when the player acts. One turn is six
+minutes of game time.
+
+```mermaid
+sequenceDiagram
+  participant P as Player input
+  participant G as Game
+  participant A as Animals
+  participant UI as main.ts / Animator
+  P->>G: move / eat / build / sleep / wait
+  G->>G: do the action (may fail: no turn passes)
+  G->>G: endTurn(): turn + 1
+  G->>G: tick needs (shelter, fire, daylight)
+  G->>G: warn about low needs
+  G->>A: each animal acts (events marked late)
+  G->>G: every 50 turns: replace missing animals
+  G->>G: Health 0? faint and wake at camp
+  G->>G: update field of view
+  UI->>G: takeEvents()
+  UI->>UI: animate, update HUD, save after 0.8 s
+```
+
+### Actions
+
+All actions return `true` when time passed and `false` when nothing happened.
+
+| Action | What it does |
+|---|---|
+| `move(dx, dy)` | Steps one cell. If something is there, it interacts instead (see below). |
+| `travelStep(x, y)` | One step on the shortest known path to a cell. Used for tap-to-travel. |
+| `wait()` | Passes one turn. |
+| `eat(item)` | Eats one food item from the bag. |
+| `build(recipe)` | Builds in front of the player. |
+| `sleep()` | Sleeps for many turns until a stop condition (see 4.4). |
+
+What `move` does when the target cell is not free:
+
+1. **Animal there:** shoo it. The animal runs away for 8 turns (calm animals do not run).
+2. **Solid object there:** interact with it:
+   - Spring: drink.
+   - Object with `gather`: gather from it.
+   - Other object: show its name. No turn passes.
+3. **Sea:** show "too salty". No turn passes.
+4. **Rock:** nothing happens. No turn passes.
+
+---
+
+## 4. Mechanics
+
+### 4.1 Needs
+
+All needs go from 0 to 100. A new game starts with Health 100, Food 80,
+Water 80, Energy 90 and Warmth 100.
+
+Change per turn:
+
+| Need | Awake | Asleep |
+|---|---|---|
+| Food | −0.3 | −0.15 |
+| Water | −0.45 | −0.225 |
+| Energy | −0.25 | +1.4 × (0.4 + 0.6 × shelter) |
+| Warmth | moves towards a target (see 4.3): +1.5 up, −0.6 down | same |
+| Health | −0.5 for each empty need (Food, Water, Energy, Warmth) | same |
+| Health | +0.25 if no need is empty and Food and Water are above 30 | +0.5 |
+
+What this means in play (awake, no food or drink):
+
+- Water goes from 80 to 0 in about 180 turns (three quarters of a day).
+- Food goes from 80 to 0 in about 270 turns (just over one day).
+- Energy goes from 90 to 0 in about 360 turns (one and a half days).
+
+**Warnings.** When a need goes below 25 (`LOW`), the log shows a warning one
+time. The warning resets when the need is above 35 again. The HUD bar of a
+low need pulses.
+
+### 4.2 Fainting (no death)
+
+When Health is 0 at the end of a turn:
+
+1. The log says the player feels woozy.
+2. Time jumps to the next 6:00.
+3. The player moves to **home** (the camp).
+4. Needs become: Health 60, Food at least 40, Water at least 40, Energy 70,
+   Warmth 80.
+5. All items stay in the bag.
+
+**Home** is the last shelter or cave where the player slept. At the start,
+home is the start point on the beach.
+
+### 4.3 Warmth, shelter and fire
+
+Warmth moves towards a target value each turn:
+
+- Near a campfire (2 cells or less): target 100.
+- Else: target = 100 − (1 − daylight) × (1 − shelter) × 95.
+
+Shelter values:
+
+| Place | Shelter | Night warmth target |
+|---|---|---|
+| Open ground | 0 | 5 |
+| Cave floor | 0.5 | about 52 |
+| Lean-to | 0.6 | 62 |
+| Hut | 1 | 100 |
+| Next to a campfire | (any) | 100 |
+
+### 4.4 Sleep
+
+The player can sleep when Energy is below 95. Sleep repeats turns until one of
+these occurs:
+
+- Energy is 100 ("You wake up feeling rested").
+- Warmth is below 12 ("Too cold to sleep").
+- Food or Water is 0.
+- 200 turns have passed.
+- The player faints.
+
+When the player sleeps in a shelter or a cave, that cell becomes home.
+
+Time to sleep from Energy 20 to 100:
+
+| Place | Turns | Game hours |
+|---|---|---|
+| Open ground | about 143 | 14 (the cold usually wakes the player first) |
+| Cave | about 82 | 8 |
+| Lean-to | about 75 | 7.5 |
+| Hut | about 57 | 5.7 |
+
+The UI does not animate each turn of sleep. It shows one `fade` event.
+
+### 4.5 Day and night
+
+- One day is 240 turns. One turn is 6 minutes. A new game starts at 8:00 on day 1.
+- Phases: dawn 5:00–7:00, day 7:00–19:00, dusk 19:00–21:00, night 21:00–5:00.
+- Daylight is 1 in the day, 0 at night, and changes smoothly at dawn and dusk.
+- The view distance is 4 + 4 × daylight cells (8 by day, 4 at night).
+- The renderer darkens cells at night. Campfires light 5 cells around them.
+  The player always lights a small area around themselves.
+
+### 4.6 Gathering
+
+Walking into an object with `gather` gives items. Each yield has a random
+amount (min to max) and can have a chance. After gathering, one of three
+things happens:
+
+| `after` | Effect | Examples |
+|---|---|---|
+| `{ regrow: n }` | The object stays. It gives items again after n turns. It shows its `depletedSprite` until then. | palms, trees, bushes, berry bushes |
+| `{ remove: true }` | The object is gone. | logs, driftwood, pebbles, mushrooms |
+| `{ becomes: kind }` | The object turns into another object. | closed chest → open chest |
+
+### 4.7 Eating and drinking
+
+- **Eat** from the Bag panel. Each food adds to Food, Water and/or Energy.
+  The player cannot eat when Food is 98 or more, unless the food also gives Water.
+- **Drink** by walking into a spring: +35 Water. Not possible when Water is 98 or more.
+- The sea cannot be used for drinking.
+
+### 4.8 Building
+
+The Build panel lists all recipes. A recipe needs items. The building goes:
+
+1. In front of the player (the facing direction), if the cell is free floor.
+2. Else in the first free neighbour cell.
+
+A solid building (for example a campfire) is not placed where it would cut
+off part of the island. Shelters (`walkable`) can be placed anywhere free,
+and the player can walk into them.
+
+### 4.9 Animals
+
+Animals have a **temper**. They only react when the player is within their
+`notice` range and in view.
+
+| Temper | Behaviour when the player is near | Animals |
+|---|---|---|
+| `calm` | Ignores the player. | turtle |
+| `shy` | Moves away from the player. | piglet, bat |
+| `grumpy` | If next to the player: 50% chance per turn to pinch (−4 Health), then runs away for 4 turns. | crab |
+| `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. | monkey |
+
+Other rules:
+
+- Animals only walk on their `habitat` tiles. They never enter objects or the player's cell.
+- When they do not react, they wander (chance per turn = `wander`).
+- Shooed animals run away for 8 turns.
+- Animals do not act on the player while the player sleeps.
+- Every 50 turns, the game adds one animal of each kind that is below its
+  `population`, out of the player's view.
+
+---
+
+## 5. The world
+
+`generateWorld(rng)` makes one island, 72 × 56 cells. The same seed always
+makes the same island.
+
+Tiles: `Water`, `Sand`, `Grass`, `Rock` (blocks movement and sight) and
+`CaveFloor`.
+
+Steps:
+
+1. **Landmass.** Random land, more likely near the centre, then 5 smoothing
+   passes (cellular automaton). A 2-cell ring of water stays at the edge.
+2. **Clean the coast.** Remove land that the shore tiles cannot draw (land
+   with water on opposite sides, or water only on two corners). Keep only the
+   largest landmass. Repeat until nothing changes. The island must be at
+   least 42% of the map, else start again.
+3. **Biomes.** Measure each land cell's distance from the sea.
+   - Distance below 3 to 5 (with noise): beach (`Sand`).
+   - Further in: forest (`Grass`). Clean grass edges the same way as the coast.
+   - Distance 5 or more and high "hill" noise: `Rock`. Inside rock, "cave"
+     noise makes `CaveFloor`.
+   - Cave floor needs rock around it, else it becomes grass. Grass never
+     touches the sea.
+4. **Start point.** A random sand cell with free floor on all 8 sides.
+5. **Connect.** Any floor that the start cannot reach gets a tunnel. The
+   tunnel follows the shortest path through land and turns rock into cave floor.
+6. **Objects.** Each free floor cell can get one object, with chances per
+   biome (`SCATTER`). Forest density follows a noise map, so trees form
+   groves. An object is not placed if it cuts off part of the island.
+   Then the generator adds 5 springs (forest or cave) and 4 chests (10 or
+   more cells from the start).
+7. **Animals.** `Game` adds each animal kind up to its population, on its
+   habitat, 8 or more cells from the start.
+
+A typical island has about 2,250 water, 750 sand, 700 grass, 200 rock and
+70 cave cells. Generation takes about 0.2 seconds.
+
+---
+
+## 6. Content registries
+
+All content is data. To add content, add one entry to a registry and one
+sprite. The sprite test fails if a sprite is missing.
+
+| Registry | File | Sprite name | Used by |
+|---|---|---|---|
+| Items | `src/game/defs/items.ts` (`ITEMS`) | `item_<id>` | Bag panel, recipes, gathering, eating |
+| World objects | `src/game/defs/objects.ts` (`OBJECTS`) | `<kind>`, plus `depletedSprite` and `frames` if set | World, gathering, shelter, fire |
+| Recipes | `src/game/defs/recipes.ts` (`RECIPES`) | the sprite of the object it builds | Build panel |
+| Animals | `src/game/defs/animals.ts` (`ANIMALS`) | `animal_<kind>` | Spawning, animal behaviour |
+
+### Items
+
+```ts
+coconut: { id: 'coconut', name: 'coconut', plural: 'coconuts', eat: { food: 18, water: 22 } },
+```
+
+- `eat` is optional. With `eat`, the item is food and shows an Eat button.
+- Also add the id to the `ItemId` type.
+
+### World objects
+
+| Field | Effect |
+|---|---|
+| `name` | Name in messages. |
+| `walkable` | The player can walk into it (shelters). Animals cannot. |
+| `blocksSight` | Blocks the field of view (trees, boulders). |
+| `gather` | `verb`, `yields` and `after` (see 4.6). |
+| `depletedSprite` | Sprite while waiting to regrow. |
+| `drink` | Water per drink. |
+| `shelter` | 0 to 1. Warmer nights, faster sleep, becomes home. |
+| `warmthRadius` | Warms the player within this many cells. |
+| `lightRadius` | Lights cells at night. |
+| `frames` | Sprite names for an animation (2 frames, 220 ms each). |
+
+Also add the kind to the `ObjectKind` type.
+
+To put a new object in the world, add it to `SCATTER` in `worldgen.ts` with
+a chance per biome. Or make it buildable with a recipe.
+
+### Recipes
+
+```ts
+campfire: { id: 'campfire', name: 'Campfire', builds: 'campfire',
+  description: 'Keeps you warm and lights up the night.', cost: { wood: 3, stone: 2 } },
+```
+
+### Animals
+
+```ts
+crab: { kind: 'crab', name: 'crab', temper: 'grumpy', habitat: [Tile.Sand],
+  notice: 2, wander: 0.4, population: 6, bump: 'You shoo the crab away. …' },
+```
+
+Also add the kind to the `AnimalKind` type. A new temper needs new code in
+`Game.animalAct()`.
+
+### Current content
+
+| Type | Entries |
+|---|---|
+| Items | coconut, berries, mushroom (food); wood, leaves, stone (materials) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone) |
+| Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves) |
+
+---
+
+## 7. Sprites and rendering
+
+### Sprites
+
+- All sprites are made in code in `src/sprites/`. There are no image files.
+- Every colour comes from `palette.ts`, so the set looks consistent.
+- A `Sprite` is a grid of colours (null is transparent).
+- `fromRows()` builds a sprite from text rows (one character = one pixel).
+  Use it for hand-drawn art (chests, characters, animals).
+- Shape helpers draw shaded ellipses and blobs (rocks, foliage).
+- `outline()` adds a 1 px dark outline. `shadow()` adds a soft ground shadow.
+  Call `outline()` first.
+- Sizes: terrain tiles are 16 × 16. Most objects are 16 × 16. Palms and trees
+  are 24 × 32, the hut 24 × 28 and the lean-to 20 × 20. All are drawn
+  bottom-centre on their cell, so tall sprites overlap the cell above.
+- **Transition tiles** (shore and grass edges) are 12 tiles per set: 4 edges,
+  4 outer corners and 4 inner corners. `transitionTileName()` picks one from
+  the neighbour cells.
+- Characters have 4 facings × 3 frames (stand, step 1, step 2). The left
+  facing is the right facing, mirrored.
+- The gallery page (`/sprites.html`) shows every sprite.
+
+### Renderer
+
+`Renderer.render(game, animator, now)` draws one frame:
+
+1. Fill with fog colour.
+2. Terrain for all explored cells. The sea tiles change every 750 ms.
+3. Row by row, top to bottom: objects, then animals and the player in that
+   row. This makes tall sprites overlap correctly.
+4. Night darkness per cell, with light from campfires and the player.
+5. Dim for remembered cells (explored, not visible). Fog for unknown cells.
+6. Sparkles and floating texts.
+7. The fade overlay (after sleep or faint).
+
+Pixels stay sharp: the scale is a whole number, chosen so a phone shows about
+12 cells across (maximum 48 CSS px per cell).
+
+### Animator
+
+The animator keeps short-lived effects keyed by time. The renderer asks it
+for each actor's pose (position, walk frame, hop, flash). With
+`prefers-reduced-motion`, movement snaps, and there is no bobbing, water or
+fire animation. Flashes and floating texts stay.
+
+The render loop runs at full frame rate while the animator is busy, and every
+100 ms when not (for water, fire and idle bobbing).
+
+---
+
+## 8. Input
+
+| Input | Result |
+|---|---|
+| Tap a neighbour cell | Step, or interact with what is there |
+| Tap the player | Wait one turn |
+| Tap a far explored cell | Walk there along the shortest known path |
+| Tap a far cell that cannot be reached | Step in that direction |
+| Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
+| Bag / Build / Sleep buttons | Open the panels, or sleep |
+| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `z`: sleep. `Esc`: close a panel. |
+
+Auto-walk (travel and hold) stops when:
+
+- An animal that was not in view comes into view.
+- The log shows a warning.
+- The path is blocked or the player arrives.
+
+---
+
+## 9. Saving
+
+- `main.ts` saves `game.toSave()` as JSON in `localStorage` (`pwagame.save`)
+  0.8 s after each action, when the page is hidden, and on `pagehide`.
+- On start, the game loads the save. If the save is missing or broken, a new
+  island starts.
+- The save holds: seed, random number state, turn, tiles, explored cells,
+  objects, animals, player, home, needs, inventory, warnings and the last 30
+  log lines. It is about 15 KB.
+- `SAVE_VERSION` is 1. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves.
+- The chosen explorer (female or male) is saved as `pwagame.body`.
+- The Bag panel has "New island" (tap two times to confirm).
+
+---
+
+## 10. Tests
+
+Run `npm test`. The tests are in:
+
+| File | What it checks |
+|---|---|
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, saving, events |
+| `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
+| `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
+
+Also run `npm run build` (typecheck and build) before you commit.
+
+---
+
+## 11. Tuning reference
+
+| Value | Where | Now |
+|---|---|---|
+| Need rates | `needs.ts` → `RATES` | see 4.1 |
+| Low-need warning | `needs.ts` → `LOW` | 25 |
+| Night cold | `needs.ts` → `warmthTarget()` | 95 |
+| Day length | `clock.ts` → `TURNS_PER_DAY` | 240 turns |
+| Cave shelter | `game.ts` → `CAVE_SHELTER` | 0.5 |
+| Crab pinch | `game.ts` → `PINCH_DAMAGE` | 4 |
+| Animal top-up | `game.ts` → `RESPAWN_EVERY` | 50 turns |
+| Longest sleep | `game.ts` → `SLEEP_LIMIT` | 200 turns |
+| Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 72 × 56 |
+| Beach width, hills | `worldgen.ts` → `BEACH_WIDTH`, `HILL_MIN_DIST` | 3, 5 |
+| Object density | `worldgen.ts` → `SCATTER` | chance per cell and biome |
+| Step speed | `animator.ts` → `STEP_MS` | 130 ms |
+| Cells across a phone | `renderer.ts` → `TILES_ACROSS` | 12 |
+
+---
+
+## 12. Known limits
+
+- The balance (need rates, day length) has not been tested with real play.
+- Animals have no walk frames. They hop when they move. They always face down.
+- Objects that are removed (logs, pebbles, mushrooms) do not come back.
+- There is no goal or ending yet. The raft sprite exists for a future
+  "build a raft" goal.
+- There is no sound.
+- The game has not been tested on a real phone.
