@@ -1,18 +1,23 @@
 import { characterSet } from './characters';
 import { animalSet, itemIcons, raft, skillItemIcons } from './creatures';
-import { berryBush, berryBushEmpty, bramble, bush, mushroom, treeBroadleaf, treePine } from './forest';
-import { boat, bridge, campfire, hut, leanTo } from './structures';
+import {
+  berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
+  treeSpruce, treeSpruceSnow,
+} from './forest';
+import { beacon, boat, bridge, campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
 import { appIcon, globe, grillButton, skillIcons } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
-  caveFloor, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, river, riverBankSet, rockFace, rockTop,
-  sand, sandRipples, sandShell, shoreSet, water, waterVariants,
+  caveFloor, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, rockFace, rockTop,
+  sand, sandRipples, sandShell, scree, screeStones, shoreSet, snow, snowEdgeSet, snowTracks, water, waterVariants,
 } from './terrain';
 
 export { Sprite } from './pixel';
-export { grassTileName, riverBankTileName, shoreTileName, transitionTileName } from './terrain';
+export {
+  grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName, transitionTileName,
+} from './terrain';
 
 export interface SpriteGroup {
   title: string;
@@ -24,7 +29,9 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Characters', sprites: [...characterSet('male'), ...characterSet('female')] },
     { title: 'Palm trees', sprites: [palmTall(), palmLeaning(), palmYoung(), palmTallBare(), palmLeaningBare()] },
     { title: 'Forest', sprites: [treeBroadleaf(), treePine(), bush(), berryBush(), berryBushEmpty(), mushroom(), bramble()] },
-    { title: 'Grass', sprites: [grass(), grassFlowers(), ...grassEdgeSet()] },
+    { title: 'Northern forest', sprites: [treeSpruce(), treeSpruceSnow(), treeBirch(), treeApple(), treeAppleBare(), fern()] },
+    { title: 'Grass', sprites: [grass(), grassFlowers(), ...grassEdgeSet(), ...grassScreeSet()] },
+    { title: 'Mountains', sprites: [scree(), screeStones(), snow(), snowTracks(), ...snowEdgeSet()] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
@@ -36,6 +43,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Animals', sprites: animalSet() },
     { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
     { title: 'Boat', sprites: [...boat(), raft()] },
+    { title: 'Beacon', sprites: beacon() },
     { title: 'Interface', sprites: [globe(), ...skillIcons(), ...grillButton(), appIcon()] },
   ];
 }

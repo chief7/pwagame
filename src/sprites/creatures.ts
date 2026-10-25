@@ -198,6 +198,71 @@ export function bear(): Sprite {
   ], { b: P.bear, L: P.bearLight, d: P.bearDark, m: P.bearMuzzle, n: P.outline, e: P.outline }, 7);
 }
 
+export function rabbit(): Sprite {
+  return creature('animal_rabbit', [
+    '................',
+    '................',
+    '................',
+    '.........rr.....',
+    '........rpr.rr..',
+    '........rpr.rpr.',
+    '.........rrrrr..',
+    '........rLLrer..',
+    '...rrrrrLLrrrrn.',
+    '..rLLLLrrrrrrr..',
+    '.wrLLrrrrrrrr...',
+    '.wwrrrrrrrrrD...',
+    '..DrrrrrrrrDD...',
+    '...DDD..DD.DD...',
+    '................',
+    '................',
+  ], { r: P.rabbit, L: P.rabbitLight, D: P.rabbitDark, p: P.rabbitEar, w: P.flowerWhite, e: P.outline, n: P.rabbitEar }, 5);
+}
+
+export function squirrel(): Sprite {
+  // Sitting up with its big bushy tail curled behind it.
+  return creature('animal_squirrel', [
+    '................',
+    '................',
+    '..TTT...........',
+    '.TLLTT..........',
+    '.TLTTTT....s.s..',
+    '.TTT.TT...sssss.',
+    '..T..TT...sLsess',
+    '.....TT..sLssssn',
+    '....TTT..sLbbs..',
+    '....TT..ssbbbs..',
+    '...TTT..sbbbss..',
+    '...TTTTssbbbs...',
+    '....TTTsssss....',
+    '.....DDDD.DD....',
+    '................',
+    '................',
+  ], { s: P.squirrel, L: P.squirrelLight, T: P.squirrelDark, D: P.squirrelDark, b: P.squirrelBelly, e: P.outline, n: P.outline }, 5);
+}
+
+export function goat(): Sprite {
+  // A shaggy mountain goat with curved horns and a little beard.
+  return creature('animal_goat', [
+    '................',
+    '................',
+    '................',
+    '...........hh...',
+    '..........h..h..',
+    '..........gggh..',
+    '..........gegg..',
+    '...gggggggggggg.',
+    '..gLLLLLgggggn..',
+    '.tgLLggggggggb..',
+    '..ggggggggggg.b.',
+    '..SgggggggggS...',
+    '..SSSSSSSSSSS...',
+    '..dS.dS..dS.dS..',
+    '..d..d...d..d...',
+    '................',
+  ], { g: P.goat, L: P.snowLight, S: P.goatShade, d: P.goatDark, h: P.goatHorn, e: P.outline, n: P.goatDark, b: P.goatShade, t: P.goatShade }, 6);
+}
+
 export function raft(): Sprite {
   return fromRows('raft', [
     '................',
@@ -220,7 +285,7 @@ export function raft(): Sprite {
 }
 
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear()];
+  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat()];
 }
 
 // ---- Item icons -------------------------------------------------------------------
@@ -266,6 +331,13 @@ export function itemIcons(): Sprite[] {
       }
       s.set(5, 6, P.mushroomSpot);
       s.set(9, 5, P.mushroomSpot);
+    }),
+    icon('apple', (s) => {
+      ball(s, 8, 9, 5, P.appleLight, P.apple, P.appleDark);
+      s.set(6, 7, P.snowLight);
+      for (const [x, y] of [[8, 4], [8, 3], [9, 2]]) s.set(x, y, P.woodDark);
+      for (const [x, y] of [[9, 4], [10, 3], [11, 3], [10, 4]]) s.set(x, y, P.leaf);
+      s.set(10, 3, P.leafLight);
     }),
     icon('wood', (s) => {
       for (const [y0, x0] of [[5, 2], [9, 3]]) {

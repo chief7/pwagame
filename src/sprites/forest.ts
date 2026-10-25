@@ -1,5 +1,5 @@
 import { PALETTE as P } from './palette';
-import { hash2, Sprite } from './pixel';
+import { fromRows, hash2, Sprite } from './pixel';
 
 interface Blob {
   cx: number;
@@ -154,4 +154,120 @@ export function bramble(): Sprite {
     s.set(x + 1, y, P.flowerYellow);
   }
   return s.outline().shadow(8, 15, 7.5, 1.2);
+}
+
+// ---- Island 2: the northern forest -------------------------------------------------
+
+/** Tall, narrow spruce, 24×32: many short drooping tiers up to a sharp tip. */
+function spruceShape(name: string, snowy: boolean): Sprite {
+  const s = new Sprite(name, 24, 32);
+  trunk(s, 11, 26, 29);
+  const tiers: [number, number, number][] = [[1, 6, 2.5], [4, 10, 4], [8, 14, 5.5], [12, 19, 7], [17, 24, 8.5], [21, 27, 9.5]];
+  for (const [top, bottom, half] of tiers) {
+    for (let y = top; y <= bottom; y++) {
+      const t = (y - top) / (bottom - top);
+      const w = half * t + 0.5;
+      for (let x = Math.floor(12 - w); x <= Math.ceil(12 + w); x++) {
+        const side = (x + 0.5 - 12) / (w + 0.5);
+        if (Math.abs(side) > 1) continue;
+        // Drooping branch tips: the lowest row is ragged.
+        if (y === bottom && hash2(x, y, 90) < 0.35) continue;
+        const n = hash2(x, y, 91);
+        let c: string = side < -0.3 ? (n < 0.6 ? P.spruceLight : P.spruce) : side > 0.35 ? P.spruceDark : n < 0.12 ? P.spruceLight : P.spruce;
+        if (y >= bottom - 1) c = side < -0.3 ? P.spruce : P.spruceDark;
+        // Snow rests on the top of each tier, thicker on the lit side.
+        if (snowy && y <= top + 1 + (side < 0 ? 1 : 0) && n < 0.85) c = side > 0.4 ? P.snowShade : P.snow;
+        s.set(x, y, c);
+      }
+    }
+  }
+  return s.outline().shadow(12.5, 30.5, 6, 1.5);
+}
+
+export function treeSpruce(): Sprite {
+  return spruceShape('tree_spruce', false);
+}
+
+export function treeSpruceSnow(): Sprite {
+  return spruceShape('tree_spruce_snow', true);
+}
+
+/** Birch, 24×32: a slim white trunk with dark marks and a light, airy crown. */
+export function treeBirch(): Sprite {
+  const s = new Sprite('tree_birch', 24, 32);
+  for (let y = 9; y <= 29; y++) {
+    const x = 11 + (y < 16 ? 1 : 0);
+    s.set(x, y, P.birchBark);
+    s.set(x + 1, y, hash2(0, y, 92) < 0.3 ? P.birchMark : P.birchBarkShade);
+    if (hash2(1, y, 93) < 0.18) s.set(x, y, P.birchMark);
+  }
+  s.set(10, 29, P.birchBarkShade);
+  s.set(13, 29, P.birchBarkShade);
+  // Crown: smaller, looser blobs than the broadleaf tree, with gaps.
+  const blobs = [
+    { cx: 12, cy: 9, r: 6 }, { cx: 7.5, cy: 13, r: 4 }, { cx: 16.5, cy: 12, r: 4.2 },
+    { cx: 12, cy: 4.5, r: 3.8 }, { cx: 9, cy: 18, r: 3 }, { cx: 15.5, cy: 17.5, r: 3 },
+  ];
+  const light = { cx: 12, cy: 10, r: 9 };
+  for (const b of blobs) {
+    for (let y = Math.floor(b.cy - b.r); y <= Math.ceil(b.cy + b.r); y++) {
+      for (let x = Math.floor(b.cx - b.r); x <= Math.ceil(b.cx + b.r); x++) {
+        if (Math.hypot(x + 0.5 - b.cx, y + 0.5 - b.cy) > b.r) continue;
+        const nx = (x + 0.5 - light.cx) / light.r;
+        const ny = (y + 0.5 - light.cy) / light.r;
+        const l = -0.55 * nx - 0.75 * ny + (hash2(x >> 1, y >> 1, 95) - 0.5) * 0.6;
+        s.set(x, y, l > 0.4 ? P.birchLeafLight : l > -0.15 ? P.birchLeaf : l > -0.6 ? P.birchLeafDark : P.birchLeafDeep);
+      }
+    }
+  }
+  return s.outline().shadow(12.5, 30.5, 5.5, 1.4);
+}
+
+function appleTreeShape(name: string, apples: boolean): Sprite {
+  const s = new Sprite(name, 24, 32);
+  trunk(s, 11, 20, 29);
+  // A low, wide crown, so it reads as an orchard tree next to the tall ones.
+  foliage(s, [
+    { cx: 12, cy: 13, r: 7 }, { cx: 6, cy: 15.5, r: 5 }, { cx: 18, cy: 15.5, r: 5 },
+    { cx: 9, cy: 9, r: 4.5 }, { cx: 15, cy: 9, r: 4.5 },
+  ], { cx: 12, cy: 13, r: 10 }, 96);
+  if (apples) {
+    for (const [x, y] of [[6, 13], [10, 10], [15, 8], [17, 14], [12, 16], [7, 17], [19, 17], [14, 12]]) {
+      s.set(x, y, P.appleLight);
+      s.set(x + 1, y, P.apple);
+      s.set(x, y + 1, P.apple);
+      s.set(x + 1, y + 1, P.appleDark);
+    }
+  }
+  return s.outline().shadow(12.5, 30.5, 7, 1.6);
+}
+
+export function treeApple(): Sprite {
+  return appleTreeShape('tree_apple', true);
+}
+
+export function treeAppleBare(): Sprite {
+  return appleTreeShape('tree_apple_bare', false);
+}
+
+/** A clump of fern fronds arching up and out from the middle. */
+export function fern(): Sprite {
+  return fromRows('fern', [
+    '................',
+    '................',
+    '.......l........',
+    '......lLd.......',
+    '...l..lLd..d....',
+    '..lLd.lfd.dfd...',
+    '..lfd.lLd.lfd...',
+    '...lfdlfdlfd..d.',
+    'l..lLdlfdlfd.dfd',
+    'lf..lfdLdlfddfd.',
+    '.lf.lLdfdlfdfd..',
+    '..lfdlfLfdfdfd..',
+    '...lflfLfdfdd...',
+    '....lllffddd....',
+    '.......dd.......',
+    '................',
+  ], { '.': null, l: P.fernLight, L: P.fernLight, f: P.fern, d: P.fernDark }).outline().shadow(8, 14.8, 6.5, 1.2);
 }

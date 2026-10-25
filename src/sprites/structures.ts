@@ -248,3 +248,103 @@ export function boat(): Sprite[] {
     boatSprite('boat_ready_2', 'ready', 1),
   ];
 }
+
+// ---- Island 2: the signal beacon on the peak --------------------------------------
+
+const BEACON_W = 24;
+const BEACON_H = 28;
+/** Bottom row of the stone base, and its top. */
+const BASE_FOOT = 25;
+const BASE_TOP = 19;
+
+type BeaconStage = 'site' | 'base' | 'pyre' | 'ready';
+
+/** One stone of a wall: a small shaded block, lit from the top left. */
+function block(s: Sprite, x0: number, y0: number, w: number, h: number, seed: number): void {
+  for (let y = y0; y < y0 + h; y++) {
+    for (let x = x0; x < x0 + w; x++) {
+      const top = y === y0;
+      const left = x === x0;
+      const edge = y === y0 + h - 1 || x === x0 + w - 1;
+      const n = hash2(x, y, seed);
+      s.set(x, y, edge ? P.stoneDeep : top || left ? (n < 0.8 ? P.stoneLight : P.stone) : n < 0.2 ? P.stoneDark : P.stone);
+    }
+  }
+}
+
+function drawBeaconSite(s: Sprite): void {
+  // An old, fallen ring of stones round a weathered post.
+  for (const [x, y, w, h] of [[3, 22, 4, 3], [8, 24, 3, 2], [13, 24, 4, 2], [18, 21, 3, 3], [6, 19, 3, 2], [15, 19, 3, 2]] as const) {
+    block(s, x, y, w, h, 100);
+  }
+  for (let y = 12; y <= 23; y++) {
+    const x = 11 + Math.round((23 - y) * 0.2);
+    s.set(x, y, P.driftLight);
+    s.set(x + 1, y, P.driftDark);
+  }
+  s.set(13, 13, P.driftDark);
+  s.set(14, 13, P.drift);
+}
+
+function drawBeaconBase(s: Sprite): void {
+  // A round cairn of fitted stones: three courses, each one a little narrower.
+  const courses: [number, number, number][] = [[BASE_FOOT - 2, 2, 22], [BASE_FOOT - 4, 3, 21], [BASE_TOP, 4, 20]];
+  courses.forEach(([y, x0, x1], row) => {
+    for (let x = x0 + (row % 2) * 2; x <= x1; x += 4) block(s, x, y, Math.min(4, x1 - x + 1), 2, 101 + row);
+  });
+  for (let x = 5; x <= 19; x++) s.set(x, BASE_TOP - 1, x < 12 ? P.stoneLight : P.stone);
+}
+
+function drawPyre(s: Sprite): void {
+  // Logs leaning together in a tall cone over the base.
+  const tip: [number, number] = [12, 3];
+  for (const fx of [5, 8, 11, 14, 17, 19]) {
+    const n = Math.max(Math.abs(fx - tip[0]), BASE_TOP - 1 - tip[1]);
+    for (let i = 0; i <= n; i++) {
+      const x = Math.round(tip[0] + ((fx - tip[0]) * i) / n);
+      const y = Math.round(tip[1] + ((BASE_TOP - 1 - tip[1]) * i) / n);
+      s.set(x, y, fx < 12 ? P.woodLight : P.wood);
+      s.set(x + 1, y, fx < 12 ? P.wood : P.woodDark);
+    }
+  }
+  // Rope lashing near the top.
+  for (let x = 10; x <= 14; x++) s.set(x, 6, P.strawDark);
+}
+
+function drawTinder(s: Sprite, frame: 0 | 1): void {
+  // Dry leaves stuffed between the logs.
+  for (let y = 9; y <= BASE_TOP - 2; y++) {
+    const half = 1 + (y - 9) * 0.5;
+    for (let x = Math.ceil(12 - half); x <= Math.floor(12 + half); x++) {
+      if ((x + y) % 3 === 0) continue;
+      s.set(x, y, x < 12 ? P.strawLight : hash2(x, y, 104) < 0.5 ? P.straw : P.strawDark);
+    }
+  }
+  // A pole on top with a red pennant that waves.
+  for (let y = 0; y <= 3; y++) s.set(12, y, P.woodDark);
+  const flag = frame === 0 ? [[13, 0], [14, 0], [15, 0], [16, 0], [13, 1], [14, 1], [15, 1]] : [[13, 0], [14, 0], [13, 1], [14, 1], [15, 1], [16, 2], [15, 2]];
+  for (const [x, y] of flag) s.set(x, y, x === 13 && y === 0 ? P.berryLight : P.berry);
+}
+
+function beaconSprite(name: string, stage: BeaconStage, frame: 0 | 1 = 0): Sprite {
+  const s = new Sprite(name, BEACON_W, BEACON_H);
+  if (stage === 'site') {
+    drawBeaconSite(s);
+  } else {
+    drawBeaconBase(s);
+    if (stage !== 'base') drawPyre(s);
+    if (stage === 'ready') drawTinder(s, frame);
+  }
+  return s.outline().shadow(12, BASE_FOOT + 1.5, 11, 1.5);
+}
+
+/** The signal beacon in each stage; the ready beacon has two frames for its pennant. */
+export function beacon(): Sprite[] {
+  return [
+    beaconSprite('beacon_site', 'site'),
+    beaconSprite('beacon_base', 'base'),
+    beaconSprite('beacon_pyre', 'pyre'),
+    beaconSprite('beacon_ready', 'ready', 0),
+    beaconSprite('beacon_ready_2', 'ready', 1),
+  ];
+}

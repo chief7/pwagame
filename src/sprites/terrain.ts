@@ -245,3 +245,85 @@ export function caveFloorPebbles(): Sprite {
   ] as const) s.set(x, y, c);
   return s;
 }
+
+// ---- Island 2: mountain scree and snow ---------------------------------------------
+
+function screePixel(x: number, y: number, seed: number): Color {
+  // Loose gravel: small two-pixel stones, lit on top, with a few grass tufts.
+  const n = hash2(x >> 1, y >> 1, seed);
+  if (n < 0.08) return (y & 1) === 0 ? P.screeLight : P.screeDark;
+  const m = hash2(x, y, seed + 1);
+  if (m < 0.08) return P.screeDark;
+  if (m > 0.94) return P.screeLight;
+  if (m > 0.9 && hash2(x, y >> 1, seed + 2) < 0.4) return P.grassEdge;
+  return P.scree;
+}
+
+/** Walkable mountain ground: loose grey gravel between the cliffs. */
+export function scree(): Sprite {
+  return new Sprite('scree').paint((x, y) => screePixel(x, y, 80));
+}
+
+export function screeStones(): Sprite {
+  const s = new Sprite('scree_2').paint((x, y) => screePixel(x, y, 81));
+  for (const [x, y, c] of [
+    [3, 4, P.stoneLight], [4, 4, P.stone], [3, 5, P.stone], [4, 5, P.stoneDark],
+    [10, 10, P.stoneLight], [11, 10, P.stoneLight], [12, 10, P.stone], [10, 11, P.stone], [11, 11, P.stoneDark], [12, 11, P.stoneDeep],
+    [6, 12, P.stone], [7, 12, P.stoneDark],
+  ] as const) s.set(x, y, c);
+  return s;
+}
+
+function snowPixel(x: number, y: number, seed: number): Color {
+  // Soft drifts: gentle diagonal shading bands with sparkling points.
+  const drift = Math.sin(((x + y * 2) / TILE) * Math.PI * 2 + hash2(0, y >> 2, seed) * 0.6);
+  const n = hash2(x, y, seed);
+  if (n > 0.97) return P.snowLight;
+  if (drift > 0.75 && n < 0.6) return P.snowShade;
+  if (n < 0.04) return P.snowShade;
+  return P.snow;
+}
+
+/** Snow on the high peaks: walkable but cold. */
+export function snow(): Sprite {
+  return new Sprite('snow').paint((x, y) => snowPixel(x, y, 82));
+}
+
+export function snowTracks(): Sprite {
+  const s = new Sprite('snow_2').paint((x, y) => snowPixel(x, y, 83));
+  // Little paw prints of some mountain animal.
+  for (const [x, y] of [[3, 3], [5, 6], [3, 9], [5, 12], [10, 2], [12, 5]]) {
+    s.set(x, y, P.snowDeep);
+    s.set(x + 1, y, P.snowShade);
+  }
+  return s;
+}
+
+/** Snow with scree along its edges: a thin melt line of wet gravel between. */
+export function snowEdgeSet(): Sprite[] {
+  return transitionSet('snow', (f, x, y) => {
+    if (f < -1) return screePixel(x, y, 80);
+    if (f < 0) return hash2(x, y, 84) < 0.5 ? P.screeDark : P.screeDeep;
+    if (f < 1) return hash2(x, y, 85) < 0.5 ? P.snowDeep : P.snowShade;
+    return snowPixel(x, y, 82);
+  });
+}
+
+/** Grass with mountain scree along its edges. */
+export function grassScreeSet(): Sprite[] {
+  return transitionSet('grass_scree', (f, x, y) => {
+    if (f < 0) return screePixel(x, y, 80);
+    if (f < 1) return hash2(x, y, 86) < 0.5 ? P.grassEdge : P.grassDark;
+    return grassPixel(x, y, 4);
+  });
+}
+
+/** Snow tile for a snow cell given which neighbours are scree ('snow' when none). */
+export function snowTileName(isScree: (dx: number, dy: number) => boolean): string {
+  return transitionTileName('snow', 'snow', isScree);
+}
+
+/** Grass tile for a grass cell next to mountain scree ('grass' when none). */
+export function grassScreeTileName(isScree: (dx: number, dy: number) => boolean): string {
+  return transitionTileName('grass_scree', 'grass', isScree);
+}
