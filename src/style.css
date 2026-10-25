@@ -456,6 +456,59 @@ button.primary {
   image-rendering: pixelated;
 }
 
+/* ---- Landscape: map on the left, HUD, log and actions in a side column ---------- */
+
+@media (orientation: landscape) and (min-width: 600px) {
+  #app {
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 30vw, 320px);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      'view hud'
+      'view footer';
+  }
+
+  #view {
+    grid-area: view;
+  }
+
+  #hud {
+    grid-area: hud;
+    border-bottom: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  /* One need per line: the column is too narrow for five side by side. */
+  .needs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .need {
+    grid-template-columns: 4.5em minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+
+  footer {
+    grid-area: footer;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+
+  #log {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+
+  #actions {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .need.low .need-fill {
     animation: none;
