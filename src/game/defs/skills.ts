@@ -9,7 +9,7 @@ export type PathId = 'build' | 'explorer' | 'improve';
 export type SkillId =
   | 'small_sips' | 'small_appetite' | 'thick_skin'
   | 'fishing_rod' | 'patient_angler' | 'handy_builder'
-  | 'green_thumb' | 'night_eyes' | 'animal_friend';
+  | 'green_thumb' | 'night_eyes' | 'animal_friend' | 'wild_sense';
 
 export interface SkillDef {
   id: SkillId;
@@ -22,7 +22,7 @@ export interface SkillDef {
 export const PATHS: Record<PathId, SkillId[]> = {
   build: ['fishing_rod', 'handy_builder'],
   explorer: ['small_sips', 'small_appetite', 'thick_skin', 'night_eyes'],
-  improve: ['green_thumb', 'patient_angler', 'animal_friend'],
+  improve: ['green_thumb', 'patient_angler', 'animal_friend', 'wild_sense'],
 };
 
 export const PATH_IDS = Object.keys(PATHS) as PathId[];

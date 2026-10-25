@@ -10,6 +10,9 @@ export type Body = 'male' | 'female';
 
 const TILE = 16;
 const FOG = '#0a1720';
+/** Ground tint for the Wild sense skill. */
+const DANGER = 'rgba(255, 70, 90, 0.2)';
+const DANGER_EDGE = 'rgba(240, 50, 70, 0.85)';
 const DIM = 'rgba(10, 23, 32, 0.55)';
 /** Aim for about this many tiles across a phone screen. */
 const TILES_ACROSS = 12;
@@ -127,6 +130,28 @@ export class Renderer {
         if (name === '~') name = WATER_TILES[(Math.floor(hash2(x, y, 51) * 3) + waterTick) % 3];
         else if (name === '≈') name = RIVER_TILES[riverTick % 2];
         this.drawTile(name, o.x + x * cell, o.y + y * cell);
+      }
+    }
+
+    // Wild sense: a red tint on the ground where an animal would come after you.
+    const danger = game.dangerCells();
+    if (danger.size) {
+      const t = this.scale;
+      for (const i of danger) {
+        const x = i % map.width;
+        const y = (i - x) / map.width;
+        if (!map.isVisible(x, y)) continue;
+        const px = o.x + x * cell;
+        const py = o.y + y * cell;
+        ctx.fillStyle = DANGER;
+        ctx.fillRect(px, py, cell, cell);
+        // A border where the red area ends, so it reads as red on any ground.
+        ctx.fillStyle = DANGER_EDGE;
+        const inside = (dx: number, dy: number) => danger.has(map.idx(x + dx, y + dy));
+        if (!inside(0, -1)) ctx.fillRect(px, py, cell, t);
+        if (!inside(0, 1)) ctx.fillRect(px, py + cell - t, cell, t);
+        if (!inside(-1, 0)) ctx.fillRect(px, py, t, cell);
+        if (!inside(1, 0)) ctx.fillRect(px + cell - t, py, t, cell);
       }
     }
 

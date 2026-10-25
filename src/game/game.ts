@@ -19,7 +19,16 @@ const LOG_LIMIT = 100;
 const CAVE_SHELTER = 0.5;
 const RESPAWN_EVERY = 50;
 const SLEEP_LIMIT = 200;
-const PINCH_DAMAGE = 4;
+/** Default chance per turn that a grumpy animal next to you hurts you. */
+const HIT_CHANCE = 0.5;
+/** Default turns an animal runs off after it hurt you. */
+const FLEE_AFTER_HIT = 4;
+/** Cells a charging animal runs in one turn. */
+const CHARGE_STEPS = 2;
+/** Turns a chasing animal follows you before it gives up. */
+const CHASE_TURNS = 6;
+/** Cells later that wild animals notice you with Animal friend (but at least 1). */
+const FRIEND_NOTICE_LESS = 2;
 /** Water from one drink at the river, the same as a spring. */
 const RIVER_DRINK = 35;
 /** XP for each gather, and for each fish caught. Building gives 1 XP per item it costs. */
@@ -539,6 +548,7 @@ export class Game {
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: a.x, targetY: a.y });
     this.message({ key: 'shoo', animal: a.kind }, 'info');
     if (def.temper !== 'calm') a.flee = 8;
+    a.chase = 0;
   }
 
   /**
@@ -644,9 +654,9 @@ export class Game {
     this.turn += turnsUntilMorning(this.turn) || TURNS_PER_DAY;
     const n = this.needs;
     this.needs = {
-      health: 60,
-      food: Math.max(n.food, 40),
-      water: Math.max(n.water, 40),
+      health: 50,
+      food: Math.max(n.food, 25),
+      water: Math.max(n.water, 30),
       energy: 70,
       warmth: 80,
     };
@@ -660,37 +670,96 @@ export class Game {
 
   // ---- Animals ----------------------------------------------------------------------
 
+  /**
+   * How close the explorer must be before an animal reacts. Wild animals
+   * notice an Animal friend later; 0 means it never reacts.
+   */
+  noticeRange(kind: AnimalKind): number {
+    const def = ANIMALS[kind];
+    if (def.notice <= 0 || !this.has('animal_friend')) return def.notice;
+    return def.wild ? Math.max(1, def.notice - FRIEND_NOTICE_LESS) : def.notice;
+  }
+
+  /**
+   * Cells where a visible animal would come after the explorer or hurt them,
+   * for the Wild sense skill. Empty without the skill.
+   */
+  dangerCells(): Set<number> {
+    const cells = new Set<number>();
+    if (!this.has('wild_sense')) return cells;
+    const friendly = this.has('animal_friend');
+    for (const a of this.visibleAnimals()) {
+      const def = ANIMALS[a.kind];
+      if (friendly && !def.wild) continue;
+      const notice = this.noticeRange(a.kind);
+      const r = def.temper === 'grumpy' ? Math.min(1, notice) : def.temper === 'charger' || def.temper === 'chaser' ? notice : -1;
+      for (let y = a.y - r; y <= a.y + r; y++) {
+        for (let x = a.x - r; x <= a.x + r; x++) {
+          if (this.map.isFloor(x, y)) cells.add(this.map.idx(x, y));
+        }
+      }
+    }
+    return cells;
+  }
+
   private animalAct(a: Animal, playerDist: Int32Array): void {
     const def = ANIMALS[a.kind];
     const p = this.player;
-    const dist = Math.max(Math.abs(a.x - p.x), Math.abs(a.y - p.y));
+    const dist = () => Math.max(Math.abs(a.x - p.x), Math.abs(a.y - p.y));
     if (a.flee > 0) {
       a.flee--;
       this.stepAway(a);
       return;
     }
-    const noticed = def.notice > 0 && dist <= def.notice && this.map.isVisible(a.x, a.y);
-    // Animal friends get no trouble: grumpy and cheeky animals leave them be.
-    const friendly = this.has('animal_friend');
+    const notice = this.noticeRange(a.kind);
+    const noticed = notice > 0 && dist() <= notice && this.map.isVisible(a.x, a.y);
+    // Animal friends get no trouble from crabs and monkeys. Wild animals
+    // still come for them, but notice them later (see noticeRange).
+    const friendly = this.has('animal_friend') && !def.wild;
+    if (this.sleeping) a.chase = 0;
+    if (a.chase && !this.sleeping) {
+      // Wasps keep following, as long as the explorer stays on their ground.
+      a.chase--;
+      if (def.habitat.includes(this.map.get(p.x, p.y)) && this.isPassable(p.x, p.y) && !this.objectAt(p.x, p.y)) {
+        if (dist() > 1) this.stepToward(a, playerDist);
+        if (dist() <= 1) this.hurt(a);
+        if (!a.chase) a.flee = def.fleeAfter ?? FLEE_AFTER_HIT;
+      } else {
+        a.chase = 0;
+        a.flee = def.fleeAfter ?? FLEE_AFTER_HIT;
+      }
+      return;
+    }
     if (noticed && !this.sleeping) {
       switch (def.temper) {
         case 'shy':
           this.stepAway(a);
           return;
         case 'grumpy':
-          if (!friendly && dist <= 1 && this.rng.chance(0.5)) {
-            this.emit({ type: 'lunge', id: a.id, x: a.x, y: a.y, targetX: p.x, targetY: p.y });
-            this.needs.health = Math.max(0, this.needs.health - PINCH_DAMAGE);
-            this.emit({ type: 'hit', id: p.id, x: p.x, y: p.y, damage: PINCH_DAMAGE });
-            this.message({ key: 'pinch', animal: a.kind }, 'warn');
-            a.flee = 4;
+          if (!friendly && dist() <= 1 && this.rng.chance(def.hitChance ?? HIT_CHANCE)) {
+            this.hurt(a);
+            a.flee = def.fleeAfter ?? FLEE_AFTER_HIT;
             return;
           }
           break;
+        case 'charger':
+          if (dist() > 1) {
+            this.message({ key: 'alert', animal: a.kind }, 'warn');
+            for (let n = 0; n < CHARGE_STEPS && dist() > 1; n++) this.stepToward(a, playerDist);
+          } else if (this.rng.chance(def.hitChance ?? HIT_CHANCE)) {
+            this.hurt(a);
+            a.flee = def.fleeAfter ?? FLEE_AFTER_HIT;
+          }
+          return;
+        case 'chaser':
+          this.message({ key: 'alert', animal: a.kind }, 'warn');
+          a.chase = CHASE_TURNS;
+          if (dist() > 1) this.stepToward(a, playerDist);
+          return;
         case 'cheeky': {
           const foods = this.inventory.foods();
           if (friendly || !foods.length) break;
-          if (dist <= 1) {
+          if (dist() <= 1) {
             const item = this.rng.pick(foods);
             this.inventory.take(item);
             this.emit({ type: 'lunge', id: a.id, x: a.x, y: a.y, targetX: p.x, targetY: p.y });
@@ -710,6 +779,16 @@ export class Game {
       const [dx, dy] = this.rng.pick(DIRS);
       this.tryStep(a, a.x + dx, a.y + dy);
     }
+  }
+
+  /** The animal pinches, bites, stings or bumps the explorer. */
+  private hurt(a: Animal): void {
+    const p = this.player;
+    const damage = ANIMALS[a.kind].damage ?? 0;
+    this.emit({ type: 'lunge', id: a.id, x: a.x, y: a.y, targetX: p.x, targetY: p.y });
+    this.needs.health = Math.max(0, this.needs.health - damage);
+    this.emit({ type: 'hit', id: p.id, x: p.x, y: p.y, damage });
+    this.message(a.kind === 'crab' ? { key: 'pinch', animal: a.kind } : { key: 'hurt', animal: a.kind }, 'warn');
   }
 
   private canStand(a: Animal, x: number, y: number): boolean {
@@ -770,6 +849,7 @@ export class Game {
       const y = this.rng.int(0, this.map.height - 1);
       if (!def.habitat.includes(this.map.get(x, y)) || this.objectAt(x, y) || this.animalAt(x, y)) continue;
       if (Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) < 8) continue;
+      if (def.minHomeDistance && Math.max(Math.abs(x - this.home.x), Math.abs(y - this.home.y)) < def.minHomeDistance) continue;
       if (outOfSight && this.map.isVisible(x, y)) continue;
       this.animals.push({ id: this.nextId++, kind, x, y, facing: 'down', flee: 0 });
       return;

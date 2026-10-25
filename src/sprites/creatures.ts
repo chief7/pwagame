@@ -113,6 +113,91 @@ export function bat(): Sprite {
   ], { b: '#7a5a9e', w: '#523a70', e: '#ffd166' }, 4);
 }
 
+export function boar(): Sprite {
+  return creature('animal_boar', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....h.h.........',
+    '...hbbbbbbh.....',
+    '..bbLLLLLbbbb...',
+    '.bLLbbbbbbbbbbs.',
+    '.bbbbbbbbbbebss.',
+    't.bbbbbbbbbbbsn.',
+    '.tDbbbbbbbbbTs..',
+    '..DDDDDDDDDD....',
+    '..DD.DD..DD.DD..',
+    '................',
+    '................',
+    '................',
+  ], { b: P.boar, L: P.boarLight, D: P.boarDark, h: P.boarDark, s: P.boarSnout, n: P.boarDark, T: P.tusk, e: P.outline, t: P.boarDark }, 6);
+}
+
+export function snake(): Sprite {
+  return creature('animal_snake', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '...........ggg..',
+    '..........gLeLg.',
+    '...ggg....gggggr',
+    '..gLLLg..gdg..r.',
+    '.gLdddLggLdg....',
+    '.gdg.gddLLdg....',
+    '..d...ddddd.....',
+    '................',
+    '................',
+  ], { g: P.snake, L: P.snakeLight, d: P.snakeDark, e: P.outline, r: P.snakeTongue }, 5);
+}
+
+export function wasps(): Sprite {
+  // A small buzzing swarm: three wasps with pale wings.
+  return creature('animal_wasps', [
+    '................',
+    '................',
+    '......ww........',
+    '.....wwww.......',
+    '.....yKyK.......',
+    '......yy........',
+    '...........ww...',
+    '..ww......wwww..',
+    '.wwww.....yKyK..',
+    '.yKyK......yy...',
+    '..yy............',
+    '......ww........',
+    '.....wwww.......',
+    '.....yKyK.......',
+    '......yy........',
+    '................',
+  ], { y: P.wasp, K: P.waspStripe, w: P.waspWing }, 3);
+}
+
+export function bear(): Sprite {
+  return creature('animal_bear', [
+    '................',
+    '................',
+    '...bb......bb...',
+    '..bLLb....bLLb..',
+    '..bLbbbbbbbbLb..',
+    '...bLLLbbbbbb...',
+    '...bLebbbbebb...',
+    '...bbbmmmmbbb...',
+    '...bbmmnnmmbb...',
+    '..bbbbmmmmbbbb..',
+    '.bbLLbbbbbbbbbb.',
+    '.bLbbbbbbbbbbdb.',
+    '.bbbbbbbbbbbbdb.',
+    '..ddbbbbbbbbdd..',
+    '..ddd.dddd.ddd..',
+    '................',
+  ], { b: P.bear, L: P.bearLight, d: P.bearDark, m: P.bearMuzzle, n: P.outline, e: P.outline }, 7);
+}
+
 export function raft(): Sprite {
   return fromRows('raft', [
     '................',
@@ -135,7 +220,7 @@ export function raft(): Sprite {
 }
 
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat()];
+  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear()];
 }
 
 // ---- Item icons -------------------------------------------------------------------

@@ -191,17 +191,20 @@ Change per turn:
 
 | Need | Awake | Asleep |
 |---|---|---|
-| Food | −0.3 | −0.15 |
+| Food | −0.45 | −0.225 |
 | Water | −0.45 | −0.225 |
 | Energy | −0.25 | +1.4 × (0.4 + 0.6 × shelter) |
 | Warmth | moves towards a target (see 4.3): +1.5 up, −0.6 down | same |
-| Health | −0.5 for each empty need (Food, Water, Energy, Warmth) | same |
-| Health | +0.25 if no need is empty and Food and Water are above 30 | +0.5 |
+| Health | −1 for each empty need (Food, Water, Energy, Warmth) | same |
+| Health | +0.25 if no need is empty and Food and Water are above 50 | +0.5 |
 
 What this means in play (awake, no food or drink):
 
 - Water goes from 80 to 0 in about 180 turns (three quarters of a day).
-- Food goes from 80 to 0 in about 270 turns (just over one day).
+- Food goes from 80 to 0 in about 180 turns. A day uses about 108 Food:
+  11 coconuts, or less than 3 cooked fish.
+- Health from animals comes back only while Food and Water are above 50. So
+  an explorer who eats badly stays hurt.
 - Energy goes from 90 to 0 in about 360 turns (one and a half days).
 
 **Warnings.** When a need goes below 25 (`LOW`), the log shows a warning one
@@ -215,7 +218,7 @@ When Health is 0 at the end of a turn:
 1. The log says the player feels woozy.
 2. Time jumps to the next 6:00.
 3. The player moves to **home** (the camp).
-4. Needs become: Health 60, Food at least 40, Water at least 40, Energy 70,
+4. Needs become: Health 50, Food at least 25, Water at least 30, Energy 70,
    Warmth 80.
 5. All items stay in the bag.
 
@@ -340,8 +343,14 @@ Animals have a **temper**. They only react when the player is within their
 |---|---|---|
 | `calm` | Ignores the player. | turtle |
 | `shy` | Moves away from the player. | piglet, bat |
-| `grumpy` | If next to the player: 50% chance per turn to pinch (−4 Health), then runs away for 4 turns. | crab |
+| `grumpy` | If next to the player: `hitChance` (default 50%) per turn to hurt (−`damage` Health), then runs away for `fleeAfter` turns (default 4). | crab (−4), snake (70%, −8), cave bear (50%, −20) |
 | `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. | monkey |
+| `charger` | Runs at the player, 2 cells per turn (`CHARGE_STEPS`), with the message `alert`. When it starts a turn next to the player, it knocks them over (−12 Health), then trots off for 10 turns. | wild boar |
+| `chaser` | Follows the player for 6 turns (`CHASE_TURNS`, stored as `chase` on the animal) and stings each turn it is next to them (−3 Health). It gives up at once when the player stands off its habitat (sand, cave, shelter). Then it flies off for 8 turns. | wasps |
+
+**Wild animals** (`wild: true`: boar, snake, wasps, cave bear) only appear
+at least `minHomeDistance` (25) cells from home. A new hurt message is
+`hurt`, with a text for each animal in `src/i18n/`. Crabs keep `pinch`.
 
 Other rules:
 
@@ -349,7 +358,8 @@ Other rules:
   No habitat has river tiles, so animals never cross the river, also not on bridges.
 - When they do not react, they wander (chance per turn = `wander`).
 - Shooed animals run away for 8 turns.
-- Animals do not act on the player while the player sleeps.
+- Animals do not act on the player while the player sleeps. Sleep also ends a wasp chase.
+- `game.noticeRange(kind)` gives the notice range after skills.
 - Every 50 turns, the game adds one animal of each kind that is below its
   `population`, out of the player's view.
 
@@ -387,7 +397,8 @@ on a path cost 1 point, the third and fourth cost 2.
 | | Night eyes | Up to 2 more cells of sight at night | `Game.sightRadius` |
 | Improving | Green thumb | Plants regrow in 70% of the time | `Game.interact()` |
 | | Patient angler | Bite chance 40% → 70% | `Game.fish()` |
-| | Animal friend | Crabs do not pinch, monkeys do not take food | `Game.animalAct()` |
+| | Animal friend | Crabs do not pinch, monkeys do not take food. Wild animals notice the player 2 cells later (at least 1) | `Game.noticeRange()`, `Game.animalAct()` |
+| | Wild sense | A red tint with a red border marks the cells where a visible animal would come after the player or hurt them | `Game.dangerCells()`, `renderer.ts` |
 
 The Skills panel shows the free points, an XP bar to the next point, and each
 path. The Skills button shows a star when there are free points.
@@ -400,7 +411,9 @@ path. The Skills button shows a star when there are free points.
   and 2 XP. Else the log says "Nothing bites".
 - The river is only for drinking. Fishing works only in the sea.
 - Raw fish (`raw: true`) cannot be eaten. The recipe "Cook a fish" (1 fish,
-  at a campfire) makes a cooked fish: +24 Food.
+  at a campfire) makes a cooked fish: +40 Food, +10 Energy. This is the best
+  food on the island (coconut 10, berries 7, mushroom 9), so fishing is the
+  way to stay well fed.
 
 ---
 
@@ -483,7 +496,7 @@ gives an error if a language does not have words for an entry.
 ### Items
 
 ```ts
-coconut: { id: 'coconut', eat: { food: 18, water: 22 } },
+coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 ```
 
 - `eat` is optional. With `eat`, the item is food and shows an Eat button.
@@ -546,8 +559,8 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 | Items | coconut, berries, mushroom, cooked fish (food); wood, leaves, stone, fish (materials; fish is raw); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions) |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
-| Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend |
-| Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves) |
+| Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend, wild sense |
+| Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves) |
 
 ---
 
@@ -699,7 +712,12 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Night cold | `needs.ts` → `warmthTarget()` | 95 |
 | Day length | `clock.ts` → `TURNS_PER_DAY` | 240 turns |
 | Cave shelter | `game.ts` → `CAVE_SHELTER` | 0.5 |
-| Crab pinch | `game.ts` → `PINCH_DAMAGE` | 4 |
+| Animal damage and hit chance | `animals.ts` → `damage`, `hitChance`, `fleeAfter` | crab 4, snake 8, boar 12, wasps 3, bear 20 |
+| Default hit chance, flee after a hit | `game.ts` → `HIT_CHANCE`, `FLEE_AFTER_HIT` | 0.5, 4 turns |
+| Charge speed, chase length | `game.ts` → `CHARGE_STEPS`, `CHASE_TURNS` | 2 cells, 6 turns |
+| Animal friend notice cut | `game.ts` → `FRIEND_NOTICE_LESS` | 2 cells |
+| Wild animals from camp | `animals.ts` → `minHomeDistance` | 25 cells |
+| Health regen threshold | `needs.ts` → `RATES.healthRegenAbove` | 50 |
 | Animal top-up | `game.ts` → `RESPAWN_EVERY` | 50 turns |
 | Longest sleep | `game.ts` → `SLEEP_LIMIT` | 200 turns |
 | Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 104 × 80 |
@@ -721,6 +739,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 ## 12. Known limits
 
 - The balance (need rates, day length) has not been tested with real play.
+  The harder food and animal values (see 4.1 and 4.9) are a first guess.
+- A wild animal only checks the distance from home when it appears. It can
+  wander closer to camp later.
 - Animals have no walk frames. They hop when they move. They always face down.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
 - There is no goal or ending yet. The raft sprite exists for a future

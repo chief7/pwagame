@@ -29,7 +29,7 @@ function everyMessage(): Msg[] {
     msgs.push({ key: 'gather', obj, got: [] }, { key: 'gather', obj, got: [['coconut', 1], ['wood', 3]] });
   }
   for (const animal of ANIMAL_KINDS) {
-    msgs.push({ key: 'shoo', animal }, { key: 'pinch', animal });
+    msgs.push({ key: 'shoo', animal }, { key: 'pinch', animal }, { key: 'hurt', animal }, { key: 'alert', animal });
     for (const item of ITEM_IDS) msgs.push({ key: 'snatch', animal, item });
   }
   for (const item of ITEM_IDS) msgs.push({ key: 'eat', item }, { key: 'make', item }, { key: 'cook', item }, { key: 'haveTool', item }, { key: 'needTool', obj: 'bramble', item });

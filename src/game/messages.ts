@@ -39,6 +39,10 @@ export type Msg =
   | { key: 'faint' }
   | { key: 'wakeAtCamp' }
   | { key: 'pinch'; animal: AnimalKind }
+  /** A wild animal bites, stings, swipes at or bumps the explorer. */
+  | { key: 'hurt'; animal: AnimalKind }
+  /** A wild animal noticed the explorer and comes after them. */
+  | { key: 'alert'; animal: AnimalKind }
   | { key: 'snatch'; animal: AnimalKind; item: ItemId }
   | { key: 'cook'; item: ItemId }
   | { key: 'needFire' }

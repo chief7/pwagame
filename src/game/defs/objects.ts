@@ -58,11 +58,11 @@ const def = (d: ObjectDef) => d;
 export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   palm_tall: def({
     kind: 'palm_tall', depletedSprite: 'palm_tall_bare',
-    gather: { yields: [{ item: 'coconut', min: 1, max: 2 }, { item: 'leaves', min: 1, max: 2 }], after: { regrow: 150 } },
+    gather: { yields: [{ item: 'coconut', min: 1, max: 2 }, { item: 'leaves', min: 1, max: 2 }], after: { regrow: 240 } },
   }),
   palm_leaning: def({
     kind: 'palm_leaning', depletedSprite: 'palm_leaning_bare',
-    gather: { yields: [{ item: 'coconut', min: 1, max: 2 }, { item: 'leaves', min: 1, max: 2 }], after: { regrow: 150 } },
+    gather: { yields: [{ item: 'coconut', min: 1, max: 2 }, { item: 'leaves', min: 1, max: 2 }], after: { regrow: 240 } },
   }),
   palm_young: def({
     kind: 'palm_young',
@@ -82,7 +82,7 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   }),
   berry_bush: def({
     kind: 'berry_bush', depletedSprite: 'berry_bush_empty',
-    gather: { yields: [{ item: 'berries', min: 2, max: 3 }], after: { regrow: 120 } },
+    gather: { yields: [{ item: 'berries', min: 2, max: 3 }], after: { regrow: 200 } },
   }),
   mushroom: def({
     kind: 'mushroom',

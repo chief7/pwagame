@@ -128,7 +128,7 @@ describe('needs', () => {
     const n = freshNeeds();
     for (let i = 0; i < 10; i++) tickNeeds(n, open);
     expect(n.food).toBeLessThan(80);
-    expect(n.water).toBeLessThan(n.food);
+    expect(n.water).toBeLessThan(80);
   });
 
   it('an empty need drains health, but slowly', () => {
@@ -157,6 +157,8 @@ describe('Game: gathering and eating', () => {
     expect(game.objectSprite(game.objectAt(game.player.x + 1, game.player.y)!)).toBe('palm_tall_bare');
     expect(game.move(1, 0)).toBe(false);
     game.turn += 200;
+    expect(game.move(1, 0)).toBe(false);
+    game.turn += 40;
     expect(game.move(1, 0)).toBe(true);
   });
 
@@ -191,8 +193,8 @@ describe('Game: gathering and eating', () => {
     game.needs.food = 30;
     game.needs.water = 30;
     expect(game.eat('coconut')).toBe(true);
-    expect(game.needs.food).toBeGreaterThan(40);
-    expect(game.needs.water).toBeGreaterThan(40);
+    expect(game.needs.food).toBeGreaterThan(38);
+    expect(game.needs.water).toBeGreaterThan(45);
     expect(game.inventory.count('coconut')).toBe(1);
     expect(game.eat('wood')).toBe(false);
   });
@@ -330,7 +332,9 @@ describe('Game: no harsh endings', () => {
     game.needs = { health: 0.5, food: 0, water: 0, energy: 0, warmth: 0 };
     game.wait();
     expect(game.player).toMatchObject(home);
-    expect(game.needs.health).toBeGreaterThan(50);
+    expect(game.needs.health).toBe(50);
+    expect(game.needs.food).toBe(25);
+    expect(game.needs.water).toBe(30);
     expect(game.phase).toBe('dawn');
     expect(game.log.some((m) => m.msg.key === 'wakeAtCamp')).toBe(true);
   });
@@ -470,7 +474,7 @@ describe('Game: experience and skills', () => {
     game.skills.add('green_thumb');
     place(game, 1, 0, 'berry_bush');
     game.move(1, 0);
-    expect(game.objectAt(game.player.x + 1, game.player.y)!.readyAt).toBe(game.turn - 1 + 84);
+    expect(game.objectAt(game.player.x + 1, game.player.y)!.readyAt).toBe(game.turn - 1 + 140);
     game.turn = nightTurn() + 20;
     expect(game.sightRadius).toBe(4);
     game.skills.add('night_eyes');
@@ -488,6 +492,138 @@ describe('Game: experience and skills', () => {
     for (let i = 0; i < 20; i++) game.wait();
     expect(game.log.some((m) => m.msg.key === 'pinch' || m.msg.key === 'snatch')).toBe(false);
     expect(game.inventory.count('coconut')).toBe(2);
+  });
+});
+
+describe('Game: wild animals', () => {
+  const wild = (kind: 'boar' | 'snake' | 'wasps' | 'bear', dx: number, dy = 0) => ({ id: 99, kind, x: 0, y: 0, facing: 'down' as const, flee: 0, dx, dy });
+  function meadow(seed: number, animal: ReturnType<typeof wild>): Game {
+    const game = sandbox(seed);
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 5; dx++) game.map.set(game.player.x + dx, game.player.y + dy, Tile.Grass);
+    const { dx, dy, ...a } = animal;
+    game.animals = [{ ...a, x: game.player.x + dx, y: game.player.y + dy }];
+    game.wait();
+    game.takeEvents();
+    return game;
+  }
+
+  it('a wild boar charges two cells a turn and knocks you over, then trots off', () => {
+    const game = sandbox(40);
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 5; dx++) game.map.set(game.player.x + dx, game.player.y + dy, Tile.Grass);
+    const boar = { id: 99, kind: 'boar' as const, x: game.player.x + 5, y: game.player.y, facing: 'down' as const, flee: 0 };
+    game.animals = [boar];
+    game.wait(); // not seen yet: 5 cells away, it notices at 4
+    boar.x = game.player.x + 4;
+    game.wait();
+    expect(boar.x - game.player.x).toBe(2);
+    expect(game.log.some((m) => m.msg.key === 'alert')).toBe(true);
+    game.wait();
+    expect(boar.x - game.player.x).toBe(1);
+    const before = game.needs.health;
+    game.wait();
+    expect(before - game.needs.health).toBeGreaterThan(11);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'hurt', animal: 'boar' });
+    expect(boar.flee).toBeGreaterThan(0);
+  });
+
+  it('a snake bites when you stand next to it', () => {
+    const game = meadow(41, wild('snake', 1));
+    const bites = [];
+    for (let i = 0; i < 10; i++) {
+      game.wait();
+      bites.push(...game.takeEvents().filter((e) => e.type === 'hit'));
+    }
+    expect(bites[0]).toMatchObject({ damage: 8 });
+    expect(game.log.some((m) => m.msg.key === 'hurt' && m.msg.animal === 'snake')).toBe(true);
+  });
+
+  it('wasps chase you for a while, but give up when you leave the grass', () => {
+    const game = meadow(42, wild('wasps', 2));
+    const hits = () => game.takeEvents().filter((e) => e.type === 'hit').length;
+    let stings = 0;
+    for (let i = 0; i < 12; i++) {
+      game.wait();
+      stings += hits();
+    }
+    expect(stings).toBeGreaterThan(0);
+    expect(stings).toBeLessThanOrEqual(6);
+
+    const again = meadow(43, wild('wasps', 2));
+    again.wait();
+    again.map.set(again.player.x - 1, again.player.y, Tile.Sand);
+    again.move(-1, 0);
+    expect(again.animals[0].chase ?? 0).toBe(0);
+    expect(again.animals[0].flee).toBeGreaterThan(0);
+  });
+
+  it('a cave bear swipes hard if you stay next to it', () => {
+    const game = sandbox(44);
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) game.map.set(game.player.x + dx, game.player.y + dy, Tile.CaveFloor);
+    game.animals = [{ id: 99, kind: 'bear', x: game.player.x + 1, y: game.player.y, facing: 'down', flee: 0 }];
+    for (let i = 0; i < 20 && game.needs.health > 85; i++) game.wait();
+    expect(game.needs.health).toBeLessThanOrEqual(81);
+  });
+
+  it('Animal friend makes wild animals notice you later', () => {
+    const game = sandbox(45);
+    expect(game.noticeRange('boar')).toBe(4);
+    game.skills.add('animal_friend');
+    expect(game.noticeRange('boar')).toBe(2);
+    expect(game.noticeRange('wasps')).toBe(1);
+    expect(game.noticeRange('snake')).toBe(1);
+    expect(game.noticeRange('crab')).toBe(2);
+
+    const calm = meadow(46, wild('boar', 6));
+    calm.skills.add('animal_friend');
+    const boar = calm.animals[0];
+    boar.x = calm.player.x + 3;
+    calm.wait();
+    expect(calm.log.some((m) => m.msg.key === 'alert')).toBe(false);
+    boar.x = calm.player.x + 2;
+    calm.wait();
+    expect(calm.log.some((m) => m.msg.key === 'alert')).toBe(true);
+  });
+
+  it('Wild sense marks the cells where animals would come after you', () => {
+    const game = sandbox(47);
+    game.animals = [
+      { id: 98, kind: 'snake', x: game.player.x + 2, y: game.player.y, facing: 'down', flee: 0 },
+      { id: 99, kind: 'monkey', x: game.player.x - 2, y: game.player.y, facing: 'down', flee: 0 },
+    ];
+    expect(game.dangerCells().size).toBe(0);
+    game.skills.add('wild_sense');
+    const cells = game.dangerCells();
+    expect(cells.size).toBe(9);
+    expect(cells.has(game.map.idx(game.player.x + 1, game.player.y))).toBe(true);
+    expect(cells.has(game.map.idx(game.player.x - 1, game.player.y))).toBe(false);
+  });
+
+  it('wild animals live far from camp', () => {
+    for (const seed of [1, 2, 3]) {
+      const game = new Game(seed);
+      const far = game.animals.filter((a) => ['boar', 'snake', 'wasps', 'bear'].includes(a.kind));
+      expect(far.length).toBeGreaterThan(0);
+      for (const a of far) expect(Math.max(Math.abs(a.x - game.home.x), Math.abs(a.y - game.home.y))).toBeGreaterThanOrEqual(25);
+    }
+  });
+});
+
+describe('Game: food matters', () => {
+  it('cooked fish is the best food on the island', () => {
+    const game = sandbox(48);
+    game.needs.food = 20;
+    game.inventory.add('cooked_fish');
+    expect(game.eat('cooked_fish')).toBe(true);
+    expect(game.needs.food).toBeGreaterThan(58);
+  });
+
+  it('health only comes back when you have eaten and drunk well', () => {
+    const hungry = { ...freshNeeds(), health: 50, food: 45, water: 80 };
+    tickNeeds(hungry, { sleeping: false, shelter: 0, nearFire: false, daylight: 1 });
+    expect(hungry.health).toBe(50);
+    const fed = { ...freshNeeds(), health: 50, food: 60, water: 80 };
+    tickNeeds(fed, { sleeping: false, shelter: 0, nearFire: false, daylight: 1 });
+    expect(fed.health).toBeGreaterThan(50);
   });
 });
 

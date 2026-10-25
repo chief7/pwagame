@@ -27,14 +27,16 @@ export interface Conditions {
 }
 
 const RATES = {
-  food: 0.3,
+  food: 0.45,
   water: 0.45,
   energyAwake: 0.25,
   energySleep: 1.4,
   warmthUp: 1.5,
   warmthDown: 0.6,
-  healthDrainPerEmpty: 0.5,
+  healthDrainPerEmpty: 1,
   healthRegen: 0.25,
+  /** Health only comes back while Food and Water are both above this. */
+  healthRegenAbove: 50,
 };
 
 /** Where Warmth drifts towards: cold open nights, cosy shelters and fires. */
@@ -58,7 +60,7 @@ export function tickNeeds(n: Needs, c: Conditions): Needs {
 
   const empty = (['food', 'water', 'energy', 'warmth'] as const).filter((k) => n[k] <= 0).length;
   if (empty > 0) n.health -= RATES.healthDrainPerEmpty * empty;
-  else if (n.food > 30 && n.water > 30) n.health += RATES.healthRegen * (c.sleeping ? 2 : 1);
+  else if (n.food > RATES.healthRegenAbove && n.water > RATES.healthRegenAbove) n.health += RATES.healthRegen * (c.sleeping ? 2 : 1);
 
   for (const k of NEED_IDS) n[k] = Math.max(0, Math.min(100, n[k]));
   return n;

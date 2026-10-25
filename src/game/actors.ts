@@ -17,6 +17,8 @@ export interface Animal {
   facing: Facing;
   /** Turns left running away from the player after being shooed (or after mischief). */
   flee: number;
+  /** Turns left following the player (wasps). Missing in older saves. */
+  chase?: number;
 }
 
 /** The player's id; animals count up from here. */

@@ -43,12 +43,22 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   bridge_ew: { name: 'bridge' },
 };
 
-const ANIMAL: AnimalWords<{ name: string; shoo: string }> = {
+const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
   crab: { name: 'crab', shoo: 'You shoo the crab away. It scuttles off sideways.' },
   turtle: { name: 'turtle', shoo: 'The turtle blinks at you slowly.' },
   monkey: { name: 'monkey', shoo: 'You shoo the monkey. It chatters and scampers off.' },
   piglet: { name: 'piglet', shoo: 'The piglet squeals and trots away.' },
   bat: { name: 'bat', shoo: 'The bat flutters past your ear.' },
+  boar: {
+    name: 'wild boar', shoo: 'You wave your arms. The boar snorts and trots off.',
+    hurt: 'Oof! The wild boar bumps into you and knocks you over.', alert: 'A wild boar snorts and runs at you!',
+  },
+  snake: { name: 'snake', shoo: 'The snake hisses and slides away.', hurt: 'Ouch! The snake bites you.' },
+  wasps: {
+    name: 'wasps', shoo: 'You swat at the wasps. They buzz away.',
+    hurt: 'Ouch! A wasp stings you.', alert: 'Bzzz! Wasps come after you. Run off the grass!',
+  },
+  bear: { name: 'cave bear', shoo: 'The cave bear grumbles and shuffles away.', hurt: 'The cave bear wakes up and swipes at you!' },
 };
 
 const NEEDS = { health: 'Health', food: 'Food', water: 'Water', energy: 'Energy', warmth: 'Warmth' };
@@ -121,7 +131,8 @@ export const en: Strings = {
     handy_builder: { name: 'Handy builder', description: 'Everything you build costs 1 wood less.' },
     green_thumb: { name: 'Green thumb', description: 'Plants grow back faster.' },
     night_eyes: { name: 'Night eyes', description: 'You see further at night.' },
-    animal_friend: { name: 'Animal friend', description: "Crabs don't pinch you, and monkeys don't take your food." },
+    animal_friend: { name: 'Animal friend', description: "Crabs don't pinch you, and monkeys don't take your food. Wild animals notice you later." },
+    wild_sense: { name: 'Wild sense', description: 'You see where animals would come after you or hurt you. These places look red.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].many}`,
   itemCount,
@@ -179,6 +190,8 @@ export const en: Strings = {
       case 'faint': return 'You feel woozy and sit down for a rest…';
       case 'wakeAtCamp': return 'You wake up back at camp, feeling better. Remember to eat, drink and keep warm!';
       case 'pinch': return `Ouch! The ${ANIMAL[msg.animal].name} pinched you.`;
+      case 'hurt': return ANIMAL[msg.animal].hurt ?? `Ouch! The ${ANIMAL[msg.animal].name} hurt you.`;
+      case 'alert': return ANIMAL[msg.animal].alert ?? `The ${ANIMAL[msg.animal].name} comes after you!`;
       case 'snatch': return `The cheeky ${ANIMAL[msg.animal].name} snatched ${itemCount(msg.item, 1)}!`;
       case 'cook': return `You cook over the fire and get ${itemCount(msg.item, 1)}. Smells great!`;
       case 'needFire': return 'Stand next to a campfire to cook.';

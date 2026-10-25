@@ -102,12 +102,22 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   bridge_ew: { g: 'f', word: 'Brücke' },
 };
 
-const ANIMAL: AnimalWords<Noun & { shoo: string }> = {
+const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
   crab: { g: 'f', word: 'Krabbe', shoo: 'Du verscheuchst die Krabbe. Sie krabbelt seitwärts davon.' },
   turtle: { g: 'f', word: 'Schildkröte', shoo: 'Die Schildkröte blinzelt dich langsam an.' },
   monkey: { g: 'm', word: 'Affe', shoo: 'Du verscheuchst den Affen. Er schnattert und flitzt davon.' },
   piglet: { g: 'n', word: 'Ferkel', shoo: 'Das Ferkel quiekt und trabt davon.' },
   bat: { g: 'f', word: 'Fledermaus', shoo: 'Die Fledermaus flattert an deinem Ohr vorbei.' },
+  boar: {
+    g: 'n', word: 'Wildschwein', shoo: 'Du fuchtelst mit den Armen. Das Wildschwein schnaubt und trabt davon.',
+    hurt: 'Uff! Das Wildschwein rempelt dich an und wirft dich um.', alert: 'Ein Wildschwein schnaubt und rennt auf dich zu!',
+  },
+  snake: { g: 'f', word: 'Schlange', shoo: 'Die Schlange zischt und gleitet davon.', hurt: 'Autsch! Die Schlange beißt dich.' },
+  wasps: {
+    g: 'pl', word: 'Wespen', shoo: 'Du schlägst nach den Wespen. Sie summen davon.',
+    hurt: 'Autsch! Eine Wespe sticht dich.', alert: 'Bzzz! Wespen fliegen dir nach. Lauf weg vom Gras!',
+  },
+  bear: { g: 'm', word: 'Höhlenbär', shoo: 'Der Höhlenbär brummt und tapst davon.', hurt: 'Der Höhlenbär wacht auf und haut nach dir!' },
 };
 
 const NEEDS = { health: 'Leben', food: 'Essen', water: 'Wasser', energy: 'Energie', warmth: 'Wärme' };
@@ -180,7 +190,8 @@ export const de: Strings = {
     handy_builder: { name: 'Geschickter Baumeister', description: 'Alles, was du baust, kostet 1 Holz weniger.' },
     green_thumb: { name: 'Grüner Daumen', description: 'Pflanzen wachsen schneller nach.' },
     night_eyes: { name: 'Eulenaugen', description: 'Du siehst nachts weiter.' },
-    animal_friend: { name: 'Tierfreund', description: 'Krabben zwicken dich nicht, und Affen klauen dir kein Essen.' },
+    animal_friend: { name: 'Tierfreund', description: 'Krabben zwicken dich nicht, und Affen klauen dir kein Essen. Wilde Tiere bemerken dich später.' },
+    wild_sense: { name: 'Spürsinn', description: 'Du siehst, wo Tiere dich verfolgen oder dir wehtun würden. Diese Stellen sind rot.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].plural}`,
   itemCount,
@@ -238,6 +249,8 @@ export const de: Strings = {
       case 'faint': return 'Dir wird schwummrig und du setzt dich zum Ausruhen hin …';
       case 'wakeAtCamp': return 'Du wachst im Lager auf und fühlst dich besser. Denk daran zu essen, zu trinken und dich warm zu halten!';
       case 'pinch': return `Autsch! ${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} hat dich gezwickt.`;
+      case 'hurt': return ANIMAL[msg.animal].hurt ?? `Autsch! ${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} hat dir wehgetan.`;
+      case 'alert': return ANIMAL[msg.animal].alert ?? `${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} kommt auf dich zu!`;
       case 'snatch': return `${cap(phrase(ANIMAL[msg.animal], 'nom', 'the', 'frech'))} hat dir ${itemCount(msg.item, 1)} stibitzt!`;
       case 'cook': return `Du brätst über dem Feuer und bekommst ${itemCount(msg.item, 1)}. Das duftet lecker!`;
       case 'needFire': return 'Stell dich neben ein Lagerfeuer, um zu braten.';

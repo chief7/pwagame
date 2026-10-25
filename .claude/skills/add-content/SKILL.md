@@ -36,9 +36,9 @@ Fit the content to the game:
   content. Setbacks are mild and recoverable (as with fainting).
 - **Fits the island.** Natural materials, beach, forest and cave themes.
 - **Balanced against what exists.** Compare numbers with similar entries.
-  For example, compare a new food with coconut (18 food, 22 water) and
-  berries (12 food, 5 water). Compare a recipe cost with the hut
-  (10 wood, 8 leaves, 4 stone).
+  For example, compare a new food with coconut (10 food, 18 water),
+  berries (7 food, 4 water) and cooked fish (40 food, 10 energy). Compare
+  a recipe cost with the hut (10 wood, 8 leaves, 4 stone).
 - **Data first.** Prefer a registry entry over new code. Decide which of
   these the content needs:
   - **Data only:** new entries in `ITEMS`, `OBJECTS`, `RECIPES`, `ANIMALS`,

@@ -41,12 +41,19 @@ npm run preview   # serve the build (service worker is only active here)
   Behind it is the wild forest, and then a river: build a bridge to reach
   the far side, where most hills and caves are. Further out are more chests.
 - **Animals:** crabs pinch if you linger, monkeys snatch food, piglets and
-  bats keep their distance, turtles don't mind you.
+  bats keep their distance, turtles don't mind you. Far from camp live wild
+  animals that hurt: wild boars charge at you, snakes bite, wasps chase you
+  until you leave the grass, and cave bears swipe. They are why explorers
+  faint and wake up back at camp.
+- **Food matters:** food runs down fast, and fruit, berries and mushrooms
+  fill you up only a little. Cooked fish is by far the best food. Health
+  only comes back while Food and Water are both above 50.
 - **Skills:** gathering, building and fishing give XP. XP earns skill points
   (the first at 10 XP, each next one 5 XP more), which you spend in the
   Skills panel on three paths: Building (fishing rod, cheaper building),
   Explorer (needs drop slower, night eyes) and Improving (faster regrowth,
-  better catches, animal friend). Each path is learned in order.
+  better catches, animal friend, wild sense). Each path is learned in order.
+  Wild sense marks in red the ground where an animal would come after you.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
   campfire (Build panel).
@@ -85,7 +92,9 @@ matching sprite (see below); the sprite test fails if one is missing.
 - **Skill:** add it to a path in `PATHS` in `skills.ts` and give it words in
   `src/i18n/`. Its effect is code where it applies (`game.has(id)`).
 - **Animal:** add it to `ANIMALS` in `animals.ts` with a temper (`calm`,
-  `shy`, `grumpy`, `cheeky`), habitat, notice range and population, and draw
+  `shy`, `grumpy`, `cheeky`, `charger`, `chaser`), habitat, notice range and
+  population (plus `damage`, `hitChance`, `wild` and `minHomeDistance` for
+  animals that hurt), and draw
   `animal_<kind>`.
 - **Need:** `needs.ts` holds the rates and the warmth model.
 

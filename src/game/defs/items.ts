@@ -24,10 +24,10 @@ export interface ItemDef {
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
-  coconut: { id: 'coconut', eat: { food: 18, water: 22 } },
-  berries: { id: 'berries', eat: { food: 12, water: 5 } },
-  mushroom: { id: 'mushroom', eat: { food: 15, energy: 5 } },
-  cooked_fish: { id: 'cooked_fish', eat: { food: 24 } },
+  coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
+  berries: { id: 'berries', eat: { food: 7, water: 4 } },
+  mushroom: { id: 'mushroom', eat: { food: 9, energy: 5 } },
+  cooked_fish: { id: 'cooked_fish', eat: { food: 40, energy: 10 } },
   wood: { id: 'wood' },
   leaves: { id: 'leaves' },
   stone: { id: 'stone' },
