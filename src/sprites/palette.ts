@@ -180,4 +180,12 @@ export const PALETTE = {
   goatShade: '#c4bba8',
   goatDark: '#9a907c',
   goatHorn: '#6e6252',
+
+  // The dog the explorer can adopt.
+  dog: '#c48a4e',
+  dogLight: '#e6b97e',
+  dogDark: '#8e5c2e',
+  dogNose: '#2a1d14',
+  collar: '#d6334a',
+  collarTag: '#f2c14e',
 } as const;

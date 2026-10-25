@@ -263,6 +263,64 @@ export function goat(): Sprite {
   ], { g: P.goat, L: P.snowLight, S: P.goatShade, d: P.goatDark, h: P.goatHorn, e: P.outline, n: P.goatDark, b: P.goatShade, t: P.goatShade }, 6);
 }
 
+// ---- The dog -------------------------------------------------------------------
+
+const DOG_KEY = { d: P.dog, L: P.dogLight, D: P.dogDark, n: P.dogNose, e: P.outline, c: P.collar, t: P.collarTag };
+
+/** A stray dog, standing, with floppy ears and a raised tail. */
+export function strayDog(): Sprite {
+  return creature('animal_dog', DOG_ROWS, DOG_KEY, 6);
+}
+
+const DOG_ROWS = [
+  '................',
+  '................',
+  '................',
+  '................',
+  '..........dd....',
+  '.........dLLdd..',
+  '........DdLLeLd.',
+  '.d......DDLLLLLn',
+  '.dd.....DDdLLL..',
+  '..dd...ddDdddd..',
+  '...dddddddddd...',
+  '...dLLLLLLLdd...',
+  '...dddddddddD...',
+  '...Dd.Dd..dD.D..',
+  '...D..D...D..D..',
+  '................',
+];
+
+/** The adopted dog: the same dog with a red collar and a gold tag. */
+export function companionDog(): Sprite {
+  const rows = [...DOG_ROWS];
+  rows[9] = '..dd...ddDccdd..';
+  rows[10] = '...ddddddddtd...';
+  return creature('dog', rows, DOG_KEY, 6);
+}
+
+/** The adopted dog lying down with its head on its paws, resting (asleep, or tired and waiting at camp). */
+export function dogRest(): Sprite {
+  return creature('dog_rest', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '..........ddd...',
+    '.........dLLdd..',
+    '..dddddddDLDLLd.',
+    '.dLLLLLLLDDLLLLn',
+    'ddLLLLLLdcctdLL.',
+    'dddddddddddddd..',
+    '.DDDDDDDDDDDDD..',
+    '................',
+  ], DOG_KEY, 7);
+}
+
 export function raft(): Sprite {
   return fromRows('raft', [
     '................',
@@ -285,7 +343,7 @@ export function raft(): Sprite {
 }
 
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat()];
+  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), companionDog(), dogRest()];
 }
 
 // ---- Item icons -------------------------------------------------------------------
