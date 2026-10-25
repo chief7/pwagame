@@ -17,7 +17,7 @@ function everyMessage(): Msg[] {
   const msgs: Msg[] = [
     { key: 'arrive' }, { key: 'seaSalty' }, { key: 'tooFull' }, { key: 'needMaterials' }, { key: 'noRoom' },
     { key: 'notSleepy' }, { key: 'fallAsleep' }, { key: 'dozeOff' }, { key: 'notThirsty' }, { key: 'drink' },
-    { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'legacy', text: 'Old line.' },
+    { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
   ];
   for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
   for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need });
@@ -29,7 +29,7 @@ function everyMessage(): Msg[] {
     msgs.push({ key: 'shoo', animal }, { key: 'pinch', animal });
     for (const item of ITEM_IDS) msgs.push({ key: 'snatch', animal, item });
   }
-  for (const item of ITEM_IDS) msgs.push({ key: 'eat', item });
+  for (const item of ITEM_IDS) msgs.push({ key: 'eat', item }, { key: 'make', item }, { key: 'haveTool', item }, { key: 'needTool', obj: 'bramble', item });
   return msgs;
 }
 
@@ -74,6 +74,11 @@ describe('i18n', () => {
     expect(de.ui.inShelter('lean_to')).toBe('In deinem Unterstand');
     expect(de.ui.inShelter('hut')).toBe('In deiner Hütte');
     expect(de.clock(0)).toBe('Tag 1 · 8:00');
+    expect(de.message({ key: 'make', item: 'axe' })).toBe('Du baust eine Steinaxt.');
+    expect(de.message({ key: 'needTool', obj: 'bramble', item: 'axe' })).toBe(
+      'Das Dornengestrüpp ist zu dornig für deine Hände. Du brauchst eine Steinaxt.',
+    );
+    expect(de.message({ key: 'build', obj: 'bridge_ew' })).toBe('Du baust eine Brücke.');
   });
 
   it('keeps English as it was', () => {

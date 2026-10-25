@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildSprites, grassTileName, shoreTileName } from '../sprites';
+import { buildSprites, grassTileName, riverBankTileName, shoreTileName } from '../sprites';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
 import { Game, SAVE_VERSION } from './game';
 import { Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
-import { distanceMap } from './pathing';
+import { distanceMap, reachWithBridges } from './pathing';
 import { Rng } from './rng';
-import { generateWorld } from './worldgen';
+import { generateWorld, NO_REGION } from './worldgen';
 
 describe('Rng', () => {
   it('is deterministic for a seed and can resume from saved state', () => {
@@ -24,19 +24,45 @@ describe('generateWorld', () => {
   const sprites = buildSprites();
   const worlds = [1, 2, 3, 4, 5, 6].map((seed) => generateWorld(new Rng(seed)));
 
-  it('makes one island where every bit of ground can be reached', () => {
+  it('makes one island where every bit of ground can be reached by clearing brambles and bridging the river', () => {
     for (const { map, start, objects } of worlds) {
       const passable = (x: number, y: number) => {
         const o = objects.get(map.idx(x, y));
-        return map.isFloor(x, y) && (!o || o.kind === 'lean_to' || o.kind === 'hut');
+        return map.isFloor(x, y) && (!o || o.kind === 'lean_to' || o.kind === 'hut' || o.kind === 'bramble');
       };
-      const dist = distanceMap(map, start.x, start.y, passable);
+      const reach = reachWithBridges(map, start.x, start.y, passable, (x, y) => map.get(x, y) === Tile.River);
       for (let i = 0; i < map.tiles.length; i++) {
         const x = i % map.width;
         const y = (i - x) / map.width;
-        if (passable(x, y)) expect(dist[i], `cell ${x},${y}`).toBeGreaterThanOrEqual(0);
+        if (passable(x, y)) expect(reach[i], `cell ${x},${y}`).toBe(1);
       }
       for (let x = 0; x < map.width; x++) expect(map.isLand(x, 0)).toBe(false);
+    }
+  });
+
+  it('closes the home coast with brambles and the forest with a river', () => {
+    for (const { map, start, objects, region } of worlds) {
+      const free = (x: number, y: number) => map.isFloor(x, y) && objects.get(map.idx(x, y))?.kind !== 'bramble';
+      const home = distanceMap(map, start.x, start.y, free);
+      const forest = distanceMap(map, start.x, start.y, (x, y) => map.isFloor(x, y));
+      const counts = [0, 0, 0];
+      for (let i = 0; i < map.tiles.length; i++) {
+        if (region[i] === NO_REGION) continue;
+        counts[region[i]]++;
+        if (home[i] >= 0) expect(region[i]).toBe(0);
+        if (forest[i] >= 0) expect(region[i]).toBeLessThan(2);
+      }
+      const total = counts[0] + counts[1] + counts[2];
+      expect(counts[0] / total).toBeGreaterThan(0.25);
+      expect(counts[2] / total).toBeGreaterThan(0.15);
+    }
+  });
+
+  it('puts fresh water on the home coast and chests in every region', () => {
+    for (const { objects, region } of worlds) {
+      const where = (kind: string) => [...objects].filter(([, o]) => o.kind === kind).map(([i]) => region[i]);
+      expect(where('spring').filter((r) => r === 0).length).toBeGreaterThanOrEqual(2);
+      for (const r of [0, 1, 2]) expect(where('chest_closed')).toContain(r);
     }
   });
 
@@ -61,13 +87,19 @@ describe('generateWorld', () => {
       for (let y = 0; y < map.height; y++) {
         for (let x = 0; x < map.width; x++) {
           const t = map.get(x, y);
-          if (t === Tile.Water) continue;
-          const water = (dx: number, dy: number) => !map.isLand(x + dx, y + dy);
+          if (map.isWet(x, y)) continue;
+          const water = (dx: number, dy: number) => map.isWet(x + dx, y + dy);
           expect(water(0, -1) && water(0, 1)).toBe(false);
           expect(water(-1, 0) && water(1, 0)).toBe(false);
           expect(sprites.has(shoreTileName(water))).toBe(true);
           if (t === Tile.Grass) {
+            const river = (dx: number, dy: number) => map.get(x + dx, y + dy) === Tile.River;
+            expect(river(0, -1) && river(0, 1), `grass ${x},${y}`).toBe(false);
+            expect(river(-1, 0) && river(1, 0), `grass ${x},${y}`).toBe(false);
+            expect(sprites.has(riverBankTileName(river))).toBe(true);
             const sand = (dx: number, dy: number) => map.get(x + dx, y + dy) === Tile.Sand;
+            const near = (is: typeof sand) => [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => is(dx, dy)));
+            expect(near(river) && near(sand), `grass ${x},${y} by river and beach`).toBe(false);
             expect(sand(0, -1) && sand(0, 1), `grass ${x},${y}`).toBe(false);
             expect(sand(-1, 0) && sand(1, 0), `grass ${x},${y}`).toBe(false);
             expect(sprites.has(grassTileName(sand))).toBe(true);
@@ -208,6 +240,87 @@ describe('Game: building and sleeping', () => {
   });
 });
 
+describe('Game: brambles, the axe and the river', () => {
+  it('brambles need a stone axe; the axe clears them for good', () => {
+    const game = sandbox(15);
+    place(game, 1, 0, 'bramble');
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'needTool', obj: 'bramble', item: 'axe' });
+
+    expect(game.buildProblem('axe')).toEqual({ key: 'needMaterials' });
+    game.inventory.add('wood', 2);
+    game.inventory.add('stone', 2);
+    game.inventory.add('leaves', 1);
+    expect(game.build('axe')).toBe(true);
+    expect(game.inventory.count('axe')).toBe(1);
+    expect(game.inventory.count('wood')).toBe(0);
+    expect(game.buildProblem('axe')).toEqual({ key: 'haveTool', item: 'axe' });
+
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)).toBeUndefined();
+    expect(game.inventory.count('wood')).toBe(1);
+    expect(game.inventory.count('leaves')).toBe(1);
+    expect(game.inventory.count('axe')).toBe(1);
+    game.turn += 10_000;
+    expect(game.objectAt(game.player.x + 1, game.player.y)).toBeUndefined();
+  });
+
+  it('the axe gets an extra piece of wood from trees', () => {
+    const game = sandbox(16);
+    place(game, 1, 0, 'tree_pine');
+    game.inventory.add('axe');
+    game.move(1, 0);
+    expect(game.inventory.count('wood')).toBeGreaterThanOrEqual(2);
+  });
+
+  it('you can drink from the river, but not walk into it', () => {
+    const game = sandbox(17);
+    river(game);
+    game.needs.water = 20;
+    const { x } = game.player;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.player.x).toBe(x);
+    expect(game.needs.water).toBeGreaterThan(54);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'drinkRiver' });
+    game.needs.water = 100;
+    expect(game.move(1, 0)).toBe(false);
+  });
+
+  it('a bridge spans the river in front of you and can be walked over', () => {
+    const game = sandbox(18);
+    river(game);
+    game.inventory.add('wood', 12);
+    game.inventory.add('leaves', 6);
+    game.player.facing = 'up';
+    expect(game.buildProblem('bridge')).toEqual({ key: 'noBridgeSpot' });
+    game.player.facing = 'right';
+    expect(game.build('bridge')).toBe(true);
+    const { x, y } = game.player;
+    expect(game.objectAt(x + 1, y)?.kind).toBe('bridge_ew');
+    expect(game.objectAt(x + 2, y)?.kind).toBe('bridge_ew');
+    expect(game.inventory.count('wood')).toBe(6);
+    for (let i = 0; i < 3; i++) expect(game.move(1, 0)).toBe(true);
+    expect(game.player.x).toBe(x + 3);
+  });
+
+  it('a river too wide for one bridge cannot be bridged', () => {
+    const game = sandbox(19);
+    river(game, 4);
+    game.inventory.add('wood', 6);
+    game.inventory.add('leaves', 3);
+    game.player.facing = 'right';
+    expect(game.build('bridge')).toBe(false);
+    expect(game.inventory.count('wood')).toBe(6);
+  });
+
+  it('brambles and rivers do not stop you building a campfire', () => {
+    const game = new Game(20);
+    game.inventory.add('wood', 3);
+    game.inventory.add('stone', 2);
+    expect(game.build('campfire')).toBe(true);
+  });
+});
+
 describe('Game: no harsh endings', () => {
   it('running out of everything makes you faint and wake up at home', () => {
     const game = sandbox(9);
@@ -251,6 +364,7 @@ describe('Game: no harsh endings', () => {
 describe('Game: saving', () => {
   it('round-trips through JSON', () => {
     const game = sandbox(12);
+    river(game, 1);
     place(game, 1, 0, 'berry_bush');
     game.move(1, 0);
     game.wait();
@@ -321,6 +435,15 @@ function sandbox(seed: number): Game {
 
 function place(game: Game, dx: number, dy: number, kind: Parameters<Game['objects']['set']>[1]['kind']): void {
   game.objects.set(game.map.idx(game.player.x + dx, game.player.y + dy), { kind });
+}
+
+/** A river `width` cells wide just east of the explorer, running north–south. */
+function river(game: Game, width = 2): void {
+  for (let dy = -3; dy <= 3; dy++) {
+    for (let dx = 1; dx <= width; dx++) game.map.set(game.player.x + dx, game.player.y + dy, Tile.River);
+    game.map.set(game.player.x + width + 1, game.player.y + dy, Tile.Sand);
+    game.objects.delete(game.map.idx(game.player.x + width + 1, game.player.y + dy));
+  }
 }
 
 function nightTurn(): number {

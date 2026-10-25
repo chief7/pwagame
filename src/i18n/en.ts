@@ -9,6 +9,7 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   wood: { one: 'piece of wood', many: 'pieces of wood', short: ['wood', 'wood'] },
   leaves: { one: 'big leaf', many: 'big leaves', short: ['leaf', 'leaves'] },
   stone: { one: 'stone', many: 'stones', short: ['stone', 'stones'] },
+  axe: { one: 'stone axe', many: 'stone axes', short: ['axe', 'axes'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -34,6 +35,9 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   campfire: { name: 'campfire' },
   lean_to: { name: 'lean-to' },
   hut: { name: 'hut' },
+  bramble: { name: 'bramble thicket', gather: 'You chop through the brambles' },
+  bridge_ns: { name: 'bridge' },
+  bridge_ew: { name: 'bridge' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string }> = {
@@ -73,6 +77,7 @@ export const en: Strings = {
     bagEmpty: 'Your bag is empty. Bump into plants, logs and stones to gather things.',
     eat: 'Eat',
     forBuilding: 'For building',
+    tool: 'A tool. Keep it in your bag.',
     buildHint: 'Buildings go in front of you.',
     changeExplorer: 'Change explorer',
     newIsland: 'New island',
@@ -90,6 +95,8 @@ export const en: Strings = {
     campfire: { name: 'Campfire', description: 'Keeps you warm and lights up the night.' },
     lean_to: { name: 'Lean-to', description: 'A simple shelter. Sleep here to rest well and stay warmer.' },
     hut: { name: 'Hut', description: 'A cosy home. Toasty nights and the best sleep.' },
+    axe: { name: 'Stone axe', description: 'Chops through brambles, and gets you more wood from trees.' },
+    bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].many}`,
   itemCount,
@@ -105,8 +112,12 @@ export const en: Strings = {
       case 'tooFull': return "You're too full to eat that.";
       case 'eat': return `You eat ${itemCount(msg.item, 1)}. Yum!`;
       case 'build': return `You build ${a(obj(msg.obj))}.`;
+      case 'make': return `You make ${a(ITEM[msg.item].one)}.`;
       case 'needMaterials': return 'You need more materials.';
       case 'noRoom': return 'There is no room to build here.';
+      case 'noBridgeSpot': return 'Stand at a river and face the water. A bridge can cross up to 3 steps.';
+      case 'haveTool': return `You already have ${a(ITEM[msg.item].one)}.`;
+      case 'needTool': return `The ${obj(msg.obj)} is too thorny to clear by hand. You need ${a(ITEM[msg.item].one)}.`;
       case 'notSleepy': return "You're not sleepy right now.";
       case 'fallAsleep': return `You curl up in the ${msg.obj ? obj(msg.obj) : 'cave'} and fall asleep.`;
       case 'dozeOff': return 'You lie down on the ground and doze off.';
@@ -122,6 +133,7 @@ export const en: Strings = {
       }
       case 'notThirsty': return "You're not thirsty.";
       case 'drink': return 'You drink the cool, fresh water. Lovely!';
+      case 'drinkRiver': return 'You scoop up some cool river water. Lovely!';
       case 'look': {
         const name = a(obj(msg.obj));
         return `${name[0].toUpperCase()}${name.slice(1)}.`;

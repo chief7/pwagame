@@ -97,3 +97,32 @@ export function hut(): Sprite {
   }
   return s.outline().shadow(12, 27, 10, 1.3);
 }
+
+/**
+ * Plank bridge over a river cell, 16×16. `ns` is walked north–south
+ * (planks run across), `ew` east–west.
+ */
+export function bridge(dir: 'ns' | 'ew'): Sprite {
+  const s = new Sprite(`bridge_${dir}`);
+  for (let a = 0; a < 16; a++) {
+    for (let b = 3; b <= 12; b++) {
+      // a runs along the walking direction, b across it.
+      const [x, y] = dir === 'ns' ? [b, a] : [a, b];
+      const gap = a % 4 === 3;
+      const rail = b === 3 || b === 12;
+      const c = rail ? (b === 3 ? P.woodLight : P.woodDark)
+        : gap ? P.woodDeep
+        : a % 4 === 0 ? P.woodLight
+        : hash2(x, y, 80) < 0.15 ? P.woodDark : P.wood;
+      s.set(x, y, c);
+    }
+  }
+  // Rope lashings on the rails.
+  for (const a of [1, 8, 14]) {
+    for (const b of [3, 12]) {
+      const [x, y] = dir === 'ns' ? [b, a] : [a, b];
+      s.set(x, y, P.strawLight);
+    }
+  }
+  return s.outline();
+}

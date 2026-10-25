@@ -29,9 +29,15 @@ npm run preview   # serve the build (service worker is only active here)
   cold; a campfire, a shelter or a cave keeps you warm.
 - **Gathering:** bump into things. Palms give coconuts and leaves, trees give
   wood, berry bushes give berries; these regrow. Logs, pebbles, mushrooms and
-  chests are used up. Springs are fresh water; the sea is too salty.
+  chests are used up. Springs and the river are fresh water; the sea is too
+  salty.
 - **Building:** campfire, lean-to and hut, placed in front of you. Sleeping
-  in a shelter (or a cave) makes it home and rests you faster.
+  in a shelter (or a cave) makes it home and rests you faster. A stone axe
+  goes in your bag; a bridge goes across the river in front of you.
+- **Exploring:** you start on the home coast. A wall of brambles closes it
+  off: chop through with a stone axe (which also gets more wood from trees).
+  Behind it is the wild forest, and then a river: build a bridge to reach
+  the far side, where most hills and caves are. Further out are more chests.
 - **Animals:** crabs pinch if you linger, monkeys snatch food, piglets and
   bats keep their distance, turtles don't mind you.
 - **Saving:** the game saves itself to the browser after every action.
@@ -79,10 +85,10 @@ src/
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
-    worldgen.ts  island generation: beach, forest, rocky hills and caves, scenery
+    worldgen.ts  island generation: beach, forest, rocky hills and caves, bramble wall, river, scenery
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view
-    pathing.ts   BFS distance maps (travel, animals, placement)
+    pathing.ts   BFS distance maps (travel, animals, placement), reach across bridgeable rivers
     actors.ts    player and animal shapes
     rng.ts       seeded PRNG (mulberry32), saveable
   ui/
@@ -93,11 +99,11 @@ src/
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
-    terrain.ts   sand, water, grass, rock, cave floor, shore and grass-edge transitions
-    forest.ts    trees, bushes, berry bushes, mushrooms
+    terrain.ts   sand, water, river, grass, rock, cave floor, shore, grass-edge and river-bank transitions
+    forest.ts    trees, bushes, berry bushes, mushrooms, brambles
     objects.ts   stones, logs, chests, stalagmite, spring
     palms.ts     palm trees (24×32), with bare versions
-    structures.ts campfire (animated), lean-to, hut
+    structures.ts campfire (animated), lean-to, hut, bridges
     creatures.ts animals, item icons, raft
     characters.ts  male and female explorer, 4 facings × idle + 2 walk frames
     gallery.ts   the sprite gallery page

@@ -2,7 +2,7 @@
 // sprite and its words in src/i18n/) and it can be gathered, stored, eaten
 // or used in recipes.
 
-export type ItemId = 'coconut' | 'berries' | 'mushroom' | 'wood' | 'leaves' | 'stone';
+export type ItemId = 'coconut' | 'berries' | 'mushroom' | 'wood' | 'leaves' | 'stone' | 'axe';
 
 export interface Food {
   food?: number;
@@ -14,6 +14,8 @@ export interface ItemDef {
   id: ItemId;
   /** Present when the item can be eaten; values are how much each need refills. */
   eat?: Food;
+  /** Kept in the bag and used by gathering; you only ever need one. */
+  tool?: true;
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
@@ -23,6 +25,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   wood: { id: 'wood' },
   leaves: { id: 'leaves' },
   stone: { id: 'stone' },
+  axe: { id: 'axe', tool: true },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];

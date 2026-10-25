@@ -122,3 +122,36 @@ export function mushroom(): Sprite {
   drawMushroom(s, 8, 14, 1);
   return s.outline().shadow(8, 14.8, 6, 1);
 }
+
+/** Thorny thicket, 16×16: fills its cell edge to edge so a row reads as a wall. */
+export function bramble(): Sprite {
+  const s = new Sprite('bramble');
+  foliage(s, [
+    { cx: 8, cy: 9.5, r: 6.5 }, { cx: 3, cy: 11, r: 4 }, { cx: 13, cy: 11, r: 4 },
+    { cx: 4.5, cy: 6, r: 3.5 }, { cx: 11.5, cy: 6, r: 3.5 },
+  ], { cx: 8, cy: 9, r: 8 }, 66);
+  // Darker, denser leaves than a bush, so a thicket reads as a barrier.
+  const darker: Record<string, string> = { [P.canopyLight]: P.canopy, [P.canopy]: P.canopyDark, [P.canopyDark]: P.canopyDeep };
+  for (let i = 0; i < s.pixels.length; i++) {
+    const c = s.pixels[i];
+    if (c && darker[c]) s.pixels[i] = darker[c];
+  }
+  // Arching canes over the leaves, 2px thick, with pale thorns on top.
+  const canes: [number, number, number, number][] = [[1, 13, 10, 2], [5, 14, 15, 4], [0, 8, 12, 13]];
+  for (const [x0, y0, x1, y1] of canes) {
+    const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = Math.round(x0 + (x1 - x0) * t);
+      const y = Math.round(y0 + (y1 - y0) * t - Math.sin(t * Math.PI) * 2);
+      s.set(x, y, P.brambleStem);
+      s.set(x, y + 1, P.brambleStemDark);
+      if (i % 3 === 1) s.set(x, y - 1, P.thorn);
+    }
+  }
+  for (const [x, y] of [[3, 4], [12, 9], [6, 11]]) {
+    s.set(x, y, P.brambleFlower);
+    s.set(x + 1, y, P.flowerYellow);
+  }
+  return s.outline().shadow(8, 15, 7.5, 1.2);
+}

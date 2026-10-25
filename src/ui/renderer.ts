@@ -2,7 +2,7 @@ import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
 import { hash2 } from '../sprites/pixel';
-import { bake, buildSprites, grassTileName, shoreTileName, type Sprite } from '../sprites';
+import { bake, buildSprites, grassTileName, riverBankTileName, shoreTileName, type Sprite } from '../sprites';
 import { characterName } from '../sprites/characters';
 import type { Animator } from './animator';
 
@@ -18,6 +18,7 @@ const MAX_CELL_CSS = 48;
 /** How often the sea swaps glint patterns. */
 const WATER_FRAME_MS = 750;
 const WATER_TILES = ['water', 'water_2', 'water_3'];
+const RIVER_TILES = ['river', 'river_2'];
 const FIRE_FRAME_MS = 220;
 /** Night tint; its alpha comes from how dark a cell is. */
 const NIGHT_RGB = '10, 16, 42';
@@ -38,7 +39,7 @@ export class Renderer {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private readonly sprites = new Map<string, Baked>();
-  /** Terrain sprite per cell, worked out once per island ('~' is animated sea). */
+  /** Terrain sprite per cell, worked out once per island ('~' is animated sea, '≈' the river). */
   private readonly terrain = new WeakMap<GameMap, string[]>();
   private scale = 2;
   private dpr = 1;
@@ -109,6 +110,7 @@ export class Renderer {
     const y1 = Math.ceil((this.canvas.height - o.y) / cell);
     const terrain = this.terrainFor(map);
     const waterTick = anim.reducedMotion ? 0 : Math.floor(now / WATER_FRAME_MS);
+    const riverTick = anim.reducedMotion ? 0 : Math.floor(now / FIRE_FRAME_MS);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.imageSmoothingEnabled = false;
@@ -121,6 +123,7 @@ export class Renderer {
         if (!map.isExplored(x, y)) continue;
         let name = terrain[map.idx(x, y)];
         if (name === '~') name = WATER_TILES[(Math.floor(hash2(x, y, 51) * 3) + waterTick) % 3];
+        else if (name === '≈') name = RIVER_TILES[riverTick % 2];
         this.drawTile(name, o.x + x * cell, o.y + y * cell);
       }
     }
@@ -325,12 +328,16 @@ export class Renderer {
     switch (map.get(x, y)) {
       case Tile.Water:
         return '~';
+      case Tile.River:
+        return '≈';
       case Tile.Sand: {
-        const shore = shoreTileName((dx, dy) => !map.isLand(x + dx, y + dy));
+        const shore = shoreTileName((dx, dy) => map.isWet(x + dx, y + dy));
         if (shore !== 'sand') return shore;
         return roll < 0.72 ? 'sand' : roll < 0.94 ? 'sand_ripples' : 'sand_shell';
       }
       case Tile.Grass: {
+        const bank = riverBankTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.River);
+        if (bank !== 'grass') return bank;
         const edge = grassTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Sand);
         if (edge !== 'grass') return edge;
         return roll < 0.88 ? 'grass' : 'grass_flowers';

@@ -5,6 +5,8 @@ export const Tile = {
   /** Solid rock of the hills: blocks movement and sight. */
   Rock: 3,
   CaveFloor: 4,
+  /** Fresh water: blocks movement like the sea, but you can drink it and bridge it. */
+  River: 5,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -41,9 +43,14 @@ export class GameMap {
     if (this.inBounds(x, y)) this.tiles[this.idx(x, y)] = tile;
   }
 
-  /** Anything that isn't sea (rock counts as land). */
+  /** Anything that isn't sea or river (rock counts as land). */
   isLand(x: number, y: number): boolean {
-    return this.get(x, y) !== Tile.Water;
+    return !this.isWet(x, y);
+  }
+
+  isWet(x: number, y: number): boolean {
+    const t = this.get(x, y);
+    return t === Tile.Water || t === Tile.River;
   }
 
   /** Ground you can stand on, ignoring objects. */

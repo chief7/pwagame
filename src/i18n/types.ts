@@ -24,6 +24,8 @@ export interface Strings {
     bagEmpty: string;
     eat: string;
     forBuilding: string;
+    /** Bag note for tools. */
+    tool: string;
     buildHint: string;
     changeExplorer: string;
     newIsland: string;

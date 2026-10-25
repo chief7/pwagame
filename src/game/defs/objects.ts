@@ -10,7 +10,8 @@ export type ObjectKind =
   | 'stone_boulder' | 'stone_pebbles' | 'stone_mossy' | 'stalagmite'
   | 'log' | 'log_pile' | 'log_driftwood'
   | 'chest_closed' | 'chest_open' | 'spring'
-  | 'campfire' | 'lean_to' | 'hut';
+  | 'campfire' | 'lean_to' | 'hut'
+  | 'bramble' | 'bridge_ns' | 'bridge_ew';
 
 export interface Yield {
   item: ItemId;
@@ -22,6 +23,10 @@ export interface Yield {
 
 export interface Gather {
   yields: Yield[];
+  /** A tool the explorer must carry to gather at all. */
+  needs?: ItemId;
+  /** Extra items when the explorer carries a tool. */
+  bonus?: { tool: ItemId; item: ItemId; amount: number };
   /** Gone for good, turned into another object, or ready again after some turns. */
   after: { remove: true } | { becomes: ObjectKind } | { regrow: number };
 }
@@ -44,6 +49,8 @@ export interface ObjectDef {
   lightRadius?: number;
   /** Animation frames (sprite names), cycled by the renderer. */
   frames?: string[];
+  /** Built over river cells rather than on the ground. */
+  bridge?: true;
 }
 
 const def = (d: ObjectDef) => d;
@@ -63,11 +70,11 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   }),
   tree_broadleaf: def({
     kind: 'tree_broadleaf', blocksSight: true,
-    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], after: { regrow: 70 } },
+    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 } },
   }),
   tree_pine: def({
     kind: 'tree_pine', blocksSight: true,
-    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], after: { regrow: 70 } },
+    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 } },
   }),
   bush: def({
     kind: 'bush',
@@ -112,6 +119,12 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   campfire: def({ kind: 'campfire', warmthRadius: 2, lightRadius: 5, frames: ['campfire', 'campfire_2'] }),
   lean_to: def({ kind: 'lean_to', walkable: true, shelter: 0.6 }),
   hut: def({ kind: 'hut', walkable: true, shelter: 1 }),
+  bramble: def({
+    kind: 'bramble',
+    gather: { yields: [{ item: 'wood', min: 1, max: 1 }, { item: 'leaves', min: 1, max: 1 }], needs: 'axe', after: { remove: true } },
+  }),
+  bridge_ns: def({ kind: 'bridge_ns', walkable: true, bridge: true }),
+  bridge_ew: def({ kind: 'bridge_ew', walkable: true, bridge: true }),
 };
 
 export interface WorldObject {

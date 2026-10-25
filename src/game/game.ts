@@ -9,7 +9,7 @@ import { Inventory } from './inventory';
 import { GameMap, Tile } from './map';
 import type { FloatWhat, Msg, WakeReason } from './messages';
 import { freshNeeds, LOW, tickNeeds, type NeedId, type Needs } from './needs';
-import { DIRS, distanceMap } from './pathing';
+import { BRIDGE_SPAN, DIRS, distanceMap, reachWithBridges } from './pathing';
 import { Rng } from './rng';
 import { generateWorld } from './worldgen';
 
@@ -19,6 +19,8 @@ const CAVE_SHELTER = 0.5;
 const RESPAWN_EVERY = 50;
 const SLEEP_LIMIT = 200;
 const PINCH_DAMAGE = 4;
+/** Water from one drink at the river, the same as a spring. */
+const RIVER_DRINK = 35;
 export const SAVE_VERSION = 2;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
@@ -140,10 +142,11 @@ export class Game {
     return this.animals.find((a) => a.x === x && a.y === y);
   }
 
-  /** Floor that nothing solid stands on. Ignores animals. */
+  /** Floor that nothing solid stands on, or a bridge. Ignores animals. */
   isPassable(x: number, y: number): boolean {
-    if (!this.map.isFloor(x, y)) return false;
     const obj = this.objectAt(x, y);
+    if (this.map.get(x, y) === Tile.River) return !!obj && !!OBJECTS[obj.kind].bridge;
+    if (!this.map.isFloor(x, y)) return false;
     return !obj || !!OBJECTS[obj.kind].walkable;
   }
 
@@ -194,8 +197,14 @@ export class Game {
 
   /** Why a recipe can't be built right now, or null if it can. */
   buildProblem(id: RecipeId): Msg | null {
-    if (!this.inventory.hasAll(RECIPES[id].cost)) return { key: 'needMaterials' };
-    if (!this.buildSpot(RECIPES[id].builds)) return { key: 'noRoom' };
+    const recipe = RECIPES[id];
+    if ('makes' in recipe && ITEMS[recipe.makes].tool && this.inventory.count(recipe.makes) > 0) {
+      return { key: 'haveTool', item: recipe.makes };
+    }
+    if (!this.inventory.hasAll(recipe.cost)) return { key: 'needMaterials' };
+    if ('builds' in recipe && !this.buildSpot(recipe.builds)) {
+      return OBJECTS[recipe.builds].bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
+    }
     return null;
   }
 
@@ -227,13 +236,19 @@ export class Game {
       return true;
     }
     if (!this.isPassable(nx, ny)) {
+      if (this.map.get(nx, ny) === Tile.River) {
+        this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: nx, targetY: ny });
+        if (!this.drink(RIVER_DRINK, { key: 'drinkRiver' })) return false;
+        this.endTurn();
+        return true;
+      }
       if (this.map.get(nx, ny) === Tile.Water) this.message({ key: 'seaSalty' }, 'info');
       return false;
     }
     this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
     p.x = nx;
     p.y = ny;
-    if (obj) this.message({ key: 'stepInto', obj: obj.kind }, 'info');
+    if (obj && OBJECTS[obj.kind].shelter) this.message({ key: 'stepInto', obj: obj.kind }, 'info');
     this.endTurn();
     return true;
   }
@@ -289,15 +304,29 @@ export class Game {
 
   build(id: RecipeId): boolean {
     const recipe = RECIPES[id];
-    const spot = this.buildSpot(recipe.builds);
-    if (!spot || !this.inventory.takeAll(recipe.cost)) {
-      this.message(this.buildProblem(id) ?? { key: 'noRoom' }, 'info');
+    const problem = this.buildProblem(id);
+    if (problem) {
+      this.message(problem, 'info');
       return false;
     }
-    this.objects.set(this.map.idx(spot.x, spot.y), { kind: recipe.builds });
-    this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: spot.x, targetY: spot.y });
-    this.emit({ type: 'sparkle', x: spot.x, y: spot.y });
-    this.message({ key: 'build', obj: recipe.builds }, 'good');
+    this.inventory.takeAll(recipe.cost);
+    const p = this.player;
+    if ('makes' in recipe) {
+      this.inventory.add(recipe.makes);
+      this.emit({ type: 'float', x: p.x, y: p.y, amount: 1, what: { item: recipe.makes }, tone: 'good' });
+      this.emit({ type: 'sparkle', x: p.x, y: p.y });
+      this.message({ key: 'make', item: recipe.makes }, 'good');
+      this.endTurn();
+      return true;
+    }
+    const spot = this.buildSpot(recipe.builds)!;
+    for (const cell of spot.cells) {
+      this.objects.set(this.map.idx(cell.x, cell.y), { kind: spot.kind });
+      this.emit({ type: 'sparkle', x: cell.x, y: cell.y });
+    }
+    const [first] = spot.cells;
+    this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: first.x, targetY: first.y });
+    this.message({ key: 'build', obj: spot.kind }, 'good');
     this.endTurn();
     return true;
   }
@@ -346,20 +375,15 @@ export class Game {
     const def = OBJECTS[obj.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
 
-    if (def.drink) {
-      if (this.needs.water >= 98) {
-        this.message({ key: 'notThirsty' }, 'info');
-        return false;
-      }
-      this.needs.water = Math.min(100, this.needs.water + def.drink);
-      this.message({ key: 'drink' }, 'good');
-      this.emit({ type: 'float', x: this.player.x, y: this.player.y, amount: def.drink, what: { need: 'water' }, tone: 'good' });
-      return true;
-    }
+    if (def.drink) return this.drink(def.drink, { key: 'drink' });
 
     const gather = def.gather;
     if (!gather) {
       this.message({ key: 'look', obj: obj.kind }, 'info');
+      return false;
+    }
+    if (gather.needs && this.inventory.count(gather.needs) === 0) {
+      this.message({ key: 'needTool', obj: obj.kind, item: gather.needs }, 'info');
       return false;
     }
     if (obj.readyAt !== undefined && obj.readyAt > this.turn) {
@@ -372,6 +396,12 @@ export class Game {
       if (y0.chance !== undefined && !this.rng.chance(y0.chance)) continue;
       const n = this.rng.int(y0.min, y0.max);
       if (n > 0) got.push([y0.item, n]);
+    }
+    const bonus = gather.bonus;
+    if (bonus && this.inventory.count(bonus.tool) > 0) {
+      const same = got.find(([item]) => item === bonus.item);
+      if (same) same[1] += bonus.amount;
+      else got.push([bonus.item, bonus.amount]);
     }
     for (const [item, n] of got) {
       this.inventory.add(item, n);
@@ -388,6 +418,17 @@ export class Game {
     return true;
   }
 
+  private drink(amount: number, msg: Msg): boolean {
+    if (this.needs.water >= 98) {
+      this.message({ key: 'notThirsty' }, 'info');
+      return false;
+    }
+    this.needs.water = Math.min(100, this.needs.water + amount);
+    this.message(msg, 'good');
+    this.emit({ type: 'float', x: this.player.x, y: this.player.y, amount, what: { need: 'water' }, tone: 'good' });
+    return true;
+  }
+
   private shoo(a: Animal): void {
     const def = ANIMALS[a.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: a.x, targetY: a.y });
@@ -395,32 +436,61 @@ export class Game {
     if (def.temper !== 'calm') a.flee = 8;
   }
 
-  /** Where a new building goes: in front of the explorer if free, else the nearest free neighbour. */
-  private buildSpot(kind: ObjectKind): { x: number; y: number } | null {
+  /**
+   * Where a new building goes: in front of the explorer if free, else the
+   * nearest free neighbour. A bridge goes straight ahead across the river
+   * instead, facing the way the explorer does.
+   */
+  private buildSpot(kind: ObjectKind): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
     const p = this.player;
     const [fx, fy] = facingDelta(p.facing);
+    if (OBJECTS[kind].bridge) {
+      const cells = this.riverAhead(p.x, p.y, fx, fy);
+      return cells ? { kind: fx ? 'bridge_ew' : 'bridge_ns', cells } : null;
+    }
     const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
     for (const [dx, dy] of order) {
       const x = p.x + dx;
       const y = p.y + dy;
       if (!this.map.isFloor(x, y) || this.objectAt(x, y) || this.animalAt(x, y)) continue;
-      if (OBJECTS[kind].walkable) return { x, y };
+      if (OBJECTS[kind].walkable) return { kind, cells: [{ x, y }] };
       // Solid buildings must not cut off part of the island.
       const i = this.map.idx(x, y);
       this.objects.set(i, { kind });
       const ok = this.allReachableFrom(p.x, p.y);
       this.objects.delete(i);
-      if (ok) return { x, y };
+      if (ok) return { kind, cells: [{ x, y }] };
     }
     return null;
   }
 
+  /** The open river cells straight ahead, if they end on free ground within a bridge's span. */
+  private riverAhead(x: number, y: number, dx: number, dy: number): { x: number; y: number }[] | null {
+    const cells: { x: number; y: number }[] = [];
+    for (let k = 1; k <= BRIDGE_SPAN + 1; k++) {
+      const cx = x + dx * k;
+      const cy = y + dy * k;
+      if (this.map.get(cx, cy) === Tile.River && !this.objectAt(cx, cy)) {
+        cells.push({ x: cx, y: cy });
+        continue;
+      }
+      return cells.length && this.isPassable(cx, cy) ? cells : null;
+    }
+    return null;
+  }
+
+  /**
+   * Whether everything the explorer could get to now (counting brambles to
+   * clear and rivers to bridge) is still reachable.
+   */
   private allReachableFrom(sx: number, sy: number): boolean {
-    const reach = distanceMap(this.map, sx, sy, (x, y) => this.isPassable(x, y));
+    const open = (x: number, y: number) => this.isPassable(x, y) || this.objectAt(x, y)?.kind === 'bramble';
+    const isRiver = (x: number, y: number) => this.map.get(x, y) === Tile.River && !this.objectAt(x, y);
+    const reach = reachWithBridges(this.map, sx, sy, open, isRiver);
     for (let i = 0; i < this.map.tiles.length; i++) {
       const x = i % this.map.width;
       const y = (i - x) / this.map.width;
-      if (this.isPassable(x, y) && reach[i] < 0) return false;
+      if (open(x, y) && !reach[i]) return false;
     }
     return true;
   }

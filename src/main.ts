@@ -300,7 +300,7 @@ function renderSheet(): void {
       });
       const note = food
         ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
-        : words.ui.forBuilding;
+        : ITEMS[id].tool ? words.ui.tool : words.ui.forBuilding;
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), button));
     }
   } else {
@@ -326,7 +326,7 @@ function renderSheet(): void {
       }
       const { name, description } = words.recipes[id];
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
-      rows.append(row(icon(recipe.builds), name, note, button));
+      rows.append(row(icon('builds' in recipe ? recipe.builds : `item_${recipe.makes}`), name, note, button));
     }
     rows.append(el('p', { className: 'empty', textContent: words.ui.buildHint }));
   }

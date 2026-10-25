@@ -161,7 +161,7 @@ All actions return `true` when time passed and `false` when nothing happened.
 | `travelStep(x, y)` | One step on the shortest known path to a cell. Used for tap-to-travel. |
 | `wait()` | Passes one turn. |
 | `eat(item)` | Eats one food item from the bag. |
-| `build(recipe)` | Builds in front of the player. |
+| `build(recipe)` | Builds in front of the player, or makes an item for the bag. |
 | `sleep()` | Sleeps for many turns until a stop condition (see 4.4). |
 
 What `move` does when the target cell is not free:
@@ -169,10 +169,12 @@ What `move` does when the target cell is not free:
 1. **Animal there:** shoo it. The animal runs away for 8 turns (calm animals do not run).
 2. **Solid object there:** interact with it:
    - Spring: drink.
-   - Object with `gather`: gather from it.
+   - Object with `gather`: gather from it. If it `needs` a tool that the
+     player does not carry (bramble: axe), say so. No turn passes.
    - Other object: show its name. No turn passes.
-3. **Sea:** show "too salty". No turn passes.
-4. **Rock:** nothing happens. No turn passes.
+3. **River** (with no bridge): drink, +35 Water.
+4. **Sea:** show "too salty". No turn passes.
+5. **Rock:** nothing happens. No turn passes.
 
 ---
 
@@ -280,11 +282,21 @@ things happens:
 | `{ remove: true }` | The object is gone. | logs, driftwood, pebbles, mushrooms |
 | `{ becomes: kind }` | The object turns into another object. | closed chest → open chest |
 
+Two optional fields use tools:
+
+- `needs: item`: the player must carry this item to gather at all. A
+  bramble needs the axe. Brambles are removed and never come back.
+- `bonus: { tool, item, amount }`: extra items when the player carries the
+  tool. Trees give 1 more wood with the axe.
+
+Tools (`tool: true` on the item) stay in the bag. They are never used up.
+
 ### 4.7 Eating and drinking
 
 - **Eat** from the Bag panel. Each food adds to Food, Water and/or Energy.
   The player cannot eat when Food is 98 or more, unless the food also gives Water.
-- **Drink** by walking into a spring: +35 Water. Not possible when Water is 98 or more.
+- **Drink** by walking into a spring or the river: +35 Water. Not possible
+  when Water is 98 or more.
 - The sea cannot be used for drinking.
 
 ### 4.8 Building
@@ -295,8 +307,20 @@ The Build panel lists all recipes. A recipe needs items. The building goes:
 2. Else in the first free neighbour cell.
 
 A solid building (for example a campfire) is not placed where it would cut
-off part of the island. Shelters (`walkable`) can be placed anywhere free,
-and the player can walk into them.
+off part of the island. This check counts brambles as open and rivers as
+crossable (as if every bramble were cleared and every bridge built).
+Shelters (`walkable`) can be placed anywhere free, and the player can walk
+into them.
+
+Special recipes:
+
+- **Items** (`makes` instead of `builds`): the item goes into the bag. A
+  tool cannot be made when the player already has one (`haveTool`).
+- **Bridge** (an object with `bridge: true`): it goes straight ahead, in the
+  facing direction. The cells in front must be river, 1 to 3 cells
+  (`BRIDGE_SPAN`), with free ground after them. The bridge fills all those
+  cells. Facing left or right builds `bridge_ew`, else `bridge_ns`. If
+  there is no such river, the message is `noBridgeSpot`.
 
 ### 4.9 Animals
 
@@ -313,6 +337,7 @@ Animals have a **temper**. They only react when the player is within their
 Other rules:
 
 - Animals only walk on their `habitat` tiles. They never enter objects or the player's cell.
+  No habitat has river tiles, so animals never cross the river, also not on bridges.
 - When they do not react, they wander (chance per turn = `wander`).
 - Shooed animals run away for 8 turns.
 - Animals do not act on the player while the player sleeps.
@@ -323,11 +348,12 @@ Other rules:
 
 ## 5. The world
 
-`generateWorld(rng)` makes one island, 72 × 56 cells. The same seed always
+`generateWorld(rng)` makes one island, 104 × 80 cells. The same seed always
 makes the same island.
 
-Tiles: `Water`, `Sand`, `Grass`, `Rock` (blocks movement and sight) and
-`CaveFloor`.
+Tiles: `Water`, `Sand`, `Grass`, `Rock` (blocks movement and sight),
+`CaveFloor` and `River` (fresh water: blocks movement, not sight).
+`map.isWet()` is true for sea and river; `map.isLand()` is the opposite.
 
 Steps:
 
@@ -347,16 +373,36 @@ Steps:
 4. **Start point.** A random sand cell with free floor on all 8 sides.
 5. **Connect.** Any floor that the start cannot reach gets a tunnel. The
    tunnel follows the shortest path through land and turns rock into cave floor.
-6. **Objects.** Each free floor cell can get one object, with chances per
-   biome (`SCATTER`). Forest density follows a noise map, so trees form
-   groves. An object is not placed if it cuts off part of the island.
-   Then the generator adds 5 springs (forest or cave) and 4 chests (10 or
-   more cells from the start).
-7. **Animals.** `Game` adds each animal kind up to its population, on its
-   habitat, 8 or more cells from the start.
+6. **Regions.** Measure the walking distance (8 ways) from the start to all
+   floor. Two distances split the floor into three regions:
+   - **Home coast** (region 0): the nearest 38% of the floor (`HOME_SHARE`).
+   - **Wild forest** (region 1): up to 70% (`FOREST_SHARE`).
+   - **Far side** (region 2): the rest. It must be at least 15%.
 
-A typical island has about 2,250 water, 750 sand, 700 grass, 200 rock and
-70 cave cells. Generation takes about 0.2 seconds.
+   All floor at exactly the first distance gets a **bramble**. All floor at
+   the second distance and one more becomes **river**, 2 cells wide. Each
+   step changes the distance by at most 1, so every way out of a region must
+   cross its band. Then the banks are cleaned: no land strip one cell thin
+   between water, and no grass that touches both river and sand (that grass
+   becomes sand). The island is made again if the far side is too small, or
+   if some floor cannot be reached with bridges of up to 3 cells
+   (`reachWithBridges` in `pathing.ts`).
+7. **Objects.** The brambles come first. Each other free floor cell can get
+   one object, with chances per biome (`SCATTER`). Forest density follows a
+   noise map, so trees form groves. Cells next to the river (4 ways) stay
+   free, so a bridge always has a place to land. An object is not placed if
+   it cuts off part of the island (brambles count as open, rivers as
+   bridgeable). A fast local test skips the full check when the open cells
+   around the new object still touch each other. Then the generator adds 8
+   springs (forest or cave, at least 2 on the home coast) and 8 chests
+   (2 home, 3 forest, 3 far side; 10 or more cells from the start).
+8. **Animals.** `Game` adds each animal kind up to its population, on its
+   habitat, 8 or more cells from the start. Animals in other regions stay
+   there.
+
+A typical island has about 3,100 floor cells (about 1,150 home, 1,000 forest,
+850 far side), 50 to 200 river cells and 50 to 80 brambles. Generation
+takes 0.1 to 0.3 seconds.
 
 ---
 
@@ -383,6 +429,7 @@ coconut: { id: 'coconut', eat: { food: 18, water: 22 } },
 ```
 
 - `eat` is optional. With `eat`, the item is food and shows an Eat button.
+- `tool: true` marks a tool: it is kept in the bag, and only one can be made.
 - Also add the id to the `ItemId` type.
 
 ### World objects
@@ -398,6 +445,7 @@ coconut: { id: 'coconut', eat: { food: 18, water: 22 } },
 | `warmthRadius` | Warms the player within this many cells. |
 | `lightRadius` | Lights cells at night. |
 | `frames` | Sprite names for an animation (2 frames, 220 ms each). |
+| `bridge` | Built across river cells (see 4.8). The player can walk on it. |
 
 Also add the kind to the `ObjectKind` type.
 
@@ -408,7 +456,10 @@ a chance per biome. Or make it buildable with a recipe.
 
 ```ts
 campfire: { id: 'campfire', builds: 'campfire', cost: { wood: 3, stone: 2 } },
+axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
 ```
+
+A recipe has `builds` (an object) or `makes` (an item for the bag).
 
 ### Animals
 
@@ -423,9 +474,9 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom (food); wood, leaves, stone (materials) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone) |
+| Items | coconut, berries, mushroom (food); wood, leaves, stone (materials); stone axe (tool) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), bridge (6 wood, 3 leaves) |
 | Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves) |
 
 ---
@@ -445,9 +496,11 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 - Sizes: terrain tiles are 16 × 16. Most objects are 16 × 16. Palms and trees
   are 24 × 32, the hut 24 × 28 and the lean-to 20 × 20. All are drawn
   bottom-centre on their cell, so tall sprites overlap the cell above.
-- **Transition tiles** (shore and grass edges) are 12 tiles per set: 4 edges,
-  4 outer corners and 4 inner corners. `transitionTileName()` picks one from
-  the neighbour cells.
+- **Transition tiles** (shore, grass edges and river banks) are 12 tiles per
+  set: 4 edges, 4 outer corners and 4 inner corners. `transitionTileName()`
+  picks one from the neighbour cells. Sand next to the river uses the shore
+  set. Grass next to the river uses the `bank_*` set.
+- The river has 2 frames (`river`, `river_2`), 220 ms each.
 - Characters have 4 facings × 3 frames (stand, step 1, step 2). The left
   facing is the right facing, mirrored.
 - The gallery page (`/sprites.html`) shows every sprite.
@@ -462,7 +515,8 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 `Renderer.render(game, animator, now)` draws one frame:
 
 1. Fill with fog colour.
-2. Terrain for all explored cells. The sea tiles change every 750 ms.
+2. Terrain for all explored cells. The sea tiles change every 750 ms, the
+   river tiles every 220 ms.
 3. Row by row, top to bottom: objects, then animals and the player in that
    row. This makes tall sprites overlap correctly.
 4. Night darkness per cell, with light from campfires and the player.
@@ -514,7 +568,9 @@ Auto-walk (travel and hold) stops when:
   island starts.
 - The save holds: seed, random number state, turn, tiles, explored cells,
   objects, animals, player, home, needs, inventory, warnings and the last 30
-  log lines. It is about 15 KB.
+  log lines. It is about 30 KB (15 KB on islands from before the larger
+  size). The save keeps the island size, so old saves load their old,
+  smaller island without brambles or river.
 - `SAVE_VERSION` is 2. **If you change the shape of the save, increase
   `SAVE_VERSION`** and decide how to handle old saves. Version 1 saves still
   load: their log lines were English text and become `legacy` messages.
@@ -575,7 +631,11 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Crab pinch | `game.ts` → `PINCH_DAMAGE` | 4 |
 | Animal top-up | `game.ts` → `RESPAWN_EVERY` | 50 turns |
 | Longest sleep | `game.ts` → `SLEEP_LIMIT` | 200 turns |
-| Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 72 × 56 |
+| Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 104 × 80 |
+| Region sizes | `worldgen.ts` → `HOME_SHARE`, `FOREST_SHARE`, `MIN_FAR_SHARE` | 0.38, 0.7, 0.15 |
+| Springs and chests | `worldgen.ts` → `SPRINGS`, `HOME_SPRINGS`, `CHESTS` | 8, 2, [2, 3, 3] |
+| Bridge span | `pathing.ts` → `BRIDGE_SPAN` | 3 cells |
+| River drink | `game.ts` → `RIVER_DRINK` | 35 |
 | Beach width, hills | `worldgen.ts` → `BEACH_WIDTH`, `HILL_MIN_DIST` | 3, 5 |
 | Object density | `worldgen.ts` → `SCATTER` | chance per cell and biome |
 | Step speed | `animator.ts` → `STEP_MS` | 130 ms |
@@ -591,6 +651,8 @@ Also run `npm run build` (typecheck and build) before you commit.
 - There is no goal or ending yet. The raft sprite exists for a future
   "build a raft" goal.
 - There is no sound.
+- Where the river meets the sea, the two water colours meet in a hard line.
+- Cave floor next to the river has no bank tile.
 - The game has not been tested on a real phone.
 
 ---

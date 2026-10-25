@@ -1,16 +1,19 @@
 import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { GameMap, Tile } from './map';
-import { DIRS, distanceMap } from './pathing';
+import { DIRS, distanceMap, reachWithBridges } from './pathing';
 import type { Rng } from './rng';
 
 export interface World {
   map: GameMap;
   start: { x: number; y: number };
   objects: Map<number, WorldObject>;
+  /** Per cell: 0 home coast, 1 wild forest, 2 far side of the river, NO_REGION elsewhere. */
+  region: Uint8Array;
 }
 
-export const WORLD_WIDTH = 72;
-export const WORLD_HEIGHT = 56;
+export const WORLD_WIDTH = 104;
+export const WORLD_HEIGHT = 80;
+export const NO_REGION = 255;
 
 const SMOOTH_PASSES = 5;
 const MIN_LAND_RATIO = 0.42;
@@ -18,6 +21,15 @@ const MIN_LAND_RATIO = 0.42;
 const BEACH_WIDTH = 3;
 /** Cells from the sea where hills may rise. */
 const HILL_MIN_DIST = 5;
+/** Share of the ground (nearest the start first) on the home coast, and on the home coast plus the forest. */
+const HOME_SHARE = 0.38;
+const FOREST_SHARE = 0.7;
+/** Least share of the ground on the far side of the river. */
+const MIN_FAR_SHARE = 0.15;
+/** Springs and chests per region (home, forest, far side); springs beyond the first go anywhere. */
+const HOME_SPRINGS = 2;
+const SPRINGS = 8;
+const CHESTS = [2, 3, 3];
 
 /** What grows where, as chance per free cell. */
 const SCATTER: Record<'sand' | 'grass' | 'cave', [ObjectKind, number][]> = {
@@ -37,6 +49,11 @@ const SCATTER: Record<'sand' | 'grass' | 'cave', [ObjectKind, number][]> = {
  * with caves in the middle. Everything walkable is connected (tunnels are
  * dug through rock where needed), and the coasts and forest edges are
  * cleaned so the transition tiles can draw them.
+ *
+ * The island has three regions by walking distance from the start: the
+ * home coast, then a wall of brambles, the wild forest, then a river, and
+ * the far side. Everything can be reached by clearing brambles and
+ * building bridges.
  */
 export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIGHT): World {
   for (;;) {
@@ -46,8 +63,10 @@ export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIG
     const start = pickStart(map, rng);
     if (!start) continue;
     connectFloor(map, start);
-    const objects = scatterObjects(map, rng, start);
-    return { map, start, objects };
+    const borders = addBorders(map, start);
+    if (!borders) continue;
+    const objects = scatterObjects(map, rng, start, borders);
+    return { map, start, objects, region: borders.region };
   }
 }
 
@@ -308,34 +327,104 @@ function connectFloor(map: GameMap, start: { x: number; y: number }): void {
   }
 }
 
+// ---- Regions: brambles and the river ----------------------------------------------
+
+interface Borders {
+  region: Uint8Array;
+  /** Cells that get a bramble: a one-cell band all the way round the home coast. */
+  brambles: number[];
+}
+
+/**
+ * Close off the home coast with a band of brambles, and the forest with a
+ * river two cells wide. Each band follows one walking distance from the
+ * start, so every way out has to cross it. Returns null when the island
+ * doesn't split well (too little far side, or a river too wide to bridge).
+ */
+function addBorders(map: GameMap, start: { x: number; y: number }): Borders | null {
+  const dist = distanceMap(map, start.x, start.y, (x, y) => map.isFloor(x, y));
+  const floor = [...dist].filter((d) => d >= 0).sort((a, b) => a - b);
+  const homeDist = floor[Math.floor(floor.length * HOME_SHARE)];
+  const riverDist = floor[Math.floor(floor.length * FOREST_SHARE)];
+  if (riverDist - homeDist < 6) return null;
+
+  for (let i = 0; i < dist.length; i++) {
+    if (dist[i] === riverDist || dist[i] === riverDist + 1) map.tiles[i] = Tile.River;
+  }
+  cleanRiverBanks(map);
+
+  const region = new Uint8Array(dist.length).fill(NO_REGION);
+  const brambles: number[] = [];
+  let far = 0;
+  for (let i = 0; i < dist.length; i++) {
+    const x = i % map.width;
+    if (dist[i] < 0 || !map.isFloor(x, (i - x) / map.width)) continue;
+    region[i] = dist[i] < homeDist ? 0 : dist[i] < riverDist ? 1 : 2;
+    if (dist[i] === homeDist) brambles.push(i);
+    if (region[i] === 2) far++;
+  }
+  if (far < floor.length * MIN_FAR_SHARE) return null;
+
+  const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
+  const reach = reachWithBridges(map, start.x, start.y, (x, y) => map.isFloor(x, y), isRiver);
+  for (let i = 0; i < dist.length; i++) if (region[i] !== NO_REGION && !reach[i]) return null;
+  return { region, brambles };
+}
+
+/**
+ * Make the river drawable: no land strips one cell thin between water, and
+ * no grass that touches both the river and the beach (a grass tile can
+ * only show one kind of edge). Sand by the river uses the shore tiles.
+ */
+function cleanRiverBanks(map: GameMap): void {
+  for (let changed = true; changed; ) {
+    const before = map.tiles.slice();
+    removeThin(map, (x, y) => map.isLand(x, y), (x, y) => map.set(x, y, Tile.River));
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        if (map.get(x, y) !== Tile.Grass) continue;
+        const near = (t: Tile) => DIRS.some(([dx, dy]) => map.get(x + dx, y + dy) === t);
+        if (near(Tile.River) && near(Tile.Sand)) map.set(x, y, Tile.Sand);
+      }
+    }
+    removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, Tile.Sand));
+    changed = map.tiles.some((t, i) => t !== before[i]);
+  }
+}
+
 // ---- Objects ---------------------------------------------------------------------
 
-function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number }): Map<number, WorldObject> {
-  const objects = new Map<number, WorldObject>();
+function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number }, borders: Borders): Map<number, WorldObject> {
+  const objects = new Map<number, WorldObject>(borders.brambles.map((i) => [i, { kind: 'bramble' }]));
+  const { region } = borders;
   const forest = valueNoise(map.width, map.height, 6, rng);
+  // Brambles can be cleared, so they don't count as blocking here.
   const blocked = (x: number, y: number) => {
     const o = objects.get(map.idx(x, y));
-    return o !== undefined && !OBJECTS[o.kind].walkable;
+    return o !== undefined && !OBJECTS[o.kind].walkable && o.kind !== 'bramble';
   };
+  const open = (x: number, y: number) => map.isFloor(x, y) && !blocked(x, y);
+  const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
   const nearStart = (x: number, y: number) => Math.max(Math.abs(x - start.x), Math.abs(y - start.y)) <= 1;
+  // River banks stay clear so a bridge always has somewhere to land.
+  const onBank = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isRiver(x + dx, y + dy));
 
   // Placing something must never wall off part of the island.
   const allReachable = (): boolean => {
-    const reach = distanceMap(map, start.x, start.y, (x, y) => map.isFloor(x, y) && !blocked(x, y));
+    const reach = reachWithBridges(map, start.x, start.y, open, isRiver);
     for (let i = 0; i < map.tiles.length; i++) {
       const x = i % map.width;
-      const y = (i - x) / map.width;
-      if (map.isFloor(x, y) && !blocked(x, y) && reach[i] < 0) return false;
+      if (open(x, (i - x) / map.width) && !reach[i]) return false;
     }
     return true;
   };
   const place = (i: number, kind: ObjectKind): boolean => {
     objects.set(i, { kind });
-    // Cells with fewer than two open neighbours can't be cut points; skip the check there.
+    // If the open cells round this one still touch each other, it can't be
+    // a cut point; only check the whole island when they don't.
     const x = i % map.width;
     const y = (i - x) / map.width;
-    const open = DIRS.filter(([dx, dy]) => map.isFloor(x + dx, y + dy) && !blocked(x + dx, y + dy)).length;
-    if (open < 2 || allReachable()) return true;
+    if (openRingConnected(x, y, open) || allReachable()) return true;
     objects.delete(i);
     return false;
   };
@@ -348,7 +437,7 @@ function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number })
   for (const i of cells) {
     const x = i % map.width;
     const y = (i - x) / map.width;
-    if (!map.isFloor(x, y) || nearStart(x, y)) continue;
+    if (!map.isFloor(x, y) || objects.has(i) || nearStart(x, y) || onBank(x, y)) continue;
     const tile = map.get(x, y);
     const biome = tile === Tile.Sand ? 'sand' : tile === Tile.Grass ? 'grass' : 'cave';
     const density = biome === 'grass' ? 0.4 + forest(x, y) * 1.2 : 1;
@@ -362,27 +451,53 @@ function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number })
     }
   }
 
-  // Fresh water: springs in the forest and pools in the caves.
-  const springSpots = cells.filter((i) => {
+  // Fresh water: springs in the forest and pools in the caves, with some
+  // always on the home coast.
+  const free = (i: number) => {
     const x = i % map.width;
     const y = (i - x) / map.width;
-    return (map.get(x, y) === Tile.Grass || map.get(x, y) === Tile.CaveFloor) && !objects.has(i) && !nearStart(x, y);
-  });
+    return map.isFloor(x, y) && !objects.has(i) && !nearStart(x, y) && !onBank(x, y);
+  };
+  const springSpots = cells.filter((i) => free(i) && (map.tiles[i] === Tile.Grass || map.tiles[i] === Tile.CaveFloor));
   let springs = 0;
   for (const i of springSpots) {
-    if (springs >= 5) break;
-    if (place(i, 'spring')) springs++;
+    if (springs >= HOME_SPRINGS) break;
+    if (region[i] === 0 && place(i, 'spring')) springs++;
+  }
+  for (const i of springSpots) {
+    if (springs >= SPRINGS) break;
+    if (free(i) && place(i, 'spring')) springs++;
   }
 
-  // A few chests to find.
-  let chests = 0;
+  // A few chests to find, most of them further out.
+  const chests = [0, 0, 0];
   for (const i of cells) {
-    if (chests >= 4) break;
+    const r = region[i];
+    if (r === NO_REGION || chests[r] >= CHESTS[r] || !free(i)) continue;
     const x = i % map.width;
     const y = (i - x) / map.width;
-    if (!map.isFloor(x, y) || objects.has(i) || nearStart(x, y)) continue;
     if (Math.abs(x - start.x) + Math.abs(y - start.y) < 10) continue;
-    if (place(i, 'chest_closed')) chests++;
+    if (place(i, 'chest_closed')) chests[r]++;
   }
   return objects;
+}
+
+/** The 8 cells round a cell, in ring order. */
+const RING: readonly (readonly [number, number])[] = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+
+/** Whether the open cells round (x, y) form one 8-way connected group without (x, y) itself. */
+function openRingConnected(x: number, y: number, open: (x: number, y: number) => boolean): boolean {
+  const cells = RING.filter(([dx, dy]) => open(x + dx, y + dy));
+  if (cells.length < 2) return true;
+  const seen = new Set([0]);
+  const stack = [0];
+  while (stack.length) {
+    const [ax, ay] = cells[stack.pop()!];
+    cells.forEach(([bx, by], j) => {
+      if (seen.has(j) || Math.max(Math.abs(ax - bx), Math.abs(ay - by)) > 1) return;
+      seen.add(j);
+      stack.push(j);
+    });
+  }
+  return seen.size === cells.length;
 }

@@ -15,6 +15,10 @@ export const PALETTE = {
   waterShallow: '#5ec0cc',
   waterGlint: '#9fe0e2',
   foam: '#eef8f2',
+  river: '#3a9cb8',
+  riverRipple: '#7fd0d8',
+  mud: '#7a5a3a',
+  mudDark: '#5e4329',
 
   wood: '#8a5a32',
   woodLight: '#b07a43',
@@ -87,6 +91,10 @@ export const PALETTE = {
   mushroomSpot: '#f6e3c4',
   mushroomStem: '#efe6d2',
   mushroomStemShade: '#cfc3a8',
+  brambleStem: '#7a3a46',
+  brambleStemDark: '#52242e',
+  thorn: '#efd9b4',
+  brambleFlower: '#f6d6e4',
 
   flameCore: '#fff3b0',
   flame: '#ffc94d',

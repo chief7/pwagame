@@ -68,6 +68,7 @@ const ITEM: ItemWords<CountNoun> = {
   wood: { g: 'n', word: 'Stück Holz', plural: 'Stück Holz', short: ['Holz', 'Holz'] },
   leaves: { g: 'n', word: 'Blatt', adj: 'groß', plural: 'große Blätter', short: ['Blatt', 'Blätter'] },
   stone: { g: 'm', word: 'Stein', plural: 'Steine', short: ['Stein', 'Steine'] },
+  axe: { g: 'f', word: 'Steinaxt', plural: 'Steinäxte', short: ['Axt', 'Äxte'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -93,6 +94,9 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   campfire: { g: 'n', word: 'Lagerfeuer' },
   lean_to: { g: 'm', word: 'Unterstand' },
   hut: { g: 'f', word: 'Hütte' },
+  bramble: { g: 'n', word: 'Dornengestrüpp', gather: 'Du schlägst dich durch das Dornengestrüpp' },
+  bridge_ns: { g: 'f', word: 'Brücke' },
+  bridge_ew: { g: 'f', word: 'Brücke' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string }> = {
@@ -132,6 +136,7 @@ export const de: Strings = {
     bagEmpty: 'Deine Tasche ist leer. Lauf gegen Pflanzen, Baumstämme und Steine, um Dinge zu sammeln.',
     eat: 'Essen',
     forBuilding: 'Zum Bauen',
+    tool: 'Ein Werkzeug. Behalte es in deiner Tasche.',
     buildHint: 'Gebäude entstehen vor dir.',
     changeExplorer: 'Figur wechseln',
     newIsland: 'Neue Insel',
@@ -149,6 +154,8 @@ export const de: Strings = {
     campfire: { name: 'Lagerfeuer', description: 'Hält dich warm und macht die Nacht hell.' },
     lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf. Hier schläfst du gut und bleibst wärmer.' },
     hut: { name: 'Hütte', description: 'Ein gemütliches Zuhause. Warme Nächte und der beste Schlaf.' },
+    axe: { name: 'Steinaxt', description: 'Schlägt dir einen Weg durch Dornengestrüpp und bringt mehr Holz von Bäumen.' },
+    bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].plural}`,
   itemCount,
@@ -164,8 +171,12 @@ export const de: Strings = {
       case 'tooFull': return 'Du bist zu satt, um das zu essen.';
       case 'eat': return `Du isst ${itemCount(msg.item, 1)}. Lecker!`;
       case 'build': return `Du baust ${obj(msg.obj, 'acc', 'a')}.`;
+      case 'make': return `Du baust ${itemCount(msg.item, 1)}.`;
       case 'needMaterials': return 'Du brauchst mehr Material.';
       case 'noRoom': return 'Hier ist kein Platz zum Bauen.';
+      case 'noBridgeSpot': return 'Stell dich an einen Fluss und schau zum Wasser. Eine Brücke reicht bis zu 3 Schritte weit.';
+      case 'haveTool': return `Du hast schon ${itemCount(msg.item, 1)}.`;
+      case 'needTool': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu dornig für deine Hände. Du brauchst ${itemCount(msg.item, 1)}.`;
       case 'notSleepy': return 'Du bist gerade nicht müde.';
       case 'fallAsleep': {
         const place = msg.obj ? contract(`in ${obj(msg.obj, 'dat', 'the')}`) : 'in der Höhle';
@@ -184,6 +195,7 @@ export const de: Strings = {
       }
       case 'notThirsty': return 'Du hast keinen Durst.';
       case 'drink': return 'Du trinkst das kühle, frische Wasser. Herrlich!';
+      case 'drinkRiver': return 'Du schöpfst kühles Flusswasser. Herrlich!';
       case 'look': return `${cap(obj(msg.obj, 'nom', 'a'))}.`;
       case 'nothingLeft': return `${cap(contract(`an ${obj(msg.obj, 'dat', 'the')}`))} ist nichts mehr. Komm später wieder.`;
       case 'gather': {
