@@ -29,6 +29,14 @@ const NIGHT_MAX = 0.62;
 /** Same pixel font as the page (src/fonts.css). */
 const FONT = "'Pixelify Sans', ui-monospace, Menlo, Consolas, monospace";
 
+/**
+ * The font's fi and fl ligatures draw as a wrong glyph, and a canvas can't
+ * turn ligatures off, so a zero-width non-joiner keeps the letters apart.
+ */
+function noLigatures(text: string): string {
+  return text.replace(/f(?=[il])/g, 'f\u200c');
+}
+
 interface Baked {
   sprite: Sprite;
   canvas: HTMLCanvasElement;
@@ -273,9 +281,10 @@ export class Renderer {
       const y = o.y + f.y * cell - p * cell * 0.6;
       ctx.globalAlpha = p < 0.7 ? 1 : (1 - p) / 0.3;
       ctx.strokeStyle = '#20180f';
-      ctx.strokeText(f.text, x, y);
+      const text = noLigatures(f.text);
+      ctx.strokeText(text, x, y);
       ctx.fillStyle = f.color;
-      ctx.fillText(f.text, x, y);
+      ctx.fillText(text, x, y);
     }
     ctx.globalAlpha = 1;
   }

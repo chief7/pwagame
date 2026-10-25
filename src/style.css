@@ -33,6 +33,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 15px/1.35 'Pixelify Sans', ui-monospace, Menlo, Consolas, monospace;
+  /* The font's fi and fl ligatures draw as a wrong glyph ("CampAre"). */
+  font-variant-ligatures: none;
   overscroll-behavior: none;
   -webkit-user-select: none;
   user-select: none;
