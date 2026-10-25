@@ -43,6 +43,7 @@ src/
     terrain.ts   sand, water and 12 autotiling shore tiles (+ shoreTileName())
     objects.ts   stones, logs, chests
     palms.ts     three palm trees (24×32, overhang the tile above)
+    characters.ts  male and female explorer, 4 facings, recolourable via Look
     gallery.ts   the sprite gallery page
 public/        manifest, icons, service worker (offline cache)
 ```

@@ -38,6 +38,15 @@ export class Sprite {
     return this;
   }
 
+  /** Horizontally mirrored copy, e.g. a left-facing pose from a right-facing one. */
+  mirrored(name: string): Sprite {
+    const out = new Sprite(name, this.width, this.height);
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) out.set(this.width - 1 - x, y, this.get(x, y));
+    }
+    return out;
+  }
+
   /** Ring every opaque shape with a 1px outline (4-way). Call before shadow(). */
   outline(color: string = PALETTE.outline): this {
     const edge: number[] = [];

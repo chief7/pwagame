@@ -20,13 +20,15 @@ const ISLAND = [
 const PROPS: [string, number, number][] = [
   ['palm_tall', 4, 4],
   ['palm_leaning', 9, 3],
-  ['palm_young', 6, 6],
+  ['palm_young', 4, 6],
   ['stone_boulder', 10, 5],
   ['stone_pebbles', 3, 5],
   ['chest_closed', 7, 4],
   ['log_driftwood', 8, 7],
   ['log_pile', 5, 3],
   ['stone_mossy', 10, 4],
+  ['male_right', 6, 5],
+  ['female_down', 8, 5],
 ];
 
 const css = `

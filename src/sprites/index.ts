@@ -1,3 +1,4 @@
+import { characterSet } from './characters';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles } from './objects';
 import { palmLeaning, palmTall, palmYoung } from './palms';
 import type { Sprite } from './pixel';
@@ -13,6 +14,7 @@ export interface SpriteGroup {
 
 export function spriteGroups(): SpriteGroup[] {
   return [
+    { title: 'Characters', sprites: [...characterSet('male'), ...characterSet('female')] },
     { title: 'Palm trees', sprites: [palmTall(), palmLeaning(), palmYoung()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...shoreSet()] },

@@ -26,6 +26,17 @@ describe('sprites', () => {
     }
   });
 
+  it('has every facing for both characters, left mirroring right', () => {
+    const sprites = buildSprites();
+    for (const body of ['male', 'female']) {
+      for (const facing of ['down', 'up', 'right', 'left']) expect(sprites.has(`${body}_${facing}`)).toBe(true);
+      const right = sprites.get(`${body}_right`)!;
+      const left = sprites.get(`${body}_left`)!;
+      expect(left.get(0, 15)).toBe(right.get(15, 15));
+      expect(left.pixels).toEqual(right.mirrored('x').pixels);
+    }
+  });
+
   it('fromRows rejects ragged rows', () => {
     expect(() => fromRows('bad', ['..', '...'], { '.': null })).toThrow(/row 1/);
   });
