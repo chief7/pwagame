@@ -57,7 +57,7 @@ npm run preview   # serve the build (service worker is only active here)
   Wild sense marks in red the ground where an animal would come after you.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
-  campfire (Build panel).
+  campfire (tap the grill button above the fire, or use the Build panel).
 - **Island goal:** an old boat wreck lies on a beach on the far side.
   Repair it in four steps (hull, mast, sail, supplies) by walking into it
   with what it needs; you can bring things in as many trips as you like.
@@ -73,9 +73,10 @@ npm run preview   # serve the build (service worker is only active here)
   hold to keep walking towards your finger. Walking stops when something new
   comes into view. Tap your explorer to wait a turn. Buttons: Bag (eat, change
   explorer, new island, reset all progress), Build, Skills (a star shows when you have points to
-  spend), Sleep.
+  spend), Sleep. With raw fish next to a campfire, tap the grill button above
+  the fire to cook a fish.
 - **Keyboard:** arrows / WASD / `hjkl` / numpad to move, `.` or `5` wait,
-  `i` bag, `b` build, `p` skills, `z` sleep, `Esc` closes panels.
+  `i` bag, `b` build, `p` skills, `g` grill a fish at the fire, `z` sleep, `Esc` closes panels.
 
 ## Adding things
 

@@ -35,6 +35,8 @@ export interface Strings {
     /** Start over from nothing: new island, no skills, choose the explorer again. */
     resetProgress: string;
     byFire: string;
+    /** The grill button above the campfire: "Grill a fish (3 left)". */
+    grill(n: number): string;
     inCave: string;
     /** HUD line while standing in a shelter: "In your hut". */
     inShelter(kind: ObjectKind): string;

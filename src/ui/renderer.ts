@@ -106,6 +106,12 @@ export class Renderer {
     };
   }
 
+  /** Top centre of a world cell in CSS pixels relative to the canvas, as of the last frame. */
+  cellTop(x: number, y: number): { x: number; y: number } {
+    const o = this.origin();
+    return { x: (o.x + (x + 0.5) * this.cell) / this.dpr, y: (o.y + y * this.cell) / this.dpr };
+  }
+
   /** Centre of the player's cell in CSS pixels relative to the canvas. */
   playerCenter(): { x: number; y: number } {
     return { x: this.canvas.clientWidth / 2, y: this.canvas.clientHeight / 2 };

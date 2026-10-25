@@ -48,6 +48,7 @@ const ui = {
   build: $<HTMLButtonElement>('btn-build'),
   skills: $<HTMLButtonElement>('btn-skills'),
   sleep: $<HTMLButtonElement>('btn-sleep'),
+  grill: $<HTMLButtonElement>('btn-grill'),
   sheet: $('sheet'),
   sheetTitle: $('sheet-title'),
   sheetBody: $('sheet-body'),
@@ -239,6 +240,7 @@ function requestFrame(): void {
 function frame(now: number): void {
   frameQueued = false;
   renderer.render(game, anim, now);
+  placeGrill(now);
   if (anim.busy(now)) requestFrame();
   else ambientTimer = window.setTimeout(requestFrame, AMBIENT_FRAME_MS);
 }
@@ -261,8 +263,57 @@ function run(cmd: Command): void {
     case 'bag': openSheet('bag'); return;
     case 'build': openSheet('build'); return;
     case 'skills': openSheet('skills'); return;
+    case 'grill': grill(); return;
   }
   afterTurn();
+}
+
+// ---- Grill button ---------------------------------------------------------------------
+//
+// With raw fish in the bag, a button floats above the campfire the explorer
+// stands by. It follows the fire as the camera moves.
+
+/** Gap between the top of the fire's cell and the button, in CSS px. */
+const GRILL_LIFT = 6;
+const GRILL_FRAME_MS = 220;
+const grillIcon = ui.grill.querySelector('img')!;
+const grillCount = ui.grill.querySelector('.count')!;
+
+function grill(): void {
+  stopAuto();
+  if (game.build('cooked_fish')) {
+    // Restart the sizzle shake on every tap.
+    ui.grill.classList.remove('sizzle');
+    void ui.grill.offsetWidth;
+    ui.grill.classList.add('sizzle');
+  }
+  afterTurn();
+}
+
+/** Show the button above the nearest fire while a fish can be cooked there; else hide it. */
+function placeGrill(now: number): void {
+  const { x, y } = game.player;
+  const fire = game.buildProblem('cooked_fish') ? null : game.nearestFire(x, y);
+  ui.grill.hidden = !fire || !game.map.isVisible(fire.x, fire.y);
+  if (ui.grill.hidden || !fire) return;
+  const fish = game.inventory.count('fish');
+  const label = t().ui.grill(fish);
+  if (ui.grill.getAttribute('aria-label') !== label) {
+    ui.grill.setAttribute('aria-label', label);
+    ui.grill.title = label;
+    grillCount.textContent = `×${fish}`;
+  }
+  const frameName = !anim.reducedMotion && Math.floor(now / GRILL_FRAME_MS) % 2 ? 'ui_grill_2' : 'ui_grill';
+  const src = icon(frameName);
+  if (grillIcon.getAttribute('src') !== src) grillIcon.src = src;
+  // Centred above the fire, but always fully on the map.
+  const rect = canvas.getBoundingClientRect();
+  const top = renderer.cellTop(fire.x, fire.y);
+  const w = ui.grill.offsetWidth;
+  const h = ui.grill.offsetHeight;
+  const left = Math.min(Math.max(top.x - w / 2, 4), rect.width - w - 4);
+  const above = Math.min(Math.max(top.y - h - GRILL_LIFT, 4), rect.height - h - 4);
+  ui.grill.style.transform = `translate(${Math.round(rect.left + left)}px, ${Math.round(rect.top + above)}px)`;
 }
 
 // ---- Bag and build sheets -----------------------------------------------------------
@@ -655,6 +706,7 @@ function tap(x: number, y: number): void {
 ui.bag.addEventListener('click', () => run({ type: 'bag' }));
 ui.build.addEventListener('click', () => run({ type: 'build' }));
 ui.skills.addEventListener('click', () => run({ type: 'skills' }));
+ui.grill.addEventListener('click', grill);
 ui.sleep.addEventListener('click', () => {
   stopAuto();
   run({ type: 'sleep' });

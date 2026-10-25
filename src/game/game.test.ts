@@ -569,6 +569,20 @@ describe('Game: experience and skills', () => {
     expect(game.needs.food).toBeGreaterThan(50);
   });
 
+  it('cooking reaches towards the nearest fire', () => {
+    const game = sandbox(25);
+    game.inventory.add('fish', 2);
+    place(game, -2, 2, 'campfire');
+    place(game, 1, 0, 'campfire');
+    expect(game.nearestFire(game.player.x, game.player.y)).toEqual({ x: game.player.x + 1, y: game.player.y });
+    game.takeEvents();
+    expect(game.build('cooked_fish')).toBe(true);
+    expect(game.takeEvents()).toContainEqual(expect.objectContaining({
+      type: 'lunge', id: game.player.id, targetX: game.player.x + 1, targetY: game.player.y,
+    }));
+    expect(game.nearestFire(game.player.x + 5, game.player.y)).toBeNull();
+  });
+
   it('handy builders use one wood less', () => {
     const game = sandbox(26);
     game.skills.add('handy_builder');

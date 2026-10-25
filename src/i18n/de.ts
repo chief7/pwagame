@@ -168,6 +168,7 @@ export const de: Strings = {
     confirmNewIsland: 'Zum Bestätigen noch mal tippen',
     resetProgress: 'Gesamten Fortschritt löschen',
     byFire: 'Am Feuer',
+    grill: (n) => `Fisch grillen (noch ${n})`,
     inCave: 'In einer Höhle',
     inShelter: (kind) => `In ${obj(kind, 'dat', 'your')}`,
     dawn: 'Morgengrauen',

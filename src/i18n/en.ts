@@ -109,6 +109,7 @@ export const en: Strings = {
     confirmNewIsland: 'Tap again to confirm',
     resetProgress: 'Reset all progress',
     byFire: 'By the fire',
+    grill: (n) => `Grill a fish (${n} left)`,
     inCave: 'In a cave',
     inShelter: (kind) => `In your ${obj(kind)}`,
     dawn: 'dawn',

@@ -96,7 +96,7 @@ flowchart TB
 | `src/ui/renderer.ts` | Draws terrain, objects, animals, the player, night light and effects on a canvas. |
 | `src/ui/animator.ts` | Turns game events into timed animations. |
 | `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
-| `src/main.ts` | Connects everything: HUD, Bag, Build and Skills panels, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
+| `src/main.ts` | Connects everything: HUD, Bag, Build and Skills panels, the grill button above the campfire, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
 | `src/game/messages.ts` | The `Msg` type: every log message as data (a key and its arguments). |
 | `src/i18n/*.ts` | All text the player sees, in English (`en.ts`) and German (`de.ts`). |
 | `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
@@ -115,7 +115,7 @@ after each action and gives them to the animator.
 | Event | Meaning | Animation |
 |---|---|---|
 | `move` | An actor moved one cell | Slide between cells, walk frames |
-| `lunge` | An actor reached towards a cell (gather, shoo, pinch, build) | Short push towards the target |
+| `lunge` | An actor reached towards a cell (gather, shoo, pinch, build, cook at the fire) | Short push towards the target |
 | `hit` | An actor lost Health | White flash and a red number |
 | `float` | Show a number at a cell (`+2 wood`, `+35 water`, `+1 XP`): `amount` and `what` (an item, a need or XP) | Text rises and fades. XP has its own colour (lavender). |
 | `sparkle` | Something good happened at a cell (chest, building, skill point, skill learned) | Gold sparkles |
@@ -419,6 +419,14 @@ path. The Skills button shows a star when there are free points.
   at a campfire) makes a cooked fish: +40 Food, +10 Energy. This is the best
   food on the island (coconut 10, berries 7, mushroom 9), so fishing is the
   way to stay well fed.
+- **Grill button.** While the recipe can be made (raw fish in the bag, a
+  campfire within 2 cells), `main.ts` shows a round button above the nearest
+  visible fire (`game.nearestFire()`). It shows `ui_grill` / `ui_grill_2`
+  (220 ms each), an ember glow and the number of raw fish. A tap (or the `g`
+  key) runs `game.build('cooked_fish')`, and the icon shakes. The button
+  follows the fire as the camera moves (`renderer.cellTop()`), and stays
+  inside the map view. With reduced motion, the icon, glow and shake stay
+  still. Cooking sends a `lunge` towards the fire.
 
 ### 4.12 The island goal (levels)
 
@@ -683,8 +691,9 @@ The render loop runs at full frame rate while the animator is busy, and every
 | Tap a far cell that cannot be reached | Step in that direction |
 | Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
 | Bag / Build / Skills / Sleep buttons | Open the panels, or sleep |
+| Grill button (above a campfire, with raw fish) | Cook one fish |
 | 🌐 button (Bag panel and explorer picker) | Switch between English and German |
-| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `z`: sleep. `Esc`: close a panel. |
+| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `g`: grill a fish at the fire. `z`: sleep. `Esc`: close a panel. |
 
 Auto-walk (travel and hold) stops when:
 
@@ -790,6 +799,7 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Object density | `worldgen.ts` → `SCATTER` | chance per cell and biome |
 | Step speed | `animator.ts` → `STEP_MS` | 130 ms |
 | Cells across a phone | `renderer.ts` → `TILES_ACROSS` | 12 |
+| Grill button frame time, lift above the fire | `main.ts` → `GRILL_FRAME_MS`, `GRILL_LIFT` | 220 ms, 6 px |
 
 ---
 

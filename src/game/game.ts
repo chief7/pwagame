@@ -230,14 +230,25 @@ export class Game {
   }
 
   nearFire(x: number, y: number): boolean {
+    return this.nearestFire(x, y) !== null;
+  }
+
+  /** The closest fire whose warmth reaches (x, y), or null if none does. */
+  nearestFire(x: number, y: number): { x: number; y: number } | null {
+    let best: { x: number; y: number } | null = null;
+    let bestDist = Infinity;
     for (const [i, obj] of this.objects) {
       const r = OBJECTS[obj.kind].warmthRadius;
       if (!r) continue;
       const fx = i % this.map.width;
       const fy = Math.floor(i / this.map.width);
-      if (Math.max(Math.abs(fx - x), Math.abs(fy - y)) <= r) return true;
+      const d = Math.max(Math.abs(fx - x), Math.abs(fy - y));
+      if (d <= r && d < bestDist) {
+        best = { x: fx, y: fy };
+        bestDist = d;
+      }
     }
-    return false;
+    return best;
   }
 
   get daylight(): number {
@@ -445,6 +456,9 @@ export class Game {
     const xp = Object.values(cost).reduce((sum, n) => sum + (n ?? 0), 0);
     const p = this.player;
     if ('makes' in recipe) {
+      // Cooking: reach towards the fire.
+      const fire = recipe.atFire ? this.nearestFire(p.x, p.y) : null;
+      if (fire) this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: fire.x, targetY: fire.y });
       this.inventory.add(recipe.makes);
       this.emit({ type: 'float', x: p.x, y: p.y, amount: 1, what: { item: recipe.makes }, tone: 'good' });
       this.emit({ type: 'sparkle', x: p.x, y: p.y });
