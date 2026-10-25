@@ -3,6 +3,7 @@ import { ANIMAL_KINDS } from '../game/defs/animals';
 import { ITEM_IDS } from '../game/defs/items';
 import { OBJECTS, type ObjectKind } from '../game/defs/objects';
 import { RECIPE_IDS } from '../game/defs/recipes';
+import { PATH_IDS, SKILL_IDS } from '../game/defs/skills';
 import { Game } from '../game/game';
 import type { Msg } from '../game/messages';
 import { NEED_IDS } from '../game/needs';
@@ -18,7 +19,9 @@ function everyMessage(): Msg[] {
     { key: 'arrive' }, { key: 'seaSalty' }, { key: 'tooFull' }, { key: 'needMaterials' }, { key: 'noRoom' },
     { key: 'notSleepy' }, { key: 'fallAsleep' }, { key: 'dozeOff' }, { key: 'notThirsty' }, { key: 'drink' },
     { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
+    { key: 'needFire' }, { key: 'needPoints' }, { key: 'skillPoint' }, { key: 'catch' }, { key: 'noBite' },
   ];
+  for (const skill of SKILL_IDS) msgs.push({ key: 'needSkill', skill }, { key: 'learn', skill });
   for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
   for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need });
   for (const obj of OBJECT_KINDS) {
@@ -29,7 +32,7 @@ function everyMessage(): Msg[] {
     msgs.push({ key: 'shoo', animal }, { key: 'pinch', animal });
     for (const item of ITEM_IDS) msgs.push({ key: 'snatch', animal, item });
   }
-  for (const item of ITEM_IDS) msgs.push({ key: 'eat', item }, { key: 'make', item }, { key: 'haveTool', item }, { key: 'needTool', obj: 'bramble', item });
+  for (const item of ITEM_IDS) msgs.push({ key: 'eat', item }, { key: 'make', item }, { key: 'cook', item }, { key: 'haveTool', item }, { key: 'needTool', obj: 'bramble', item });
   return msgs;
 }
 
@@ -47,6 +50,9 @@ describe('i18n', () => {
       }
       for (const id of NEED_IDS) expect(words.needs[id]).toBeTruthy();
       for (const id of RECIPE_IDS) expect(words.recipes[id].name).toBeTruthy();
+      for (const id of SKILL_IDS) expect(words.skills[id].name).toBeTruthy();
+      for (const id of PATH_IDS) expect(words.paths[id]).toBeTruthy();
+      expect(words.float(3, { xp: true })).toMatch(/^\+3 (XP|EP)$/);
     }
   });
 

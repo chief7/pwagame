@@ -20,6 +20,10 @@ export interface Conditions {
   nearFire: boolean;
   /** 0 night .. 1 day. */
   daylight: number;
+  /** Skills slow some needs down: each is a factor on how fast it drops (default 1). */
+  thirst?: number;
+  hunger?: number;
+  chill?: number;
 }
 
 const RATES = {
@@ -44,13 +48,13 @@ export function warmthTarget(c: Conditions): number {
 /** Advance needs by one turn. Mutates and returns `n`. */
 export function tickNeeds(n: Needs, c: Conditions): Needs {
   const slow = c.sleeping ? 0.5 : 1;
-  n.food -= RATES.food * slow;
-  n.water -= RATES.water * slow;
+  n.food -= RATES.food * slow * (c.hunger ?? 1);
+  n.water -= RATES.water * slow * (c.thirst ?? 1);
   n.energy += c.sleeping ? RATES.energySleep * (0.4 + 0.6 * c.shelter) : -RATES.energyAwake;
 
   const target = warmthTarget(c);
   if (n.warmth < target) n.warmth = Math.min(target, n.warmth + RATES.warmthUp);
-  else n.warmth = Math.max(target, n.warmth - RATES.warmthDown);
+  else n.warmth = Math.max(target, n.warmth - RATES.warmthDown * (c.chill ?? 1));
 
   const empty = (['food', 'water', 'energy', 'warmth'] as const).filter((k) => n[k] <= 0).length;
   if (empty > 0) n.health -= RATES.healthDrainPerEmpty * empty;

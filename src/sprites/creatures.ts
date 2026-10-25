@@ -239,3 +239,50 @@ export function itemIcons(): Sprite[] {
     }),
   ];
 }
+
+/** Items that skills unlock: the fishing rod and what it catches. */
+export function skillItemIcons(): Sprite[] {
+  const rod = new Sprite('item_fishing_rod');
+  // A thin rod on a diagonal with cord round the grip, and a bobber.
+  for (let i = 0; i <= 10; i++) {
+    rod.set(2 + i, 14 - i, i < 4 ? P.wood : P.woodLight);
+    if (i < 6) rod.set(3 + i, 14 - i, i < 4 ? P.woodDark : P.wood);
+  }
+  for (const [x, y] of [[3, 13], [4, 12]]) rod.set(x, y, P.strawDark);
+  rod.set(13, 11, P.flowerWhite);
+  rod.set(13, 12, P.bobber);
+  rod.outline();
+  // The line goes on after the outline so it stays one pixel thin.
+  for (let y = 4; y <= 9; y++) rod.set(13, y, P.fishingLine);
+  return [
+    rod,
+    fish('item_fish', { L: P.fishLight, m: P.fish, b: P.fishBelly, f: P.fishFin }),
+    fish('item_cooked_fish', { L: P.fishCookedLight, m: P.fishCooked, b: P.fishCookedBelly, f: P.fishCooked }, true),
+  ];
+}
+
+/** A fish lying on its side, facing left; cooked ones are golden brown with grill marks. */
+function fish(name: string, colors: Record<'L' | 'm' | 'b' | 'f', string>, grilled = false): Sprite {
+  const sprite = fromRows(name, [
+    '................',
+    '................',
+    '................',
+    '................',
+    '......ff........',
+    '....LLLLmm...ff.',
+    '...LLLLLLmm.fff.',
+    '..LwoLLLLmmmfff.',
+    '.LLLLLLLmmmmmf..',
+    '.bbbbbbbbbmmmf..',
+    '..bbbbbbbbmmfff.',
+    '...bbbbbbmm.fff.',
+    '.....bbmm....ff.',
+    '......ff........',
+    '................',
+    '................',
+  ], { '.': null, ...colors, w: P.flowerWhite, o: P.outline });
+  if (grilled) {
+    for (const x0 of [5, 8]) for (let i = 0; i < 4; i++) sprite.set(x0 + i, 6 + i, P.fishCookedDark);
+  }
+  return sprite.outline();
+}

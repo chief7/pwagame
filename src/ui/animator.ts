@@ -19,6 +19,8 @@ const TONE_COLORS: Record<Tone, string> = {
   warn: '#ff8a73',
   loot: '#f7d774',
 };
+/** Experience floats in its own colour, so it doesn't read as an item. */
+const XP_COLOR = '#b9a4ff';
 
 interface Tween {
   fromX: number;
@@ -104,7 +106,8 @@ export class Animator {
           const key = `${e.x},${e.y}`;
           const n = stacked.get(key) ?? 0;
           stacked.set(key, n + 1);
-          this.float(e.x, e.y, strings().float(e.amount, e.what), TONE_COLORS[e.tone], t + n * 220);
+          const color = 'xp' in e.what ? XP_COLOR : TONE_COLORS[e.tone];
+          this.float(e.x, e.y, strings().float(e.amount, e.what), color, t + n * 220);
           break;
         }
         case 'sparkle':

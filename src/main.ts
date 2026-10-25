@@ -2,6 +2,7 @@ import './style.css';
 import { ITEMS, type ItemId } from './game/defs/items';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
+import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
 import { Game, type SaveData } from './game/game';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
@@ -45,6 +46,7 @@ const ui = {
   log: $('log'),
   bag: $<HTMLButtonElement>('btn-bag'),
   build: $<HTMLButtonElement>('btn-build'),
+  skills: $<HTMLButtonElement>('btn-skills'),
   sleep: $<HTMLButtonElement>('btn-sleep'),
   sheet: $('sheet'),
   sheetTitle: $('sheet-title'),
@@ -206,7 +208,18 @@ function updateHud(): void {
       return li;
     }),
   );
+  updateSkillsButton();
   if (!ui.sheet.hidden) renderSheet();
+}
+
+/** A star on the Skills button while there are points to spend. */
+const skillStar = el('img', { className: 'star', alt: '' });
+function updateSkillsButton(): void {
+  const points = game.skillPoints;
+  skillStar.src = icon('ui_star');
+  if (points > 0) ui.skills.append(skillStar);
+  else skillStar.remove();
+  ui.skills.setAttribute('aria-label', points > 0 ? `${t().ui.skills}: ${t().ui.skillPoints(points)}` : t().ui.skills);
 }
 
 // ---- Render loop ------------------------------------------------------------------
@@ -245,13 +258,14 @@ function run(cmd: Command): void {
     case 'sleep': game.sleep(); break;
     case 'bag': openSheet('bag'); return;
     case 'build': openSheet('build'); return;
+    case 'skills': openSheet('skills'); return;
   }
   afterTurn();
 }
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build';
+type SheetKind = 'bag' | 'build' | 'skills';
 let sheetKind: SheetKind = 'bag';
 let confirmNewIsland = false;
 const icons = new Map<string, string>();
@@ -290,9 +304,11 @@ function row(image: string, title: string, note: Node | string, action?: HTMLBut
 
 function renderSheet(): void {
   const words = t();
-  ui.sheetTitle.textContent = sheetKind === 'bag' ? words.ui.yourBag : words.ui.build;
+  ui.sheetTitle.textContent = { bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills }[sheetKind];
   const rows = el('div', { className: 'rows' });
-  if (sheetKind === 'bag') {
+  if (sheetKind === 'skills') {
+    renderSkills(rows);
+  } else if (sheetKind === 'bag') {
     const entries = game.inventory.entries();
     if (!entries.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmpty }));
     for (const [id, count] of entries) {
@@ -304,7 +320,7 @@ function renderSheet(): void {
       });
       const note = food
         ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
-        : ITEMS[id].tool ? words.ui.tool : words.ui.forBuilding;
+        : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : words.ui.forBuilding;
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), button));
     }
   } else {
@@ -319,7 +335,7 @@ function renderSheet(): void {
         }
       });
       const costs = el('div', { className: 'costs' });
-      for (const [item, need] of Object.entries(recipe.cost) as [ItemId, number][]) {
+      for (const [item, need] of Object.entries(game.recipeCost(id)) as [ItemId, number][]) {
         const have = game.inventory.count(item);
         costs.append(
           el('span', { className: `cost${have < need ? ' missing' : ''}`, title: words.itemCount(item, need) }, [
@@ -330,6 +346,10 @@ function renderSheet(): void {
       }
       const { name, description } = words.recipes[id];
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
+      // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
+      if (problem && (problem.key === 'needSkill' || problem.key === 'needFire')) {
+        note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
+      }
       rows.append(row(icon('builds' in recipe ? recipe.builds : `item_${recipe.makes}`), name, note, button));
     }
     rows.append(el('p', { className: 'empty', textContent: words.ui.buildHint }));
@@ -360,6 +380,52 @@ function renderSheet(): void {
     foot.append(change, fresh, lang);
   }
   ui.sheetBody.replaceChildren(rows, foot);
+}
+
+/** XP bar, points to spend, and each path's skills in the order they're learned. */
+function renderSkills(rows: HTMLElement): void {
+  const words = t();
+  const earned = pointsForXp(game.xp);
+  const from = xpForPoints(earned);
+  const to = xpForPoints(earned + 1);
+  const bar = el('div', { className: 'xp-bar' }, [el('div', { className: 'xp-fill' })]);
+  (bar.firstChild as HTMLElement).style.width = `${((game.xp - from) / (to - from)) * 100}%`;
+  rows.append(
+    el('div', { className: 'xp' }, [
+      el('img', { src: icon('ui_star'), alt: '' }),
+      el('div', { className: 'row-text' }, [
+        el('span', { className: 'row-title', textContent: words.ui.skillPoints(game.skillPoints) }),
+        bar,
+        el('span', { className: 'row-note', textContent: words.ui.xpToNext(game.xp, to) }),
+      ]),
+    ]),
+  );
+  for (const path of PATH_IDS) {
+    rows.append(el('h3', { className: 'path' }, [el('img', { src: icon(`ui_path_${path}`), alt: '' }), words.paths[path]]));
+    for (const id of PATHS[path]) {
+      const learned = game.has(id);
+      const problem = learned ? null : game.skillProblem(id);
+      const button = el('button', {
+        type: 'button',
+        textContent: learned ? words.ui.learned : words.ui.learn,
+        disabled: learned || !!problem,
+        className: learned || problem ? '' : 'primary',
+      });
+      button.addEventListener('click', () => {
+        if (game.learn(id)) afterTurn();
+        else updateHud();
+      });
+      const { name, description } = words.skills[id];
+      const note = el('div', {}, [
+        el('span', { className: 'row-note', textContent: description }),
+        learned ? '' : el('span', { className: `row-note ${problem?.key === 'needSkill' ? 'locked' : 'skill-cost'}`, textContent: problem?.key === 'needSkill' ? words.message(problem) : words.ui.skillCost(SKILLS[id].cost) }),
+      ]);
+      const card = row(icon(`ui_path_${path}`), name, note, button);
+      if (learned) card.classList.add('learned');
+      rows.append(card);
+    }
+  }
+  rows.append(el('p', { className: 'empty', textContent: words.ui.skillsHint }));
 }
 
 ui.sheetClose.addEventListener('click', closeSheet);
@@ -502,6 +568,7 @@ function tap(x: number, y: number): void {
 
 ui.bag.addEventListener('click', () => run({ type: 'bag' }));
 ui.build.addEventListener('click', () => run({ type: 'build' }));
+ui.skills.addEventListener('click', () => run({ type: 'skills' }));
 ui.sleep.addEventListener('click', () => {
   stopAuto();
   run({ type: 'sleep' });

@@ -42,6 +42,14 @@ npm run preview   # serve the build (service worker is only active here)
   the far side, where most hills and caves are. Further out are more chests.
 - **Animals:** crabs pinch if you linger, monkeys snatch food, piglets and
   bats keep their distance, turtles don't mind you.
+- **Skills:** gathering, building and fishing give XP. XP earns skill points
+  (the first at 10 XP, each next one 5 XP more), which you spend in the
+  Skills panel on three paths: Survival (needs drop slower), Crafting
+  (fishing rod, better catches, cheaper building) and Explorer (faster
+  regrowth, night eyes, animal friend). Each path is learned in order.
+- **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
+  sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
+  campfire (Build panel).
 - **Saving:** the game saves itself to the browser after every action.
 
 ## Controls
@@ -50,9 +58,10 @@ npm run preview   # serve the build (service worker is only active here)
   what's there; tap further away to walk there along a known path; press and
   hold to keep walking towards your finger. Walking stops when something new
   comes into view. Tap your explorer to wait a turn. Buttons: Bag (eat, change
-  explorer, new island), Build, Sleep.
+  explorer, new island), Build, Skills (a star shows when you have points to
+  spend), Sleep.
 - **Keyboard:** arrows / WASD / `hjkl` / numpad to move, `.` or `5` wait,
-  `i` bag, `b` build, `z` sleep, `Esc` closes panels.
+  `i` bag, `b` build, `p` skills, `z` sleep, `Esc` closes panels.
 
 ## Adding things
 
@@ -71,7 +80,10 @@ matching sprite (see below); the sprite test fails if one is missing.
   `blocksSight` add behaviour. Place it in the world via `SCATTER` in
   `worldgen.ts`, or make it buildable.
 - **Recipe:** add it to `RECIPES` in `recipes.ts`; the Build panel lists it
-  automatically.
+  automatically. `skill` locks it until a skill is learned; `atFire` makes it
+  need a campfire next to you.
+- **Skill:** add it to a path in `PATHS` in `skills.ts` and give it words in
+  `src/i18n/`. Its effect is code where it applies (`game.has(id)`).
 - **Animal:** add it to `ANIMALS` in `animals.ts` with a temper (`calm`,
   `shy`, `grumpy`, `cheeky`), habitat, notice range and population, and draw
   `animal_<kind>`.
@@ -82,7 +94,7 @@ matching sprite (see below); the sprite test fails if one is missing.
 ```
 src/
   game/        pure game logic, no DOM — unit-testable
-    defs/        data registries: items, objects, recipes, animals
+    defs/        data registries: items, objects, recipes, animals, skills
     game.ts      actions, turn loop, needs, animals, fainting, sleep, save/load
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
@@ -97,7 +109,7 @@ src/
     renderer.ts  sprite renderer (integer scaling), night lighting, camera
     animator.ts  turns game events into tweens, lunges, flashes, floating text, fades
     input.ts     keyboard mapping and tap/hold direction helper
-  main.ts      HUD, Bag/Build panels, input, render loop, autosave
+  main.ts      HUD, Bag/Build/Skills panels, input, render loop, autosave
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art

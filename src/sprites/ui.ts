@@ -77,3 +77,83 @@ export function appIcon(size = 32): Sprite {
   stamp(s, character('female', 'down'), o + 22, o + 29);
   return s;
 }
+
+/** Skill point star and one badge for each skill path. */
+export function skillIcons(): Sprite[] {
+  const star = new Sprite('ui_star');
+  // Five points around (8, 8.5); the top-left half catches the light.
+  const corners = Array.from({ length: 10 }, (_, k) => {
+    const r = k % 2 ? 3 : 7.5;
+    const t = -Math.PI / 2 + (k * Math.PI) / 5;
+    return [8 + r * Math.cos(t), 8.8 + r * Math.sin(t)] as const;
+  });
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const px = x + 0.5;
+      const py = y + 0.5;
+      let inside = false;
+      for (let i = 0, j = corners.length - 1; i < corners.length; j = i++) {
+        const [xi, yi] = corners[i];
+        const [xj, yj] = corners[j];
+        if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+      if (inside) star.set(x, y, px - 8 + (py - 8.8) * 0.6 < 0 ? P.goldLight : P.gold);
+    }
+  }
+  star.outline();
+  const drop = fromRows('ui_path_survival', [
+    '................',
+    '.......w........',
+    '.......w........',
+    '......wwr.......',
+    '......wwr.......',
+    '.....wgwrr......',
+    '....wggwwrr.....',
+    '....wgwwwrr.....',
+    '...wwwwwwwrr....',
+    '...wwwwwwwrr....',
+    '...wwwwwwrrr....',
+    '...rwwwwwrrr....',
+    '....rrwwrrr.....',
+    '.....rrrrr......',
+    '................',
+    '................',
+  ], { '.': null, w: P.water, g: P.waterGlint, r: P.waterDeep }).outline();
+  const hammer = fromRows('ui_path_craft', [
+    '................',
+    '................',
+    '...LSSSSSs......',
+    '..LSSSSSSSs.....',
+    '..SSSSSSSSDD....',
+    '...SSSSSDDD.....',
+    '......cwcd......',
+    '......wwwd......',
+    '.......wwd......',
+    '.......wwd......',
+    '.......wwd......',
+    '.......wwd......',
+    '.......wwd......',
+    '.......wwd......',
+    '........dd......',
+    '................',
+  ], { '.': null, L: P.stoneLight, S: P.stone, s: P.stoneDark, D: P.stoneDeep, w: P.woodLight, d: P.woodDark, c: P.strawDark }).outline();
+  const compass = fromRows('ui_path_explorer', [
+    '................',
+    '.......gg.......',
+    '.....GGGGGG.....',
+    '....GffffffD....',
+    '...GffffNfffD...',
+    '...GfffNNfffD...',
+    '..GffffNNffffD..',
+    '..GffffoofffDD..',
+    '..GffffssffffD..',
+    '...GfffssfffD...',
+    '...GffffsfffD...',
+    '....DffffffD....',
+    '.....DDDDDD.....',
+    '................',
+    '................',
+    '................',
+  ], { '.': null, G: P.gold, g: P.goldLight, D: P.goldDark, f: P.compassFace, N: P.compassNeedle, s: P.stoneDark, o: P.outline }).outline();
+  return [star, drop, hammer, compass];
+}

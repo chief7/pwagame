@@ -4,6 +4,7 @@ import { ANIMAL_KINDS, ANIMALS, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
 import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPES, type RecipeId } from './defs/recipes';
+import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
 import { computeFov } from './fov';
 import { Inventory } from './inventory';
 import { GameMap, Tile } from './map';
@@ -21,7 +22,21 @@ const SLEEP_LIMIT = 200;
 const PINCH_DAMAGE = 4;
 /** Water from one drink at the river, the same as a spring. */
 const RIVER_DRINK = 35;
-export const SAVE_VERSION = 2;
+/** XP for each gather, and for each fish caught. Building gives 1 XP per item it costs. */
+const GATHER_XP = 1;
+const CATCH_XP = 2;
+/** Chance that a fish bites, without and with the Patient angler skill. */
+const BITE_CHANCE = 0.4;
+const PATIENT_BITE_CHANCE = 0.7;
+/** How fast needs drop with the Survival skills (1 is normal). */
+const SMALL_SIPS = 0.8;
+const SMALL_APPETITE = 0.8;
+const THICK_SKIN = 0.7;
+/** Plants regrow in this share of the time with Green thumb. */
+const GREEN_THUMB = 0.7;
+/** Extra cells the explorer sees at night with Night eyes. */
+const NIGHT_EYES = 2;
+export const SAVE_VERSION = 3;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -65,6 +80,8 @@ export interface SaveData {
   home: { x: number; y: number };
   needs: Needs;
   inventory: Partial<Record<ItemId, number>>;
+  xp: number;
+  skills: SkillId[];
   warned: NeedId[];
   log: LogEntry[];
 }
@@ -81,6 +98,9 @@ export class Game {
   home: { x: number; y: number };
   needs: Needs = freshNeeds();
   inventory = new Inventory();
+  /** Experience from gathering, building and fishing; it earns skill points. */
+  xp = 0;
+  skills = new Set<SkillId>();
   turn = 0;
   log: LogEntry[] = [];
   sleeping = false;
@@ -106,6 +126,8 @@ export class Game {
       this.home = save.home;
       this.needs = save.needs;
       this.inventory = Inventory.from(save.inventory);
+      this.xp = save.xp;
+      this.skills = new Set(save.skills.filter((id) => id in SKILLS));
       this.turn = save.turn;
       this.nextId = save.nextId;
       this.warned = new Set(save.warned);
@@ -192,16 +214,47 @@ export class Game {
 
   /** How far the explorer can see: less at night. */
   get sightRadius(): number {
-    return Math.round(4 + 4 * this.daylight);
+    const night = this.has('night_eyes') ? NIGHT_EYES * (1 - this.daylight) : 0;
+    return Math.round(4 + 4 * this.daylight + night);
+  }
+
+  has(skill: SkillId): boolean {
+    return this.skills.has(skill);
+  }
+
+  /** Skill points earned and not spent yet. */
+  get skillPoints(): number {
+    const spent = [...this.skills].reduce((sum, id) => sum + SKILLS[id].cost, 0);
+    return pointsForXp(this.xp) - spent;
+  }
+
+  /** Why a skill can't be learned right now, or null if it can. */
+  skillProblem(id: SkillId): Msg | null {
+    const before = skillBefore(id);
+    if (before && !this.has(before)) return { key: 'needSkill', skill: before };
+    if (this.skillPoints < SKILLS[id].cost) return { key: 'needPoints' };
+    return null;
+  }
+
+  /** What a recipe costs the explorer now (Handy builder saves a piece of wood). */
+  recipeCost(id: RecipeId): Partial<Record<ItemId, number>> {
+    const cost = { ...RECIPES[id].cost };
+    if (this.has('handy_builder') && cost.wood) {
+      cost.wood--;
+      if (!cost.wood) delete cost.wood;
+    }
+    return cost;
   }
 
   /** Why a recipe can't be built right now, or null if it can. */
   buildProblem(id: RecipeId): Msg | null {
     const recipe = RECIPES[id];
+    if (recipe.skill && !this.has(recipe.skill)) return { key: 'needSkill', skill: recipe.skill };
     if ('makes' in recipe && ITEMS[recipe.makes].tool && this.inventory.count(recipe.makes) > 0) {
       return { key: 'haveTool', item: recipe.makes };
     }
-    if (!this.inventory.hasAll(recipe.cost)) return { key: 'needMaterials' };
+    if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
+    if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
     if ('builds' in recipe && !this.buildSpot(recipe.builds)) {
       return OBJECTS[recipe.builds].bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
@@ -242,7 +295,14 @@ export class Game {
         this.endTurn();
         return true;
       }
-      if (this.map.get(nx, ny) === Tile.Water) this.message({ key: 'seaSalty' }, 'info');
+      if (this.map.get(nx, ny) === Tile.Water) {
+        if (this.inventory.count('fishing_rod') > 0) {
+          this.fish(nx, ny);
+          this.endTurn();
+          return true;
+        }
+        this.message({ key: 'seaSalty' }, 'info');
+      }
       return false;
     }
     this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
@@ -309,13 +369,16 @@ export class Game {
       this.message(problem, 'info');
       return false;
     }
-    this.inventory.takeAll(recipe.cost);
+    const cost = this.recipeCost(id);
+    this.inventory.takeAll(cost);
+    const xp = Object.values(cost).reduce((sum, n) => sum + (n ?? 0), 0);
     const p = this.player;
     if ('makes' in recipe) {
       this.inventory.add(recipe.makes);
       this.emit({ type: 'float', x: p.x, y: p.y, amount: 1, what: { item: recipe.makes }, tone: 'good' });
       this.emit({ type: 'sparkle', x: p.x, y: p.y });
-      this.message({ key: 'make', item: recipe.makes }, 'good');
+      this.message(recipe.atFire ? { key: 'cook', item: recipe.makes } : { key: 'make', item: recipe.makes }, 'good');
+      this.gainXp(xp, p.x, p.y);
       this.endTurn();
       return true;
     }
@@ -327,7 +390,22 @@ export class Game {
     const [first] = spot.cells;
     this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: first.x, targetY: first.y });
     this.message({ key: 'build', obj: spot.kind }, 'good');
+    this.gainXp(xp, first.x, first.y);
     this.endTurn();
+    return true;
+  }
+
+  /** Spend skill points on a skill. Takes no time. */
+  learn(id: SkillId): boolean {
+    if (this.has(id)) return false;
+    const problem = this.skillProblem(id);
+    if (problem) {
+      this.message(problem, 'info');
+      return false;
+    }
+    this.skills.add(id);
+    this.emit({ type: 'sparkle', x: this.player.x, y: this.player.y });
+    this.message({ key: 'learn', skill: id }, 'good');
     return true;
   }
 
@@ -408,14 +486,41 @@ export class Game {
       this.emit({ type: 'float', x, y, amount: n, what: { item }, tone: 'loot' });
     }
     this.message({ key: 'gather', obj: obj.kind, got }, 'loot');
+    this.gainXp(GATHER_XP, x, y);
 
     const after = gather.after;
     if ('remove' in after) this.objects.delete(this.map.idx(x, y));
     else if ('becomes' in after) {
       obj.kind = after.becomes;
       this.emit({ type: 'sparkle', x, y });
-    } else obj.readyAt = this.turn + after.regrow;
+    } else obj.readyAt = this.turn + Math.round(after.regrow * (this.has('green_thumb') ? GREEN_THUMB : 1));
     return true;
+  }
+
+  /** Cast the fishing rod into the sea at (x, y). Always takes a turn. */
+  private fish(x: number, y: number): void {
+    const p = this.player;
+    this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: x, targetY: y });
+    if (!this.rng.chance(this.has('patient_angler') ? PATIENT_BITE_CHANCE : BITE_CHANCE)) {
+      this.message({ key: 'noBite' }, 'info');
+      return;
+    }
+    this.inventory.add('fish');
+    this.emit({ type: 'float', x, y, amount: 1, what: { item: 'fish' }, tone: 'loot' });
+    this.message({ key: 'catch' }, 'loot');
+    this.gainXp(CATCH_XP, x, y);
+  }
+
+  /** Add experience, floating it at (x, y), and say so when it earns a skill point. */
+  private gainXp(amount: number, x: number, y: number): void {
+    if (amount <= 0) return;
+    const before = pointsForXp(this.xp);
+    this.xp += amount;
+    this.emit({ type: 'float', x, y, amount, what: { xp: true }, tone: 'good' });
+    if (pointsForXp(this.xp) > before) {
+      this.emit({ type: 'sparkle', x: this.player.x, y: this.player.y });
+      this.message({ key: 'skillPoint' }, 'good');
+    }
   }
 
   private drink(amount: number, msg: Msg): boolean {
@@ -505,6 +610,9 @@ export class Game {
       shelter: this.shelterAt(p.x, p.y),
       nearFire: this.nearFire(p.x, p.y),
       daylight: this.daylight,
+      thirst: this.has('small_sips') ? SMALL_SIPS : 1,
+      hunger: this.has('small_appetite') ? SMALL_APPETITE : 1,
+      chill: this.has('thick_skin') ? THICK_SKIN : 1,
     });
     if (!this.sleeping) this.warnAboutNeeds();
 
@@ -562,13 +670,15 @@ export class Game {
       return;
     }
     const noticed = def.notice > 0 && dist <= def.notice && this.map.isVisible(a.x, a.y);
+    // Animal friends get no trouble: grumpy and cheeky animals leave them be.
+    const friendly = this.has('animal_friend');
     if (noticed && !this.sleeping) {
       switch (def.temper) {
         case 'shy':
           this.stepAway(a);
           return;
         case 'grumpy':
-          if (dist <= 1 && this.rng.chance(0.5)) {
+          if (!friendly && dist <= 1 && this.rng.chance(0.5)) {
             this.emit({ type: 'lunge', id: a.id, x: a.x, y: a.y, targetX: p.x, targetY: p.y });
             this.needs.health = Math.max(0, this.needs.health - PINCH_DAMAGE);
             this.emit({ type: 'hit', id: p.id, x: p.x, y: p.y, damage: PINCH_DAMAGE });
@@ -579,7 +689,7 @@ export class Game {
           break;
         case 'cheeky': {
           const foods = this.inventory.foods();
-          if (!foods.length) break;
+          if (friendly || !foods.length) break;
           if (dist <= 1) {
             const item = this.rng.pick(foods);
             this.inventory.take(item);
@@ -730,6 +840,8 @@ export class Game {
       home: { ...this.home },
       needs: { ...this.needs },
       inventory: this.inventory.toJSON(),
+      xp: this.xp,
+      skills: [...this.skills],
       warned: [...this.warned],
       log: this.log.slice(-30),
     };
@@ -739,7 +851,11 @@ export class Game {
     if (data.v === 1) {
       // Version 1 kept log lines as English text. Everything else is the same.
       const old = data.log as unknown as { text: string; tone: Tone }[];
-      data = { ...data, v: SAVE_VERSION, log: old.map(({ text, tone }) => ({ msg: { key: 'legacy', text }, tone })) };
+      data = { ...data, v: 2, log: old.map(({ text, tone }) => ({ msg: { key: 'legacy', text }, tone })) };
+    }
+    if (data.v === 2) {
+      // Version 2 had no experience or skills yet.
+      data = { ...data, v: SAVE_VERSION, xp: 0, skills: [] };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

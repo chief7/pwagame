@@ -110,4 +110,18 @@ export const PALETTE = {
   gold: '#f2c14e',
   goldDark: '#b8862b',
   goldLight: '#fff1b0',
+
+  fish: '#4f93c4',
+  fishLight: '#8fc8e6',
+  fishDark: '#33648f',
+  fishBelly: '#e4efe6',
+  fishFin: '#e8956a',
+  fishCooked: '#c47a3a',
+  fishCookedLight: '#e3a95f',
+  fishCookedBelly: '#f0d3a0',
+  fishCookedDark: '#7a4320',
+  fishingLine: '#ece6d4',
+  bobber: '#d6334a',
+  compassNeedle: '#d6334a',
+  compassFace: '#f4f1e6',
 } as const;

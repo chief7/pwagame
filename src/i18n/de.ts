@@ -69,6 +69,9 @@ const ITEM: ItemWords<CountNoun> = {
   leaves: { g: 'n', word: 'Blatt', adj: 'groß', plural: 'große Blätter', short: ['Blatt', 'Blätter'] },
   stone: { g: 'm', word: 'Stein', plural: 'Steine', short: ['Stein', 'Steine'] },
   axe: { g: 'f', word: 'Steinaxt', plural: 'Steinäxte', short: ['Axt', 'Äxte'] },
+  fish: { g: 'm', word: 'Fisch', plural: 'Fische', short: ['Fisch', 'Fische'] },
+  cooked_fish: { g: 'm', word: 'Fisch', adj: 'gebraten', plural: 'gebratene Fische', short: ['Bratfisch', 'Bratfische'] },
+  fishing_rod: { g: 'f', word: 'Angelrute', plural: 'Angelruten', short: ['Angel', 'Angeln'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -147,6 +150,14 @@ export const de: Strings = {
     dawn: 'Morgengrauen',
     dusk: 'Abend',
     night: 'Nacht',
+    skills: 'Talente',
+    learn: 'Lernen',
+    learned: 'Gelernt',
+    raw: 'Roh. Brate ihn am Lagerfeuer.',
+    skillsHint: 'Sammle, baue und angle, um EP zu bekommen. Mit EP bekommst du Talentpunkte, mit denen du Talente lernst.',
+    skillPoints: (n) => `${n} ${n === 1 ? 'Talentpunkt' : 'Talentpunkte'}`,
+    xpToNext: (have, need) => `EP ${have} / ${need} bis zum nächsten Punkt`,
+    skillCost: (n) => `Kostet ${n} ${n === 1 ? 'Punkt' : 'Punkte'}`,
   },
   clock,
   needs: NEEDS,
@@ -156,11 +167,25 @@ export const de: Strings = {
     hut: { name: 'Hütte', description: 'Ein gemütliches Zuhause. Warme Nächte und der beste Schlaf.' },
     axe: { name: 'Steinaxt', description: 'Schlägt dir einen Weg durch Dornengestrüpp und bringt mehr Holz von Bäumen.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
+    fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
+    cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
+  },
+  paths: { survival: 'Überleben', craft: 'Handwerk', explorer: 'Entdecker' },
+  skills: {
+    small_sips: { name: 'Kleine Schlucke', description: 'Dein Wasser sinkt 20 % langsamer.' },
+    small_appetite: { name: 'Kleiner Hunger', description: 'Dein Essen sinkt 20 % langsamer.' },
+    thick_skin: { name: 'Dickes Fell', description: 'Du verlierst Wärme 30 % langsamer.' },
+    fishing_rod: { name: 'Angelrute', description: 'Du kannst eine Angelrute bauen. Lauf damit ins Meer, um zu angeln.' },
+    patient_angler: { name: 'Geduldiger Angler', description: 'Fische beißen öfter an.' },
+    handy_builder: { name: 'Geschickter Baumeister', description: 'Alles, was du baust, kostet 1 Holz weniger.' },
+    green_thumb: { name: 'Grüner Daumen', description: 'Pflanzen wachsen schneller nach.' },
+    night_eyes: { name: 'Eulenaugen', description: 'Du siehst nachts weiter.' },
+    animal_friend: { name: 'Tierfreund', description: 'Krabben zwicken dich nicht, und Affen klauen dir kein Essen.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].plural}`,
   itemCount,
   float(amount, what) {
-    const label = 'item' in what ? ITEM[what.item].short[Math.abs(amount) === 1 ? 0 : 1] : NEEDS[what.need];
+    const label = 'item' in what ? ITEM[what.item].short[Math.abs(amount) === 1 ? 0 : 1] : 'need' in what ? NEEDS[what.need] : 'EP';
     return `${amount > 0 ? '+' : ''}${amount} ${label}`;
   },
   message(msg) {
@@ -214,6 +239,14 @@ export const de: Strings = {
       case 'wakeAtCamp': return 'Du wachst im Lager auf und fühlst dich besser. Denk daran zu essen, zu trinken und dich warm zu halten!';
       case 'pinch': return `Autsch! ${cap(phrase(ANIMAL[msg.animal], 'nom', 'the'))} hat dich gezwickt.`;
       case 'snatch': return `${cap(phrase(ANIMAL[msg.animal], 'nom', 'the', 'frech'))} hat dir ${itemCount(msg.item, 1)} stibitzt!`;
+      case 'cook': return `Du brätst über dem Feuer und bekommst ${itemCount(msg.item, 1)}. Das duftet lecker!`;
+      case 'needFire': return 'Stell dich neben ein Lagerfeuer, um zu braten.';
+      case 'needSkill': return `Lerne zuerst das Talent „${de.skills[msg.skill].name}“.`;
+      case 'needPoints': return 'Du brauchst mehr Talentpunkte. Sammle und baue, um welche zu bekommen.';
+      case 'skillPoint': return 'Du wirst geschickter! Du bekommst einen Talentpunkt.';
+      case 'learn': return `Du hast gelernt: ${de.skills[msg.skill].name}.`;
+      case 'catch': return 'Du wirfst die Angel aus … und fängst einen Fisch!';
+      case 'noBite': return 'Nichts beißt an. Versuch es noch mal!';
       case 'legacy': return msg.text;
     }
   },

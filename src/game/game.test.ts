@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSprites, grassTileName, riverBankTileName, shoreTileName } from '../sprites';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
+import { pointsForXp, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
 import { Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -361,6 +362,135 @@ describe('Game: no harsh endings', () => {
   });
 });
 
+describe('Game: experience and skills', () => {
+  it('skill points come at 10, 25, 45, 70 XP', () => {
+    expect([1, 2, 3, 4].map(xpForPoints)).toEqual([10, 25, 45, 70]);
+    expect(pointsForXp(9)).toBe(0);
+    expect(pointsForXp(10)).toBe(1);
+    expect(pointsForXp(44)).toBe(2);
+  });
+
+  it('gathering and building give XP, floated next to what you got', () => {
+    const game = sandbox(20);
+    place(game, 1, 0, 'stone_pebbles');
+    game.move(1, 0);
+    expect(game.xp).toBe(1);
+    expect(game.takeEvents().some((e) => e.type === 'float' && 'xp' in e.what && e.amount === 1)).toBe(true);
+    game.inventory.add('wood', 3);
+    game.inventory.add('stone', 2);
+    game.build('campfire');
+    expect(game.xp).toBe(6);
+  });
+
+  it('enough XP earns a skill point, which learns a skill in path order', () => {
+    const game = sandbox(21);
+    game.xp = 9;
+    place(game, 1, 0, 'stone_pebbles');
+    game.move(1, 0);
+    expect(game.skillPoints).toBe(1);
+    expect(game.log.some((m) => m.msg.key === 'skillPoint')).toBe(true);
+    expect(game.skillProblem('small_appetite')).toEqual({ key: 'needSkill', skill: 'small_sips' });
+    expect(game.learn('small_sips')).toBe(true);
+    expect(game.skillPoints).toBe(0);
+    expect(game.learn('small_appetite')).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'needPoints' });
+  });
+
+  it('survival skills make water, food and warmth drop slower', () => {
+    const plain = sandbox(22);
+    const skilled = sandbox(22);
+    skilled.skills = new Set(['small_sips', 'small_appetite', 'thick_skin']);
+    for (const g of [plain, skilled]) {
+      g.turn = nightTurn();
+      g.needs.warmth = 100;
+      for (let i = 0; i < 20; i++) g.wait();
+    }
+    expect(skilled.needs.water).toBeGreaterThan(plain.needs.water);
+    expect(skilled.needs.food).toBeGreaterThan(plain.needs.food);
+    expect(skilled.needs.warmth).toBeGreaterThan(plain.needs.warmth);
+  });
+
+  it('the fishing rod needs its skill; with it you can fish in the sea', () => {
+    const game = sandbox(23);
+    game.inventory.add('wood', 3);
+    game.inventory.add('leaves', 2);
+    expect(game.buildProblem('fishing_rod')).toEqual({ key: 'needSkill', skill: 'fishing_rod' });
+    game.skills.add('fishing_rod');
+    expect(game.build('fishing_rod')).toBe(true);
+    game.map.set(game.player.x - 1, game.player.y, Tile.Water);
+    const turn = game.turn;
+    for (let i = 0; i < 20; i++) expect(game.move(-1, 0)).toBe(true);
+    expect(game.turn).toBe(turn + 20);
+    expect(game.inventory.count('fish')).toBeGreaterThan(2);
+    expect(game.inventory.count('fish')).toBeLessThan(20);
+    expect(game.log.some((m) => m.msg.key === 'noBite')).toBe(true);
+  });
+
+  it('patient anglers catch more fish', () => {
+    const catches = (patient: boolean) => {
+      const game = sandbox(24);
+      game.inventory.add('fishing_rod');
+      if (patient) game.skills.add('patient_angler');
+      game.map.set(game.player.x - 1, game.player.y, Tile.Water);
+      for (let i = 0; i < 100; i++) {
+        game.needs = { health: 100, food: 80, water: 80, energy: 90, warmth: 100 };
+        game.move(-1, 0);
+      }
+      return game.inventory.count('fish');
+    };
+    expect(catches(true)).toBeGreaterThan(catches(false));
+  });
+
+  it('raw fish cannot be eaten; it must be cooked at a campfire', () => {
+    const game = sandbox(25);
+    game.inventory.add('fish');
+    game.needs.food = 30;
+    expect(game.eat('fish')).toBe(false);
+    expect(game.buildProblem('cooked_fish')).toEqual({ key: 'needFire' });
+    place(game, 2, 0, 'campfire');
+    expect(game.build('cooked_fish')).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'cook', item: 'cooked_fish' });
+    expect(game.eat('cooked_fish')).toBe(true);
+    expect(game.needs.food).toBeGreaterThan(50);
+  });
+
+  it('handy builders use one wood less', () => {
+    const game = sandbox(26);
+    game.skills.add('handy_builder');
+    expect(game.recipeCost('campfire')).toEqual({ wood: 2, stone: 2 });
+    expect(game.recipeCost('cooked_fish')).toEqual({ fish: 1 });
+    game.inventory.add('wood', 2);
+    game.inventory.add('stone', 2);
+    expect(game.build('campfire')).toBe(true);
+    expect(game.inventory.count('wood')).toBe(0);
+  });
+
+  it('green thumbs regrow plants faster, and night eyes see further', () => {
+    const game = sandbox(27);
+    game.skills.add('green_thumb');
+    place(game, 1, 0, 'berry_bush');
+    game.move(1, 0);
+    expect(game.objectAt(game.player.x + 1, game.player.y)!.readyAt).toBe(game.turn - 1 + 84);
+    game.turn = nightTurn() + 20;
+    expect(game.sightRadius).toBe(4);
+    game.skills.add('night_eyes');
+    expect(game.sightRadius).toBe(6);
+  });
+
+  it('animal friends are not pinched or robbed', () => {
+    const game = sandbox(28);
+    game.skills.add('animal_friend');
+    game.map.set(game.player.x - 1, game.player.y, Tile.Grass);
+    game.animals = [
+      { id: 98, kind: 'crab', x: game.player.x + 1, y: game.player.y, facing: 'down', flee: 0 },
+      { id: 99, kind: 'monkey', x: game.player.x - 1, y: game.player.y, facing: 'down', flee: 0 },
+    ];
+    for (let i = 0; i < 20; i++) game.wait();
+    expect(game.log.some((m) => m.msg.key === 'pinch' || m.msg.key === 'snatch')).toBe(false);
+    expect(game.inventory.count('coconut')).toBe(2);
+  });
+});
+
 describe('Game: saving', () => {
   it('round-trips through JSON', () => {
     const game = sandbox(12);
@@ -383,6 +513,18 @@ describe('Game: saving', () => {
     const game = Game.fromSave(JSON.parse(JSON.stringify(v1)));
     expect(game.log).toEqual([{ msg: { key: 'legacy', text: 'You wash up on a quiet island.' }, tone: 'info' }]);
     expect(game.toSave().v).toBe(SAVE_VERSION);
+  });
+
+  it('loads version 2 saves with no XP or skills yet, and keeps skills', () => {
+    const { xp: _xp, skills: _skills, ...v2 } = { ...new Game(14).toSave(), v: 2 };
+    const game = Game.fromSave(JSON.parse(JSON.stringify(v2)));
+    expect(game.xp).toBe(0);
+    expect(game.skills.size).toBe(0);
+    game.xp = 30;
+    game.learn('green_thumb');
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.has('green_thumb')).toBe(true);
+    expect(copy.skillPoints).toBe(game.skillPoints);
   });
 });
 

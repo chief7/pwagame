@@ -1,9 +1,9 @@
 import { characterSet } from './characters';
-import { animalSet, itemIcons, raft } from './creatures';
+import { animalSet, itemIcons, raft, skillItemIcons } from './creatures';
 import { berryBush, berryBushEmpty, bramble, bush, mushroom, treeBroadleaf, treePine } from './forest';
 import { bridge, campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
-import { appIcon, globe } from './ui';
+import { appIcon, globe, skillIcons } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
@@ -34,9 +34,9 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
     { title: 'Animals', sprites: animalSet() },
-    { title: 'Items', sprites: itemIcons() },
+    { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
     { title: 'Raft', sprites: [raft()] },
-    { title: 'Interface', sprites: [globe(), appIcon()] },
+    { title: 'Interface', sprites: [globe(), ...skillIcons(), appIcon()] },
   ];
 }
 

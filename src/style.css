@@ -19,6 +19,7 @@
   --energy: #b39ddb;
   --warmth: #ff7f50;
   --track: #2a2f36;
+  --xp: #b9a4ff;
 }
 
 * {
@@ -160,8 +161,22 @@ footer {
 
 #actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+}
+
+#btn-skills {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+#btn-skills .star {
+  width: 24px;
+  height: 24px;
+  margin: -6px 0;
+  image-rendering: pixelated;
 }
 
 button {
@@ -304,6 +319,62 @@ button.primary {
 
 .cost.missing {
   color: var(--warn);
+}
+
+.row-note.locked,
+.row-note.skill-cost {
+  display: block;
+  margin-top: 4px;
+  color: var(--warn);
+}
+
+.row-note.skill-cost {
+  color: var(--xp);
+}
+
+.row.learned {
+  border-color: var(--xp);
+}
+
+.xp {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+}
+
+.xp img,
+.path img {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+}
+
+.xp-bar {
+  height: 8px;
+  margin: 4px 0;
+  background: var(--track);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.xp-fill {
+  height: 100%;
+  background: var(--xp);
+}
+
+.path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 15px;
+}
+
+.path img {
+  width: 24px;
+  height: 24px;
 }
 
 .empty {

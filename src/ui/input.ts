@@ -3,7 +3,8 @@ export type Command =
   | { type: 'wait' }
   | { type: 'sleep' }
   | { type: 'bag' }
-  | { type: 'build' };
+  | { type: 'build' }
+  | { type: 'skills' };
 
 const KEY_DIRS: Record<string, [number, number]> = {
   ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
@@ -23,6 +24,7 @@ export function commandForKey(e: KeyboardEvent): Command | null {
     case 'z': return { type: 'sleep' };
     case 'i': return { type: 'bag' };
     case 'b': return { type: 'build' };
+    case 'p': return { type: 'skills' };
   }
   return null;
 }

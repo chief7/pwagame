@@ -10,6 +10,9 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   leaves: { one: 'big leaf', many: 'big leaves', short: ['leaf', 'leaves'] },
   stone: { one: 'stone', many: 'stones', short: ['stone', 'stones'] },
   axe: { one: 'stone axe', many: 'stone axes', short: ['axe', 'axes'] },
+  fish: { one: 'fish', many: 'fish', short: ['fish', 'fish'] },
+  cooked_fish: { one: 'cooked fish', many: 'cooked fish', short: ['cooked fish', 'cooked fish'] },
+  fishing_rod: { one: 'fishing rod', many: 'fishing rods', short: ['rod', 'rods'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -88,6 +91,14 @@ export const en: Strings = {
     dawn: 'dawn',
     dusk: 'dusk',
     night: 'night',
+    skills: 'Skills',
+    learn: 'Learn',
+    learned: 'Learned',
+    raw: 'Raw. Cook it at a campfire.',
+    skillsHint: 'Gather, build and fish to earn XP. XP gives you skill points to learn skills.',
+    skillPoints: (n) => `${n} skill ${n === 1 ? 'point' : 'points'}`,
+    xpToNext: (have, need) => `XP ${have} / ${need} to the next point`,
+    skillCost: (n) => `Costs ${n} ${n === 1 ? 'point' : 'points'}`,
   },
   clock,
   needs: NEEDS,
@@ -97,11 +108,25 @@ export const en: Strings = {
     hut: { name: 'Hut', description: 'A cosy home. Toasty nights and the best sleep.' },
     axe: { name: 'Stone axe', description: 'Chops through brambles, and gets you more wood from trees.' },
     bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
+    fishing_rod: { name: 'Fishing rod', description: 'Walk into the sea with it to catch fish.' },
+    cooked_fish: { name: 'Cook a fish', description: 'Stand next to a campfire. Cooked fish is tasty food.' },
+  },
+  paths: { survival: 'Survival', craft: 'Crafting', explorer: 'Explorer' },
+  skills: {
+    small_sips: { name: 'Small sips', description: 'Your water goes down 20% slower.' },
+    small_appetite: { name: 'Small appetite', description: 'Your food goes down 20% slower.' },
+    thick_skin: { name: 'Thick skin', description: 'You lose warmth 30% slower.' },
+    fishing_rod: { name: 'Fishing rod', description: 'You can build a fishing rod. Walk into the sea with it to fish.' },
+    patient_angler: { name: 'Patient angler', description: 'Fish bite more often.' },
+    handy_builder: { name: 'Handy builder', description: 'Everything you build costs 1 wood less.' },
+    green_thumb: { name: 'Green thumb', description: 'Plants grow back faster.' },
+    night_eyes: { name: 'Night eyes', description: 'You see further at night.' },
+    animal_friend: { name: 'Animal friend', description: "Crabs don't pinch you, and monkeys don't take your food." },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].many}`,
   itemCount,
   float(amount, what) {
-    const label = 'item' in what ? ITEM[what.item].short[Math.abs(amount) === 1 ? 0 : 1] : what.need;
+    const label = 'item' in what ? ITEM[what.item].short[Math.abs(amount) === 1 ? 0 : 1] : 'need' in what ? what.need : 'XP';
     return `${amount > 0 ? '+' : ''}${amount} ${label}`;
   },
   message(msg) {
@@ -155,6 +180,14 @@ export const en: Strings = {
       case 'wakeAtCamp': return 'You wake up back at camp, feeling better. Remember to eat, drink and keep warm!';
       case 'pinch': return `Ouch! The ${ANIMAL[msg.animal].name} pinched you.`;
       case 'snatch': return `The cheeky ${ANIMAL[msg.animal].name} snatched ${itemCount(msg.item, 1)}!`;
+      case 'cook': return `You cook over the fire and get ${itemCount(msg.item, 1)}. Smells great!`;
+      case 'needFire': return 'Stand next to a campfire to cook.';
+      case 'needSkill': return `Learn the skill “${en.skills[msg.skill].name}” first.`;
+      case 'needPoints': return 'You need more skill points. Gather and build to earn them.';
+      case 'skillPoint': return 'You feel more skilled! You got a skill point.';
+      case 'learn': return `You learned: ${en.skills[msg.skill].name}.`;
+      case 'catch': return 'You cast your line… and catch a fish!';
+      case 'noBite': return 'Nothing bites. Try again!';
       case 'legacy': return msg.text;
     }
   },

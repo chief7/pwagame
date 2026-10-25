@@ -63,7 +63,7 @@ flowchart TB
     inv["inventory.ts"]
     world["worldgen.ts"]
     support["map.ts · fov.ts · pathing.ts · rng.ts · actors.ts"]
-    defs["defs/<br/>items · objects · recipes · animals"]
+    defs["defs/<br/>items · objects · recipes · animals · skills"]
   end
   subgraph Art["Sprite layer (pure data)"]
     sprites["sprites/<br/>pixel art generated in code"]
@@ -83,7 +83,7 @@ flowchart TB
 | Module | Responsibility |
 |---|---|
 | `src/game/game.ts` | The `Game` class. Holds all state. Runs actions and the turn. Sends events. Saves and loads. |
-| `src/game/defs/*.ts` | Data registries for items, world objects, recipes and animals. |
+| `src/game/defs/*.ts` | Data registries for items, world objects, recipes, animals and skills. |
 | `src/game/needs.ts` | The five needs and how one turn changes them. |
 | `src/game/clock.ts` | Time of day, daylight, day and night phases. |
 | `src/game/inventory.ts` | What the player carries (a count per item). |
@@ -96,7 +96,7 @@ flowchart TB
 | `src/ui/renderer.ts` | Draws terrain, objects, animals, the player, night light and effects on a canvas. |
 | `src/ui/animator.ts` | Turns game events into timed animations. |
 | `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
-| `src/main.ts` | Connects everything: HUD, Bag and Build panels, touch and keys, render loop, autosave, language switch. |
+| `src/main.ts` | Connects everything: HUD, Bag, Build and Skills panels, touch and keys, render loop, autosave, language switch. |
 | `src/game/messages.ts` | The `Msg` type: every log message as data (a key and its arguments). |
 | `src/i18n/*.ts` | All text the player sees, in English (`en.ts`) and German (`de.ts`). |
 | `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
@@ -117,8 +117,8 @@ after each action and gives them to the animator.
 | `move` | An actor moved one cell | Slide between cells, walk frames |
 | `lunge` | An actor reached towards a cell (gather, shoo, pinch, build) | Short push towards the target |
 | `hit` | An actor lost Health | White flash and a red number |
-| `float` | Show a number at a cell (`+2 wood`, `+35 water`): `amount` and `what` (an item or a need) | Text rises and fades |
-| `sparkle` | Something good happened at a cell (chest, building) | Gold sparkles |
+| `float` | Show a number at a cell (`+2 wood`, `+35 water`, `+1 XP`): `amount` and `what` (an item, a need or XP) | Text rises and fades. XP has its own colour (lavender). |
+| `sparkle` | Something good happened at a cell (chest, building, skill point, skill learned) | Gold sparkles |
 | `fade` | Time jumped (sleep, faint, new island) | Screen fades in from dark |
 
 Each event has a `late` flag. `late` is true for events from the animals'
@@ -162,6 +162,7 @@ All actions return `true` when time passed and `false` when nothing happened.
 | `wait()` | Passes one turn. |
 | `eat(item)` | Eats one food item from the bag. |
 | `build(recipe)` | Builds in front of the player, or makes an item for the bag. |
+| `learn(skill)` | Spends skill points on a skill. No turn passes. |
 | `sleep()` | Sleeps for many turns until a stop condition (see 4.4). |
 
 What `move` does when the target cell is not free:
@@ -173,7 +174,8 @@ What `move` does when the target cell is not free:
      player does not carry (bramble: axe), say so. No turn passes.
    - Other object: show its name. No turn passes.
 3. **River** (with no bridge): drink, +35 Water.
-4. **Sea:** show "too salty". No turn passes.
+4. **Sea:** with a fishing rod in the bag, fish (see 4.11). Else show "too
+   salty". No turn passes.
 5. **Rock:** nothing happens. No turn passes.
 
 ---
@@ -316,6 +318,13 @@ Special recipes:
 
 - **Items** (`makes` instead of `builds`): the item goes into the bag. A
   tool cannot be made when the player already has one (`haveTool`).
+- **Skill** (`skill`): the recipe needs a skill (fishing rod). The Build
+  panel shows the recipe with a note until the skill is learned.
+- **At the fire** (`atFire`): the player must be within a campfire's warmth
+  (2 cells). Cooking fish works this way, with the message `cook`.
+- **Handy builder:** with this skill, a recipe that needs wood costs 1 wood
+  less. `game.recipeCost(id)` gives the cost after skills. Always use it,
+  not `RECIPES[id].cost`.
 - **Bridge** (an object with `bridge: true`): it goes straight ahead, in the
   facing direction. The cells in front must be river, 1 to 3 cells
   (`BRIDGE_SPAN`), with free ground after them. The bridge fills all those
@@ -343,6 +352,53 @@ Other rules:
 - Animals do not act on the player while the player sleeps.
 - Every 50 turns, the game adds one animal of each kind that is below its
   `population`, out of the player's view.
+
+### 4.10 Experience and skills
+
+The player gets XP (experience):
+
+| Action | XP |
+|---|---|
+| Gather from an object | 1 |
+| Build or make a recipe | 1 for each item in its cost (campfire 5, hut 22, cook a fish 1) |
+| Catch a fish | 2 |
+
+Each XP gain sends a `float` event (`what: { xp: true }`) next to the other
+floating text.
+
+**Skill points.** The first point needs 10 XP. Each next point needs 5 XP
+more than the one before: 10, 25, 45, 70, 100 XP in total
+(`xpForPoints`, `pointsForXp` in `skills.ts`). Points are not stored: free
+points = points earned from XP − cost of the learned skills. When a point is
+earned, the log says so (`skillPoint`) and the player sparkles.
+
+**Skills.** Three paths with three skills each. In a path, a skill needs the
+skill before it. The first two skills cost 1 point, the third costs 2.
+
+| Path | Skill | Effect | Where |
+|---|---|---|---|
+| Survival | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
+| | Small appetite | Food drops 20% slower | `needs.ts` (`hunger`) |
+| | Thick skin | Warmth drops 30% slower | `needs.ts` (`chill`) |
+| Crafting | Fishing rod | Unlocks the fishing rod recipe | `recipes.ts` (`skill`) |
+| | Patient angler | Bite chance 40% → 70% | `Game.fish()` |
+| | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
+| Explorer | Green thumb | Plants regrow in 70% of the time | `Game.interact()` |
+| | Night eyes | Up to 2 more cells of sight at night | `Game.sightRadius` |
+| | Animal friend | Crabs do not pinch, monkeys do not take food | `Game.animalAct()` |
+
+The Skills panel shows the free points, an XP bar to the next point, and each
+path. The Skills button shows a star when there are free points.
+
+### 4.11 Fishing and cooking
+
+- Walking into the sea with a fishing rod in the bag casts the line. One turn
+  passes.
+- Chance of a bite: 40%, or 70% with Patient angler. A catch gives 1 raw fish
+  and 2 XP. Else the log says "Nothing bites".
+- The river is only for drinking. Fishing works only in the sea.
+- Raw fish (`raw: true`) cannot be eaten. The recipe "Cook a fish" (1 fish,
+  at a campfire) makes a cooked fish: +24 Food.
 
 ---
 
@@ -430,6 +486,7 @@ coconut: { id: 'coconut', eat: { food: 18, water: 22 } },
 
 - `eat` is optional. With `eat`, the item is food and shows an Eat button.
 - `tool: true` marks a tool: it is kept in the bag, and only one can be made.
+- `raw: true` marks food that must be cooked first. The Bag panel says so.
 - Also add the id to the `ItemId` type.
 
 ### World objects
@@ -460,6 +517,16 @@ axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
 ```
 
 A recipe has `builds` (an object) or `makes` (an item for the bag).
+Optional: `skill` (a skill must be learned first) and `atFire` (the player
+must be next to a campfire).
+
+### Skills
+
+`src/game/defs/skills.ts` has `PATHS` (each path's skills, in order) and the
+skill point thresholds. A skill's cost comes from its place in the path
+(1, 1, 2). The effect of a skill is code where it applies: check it with
+`game.has(id)`. Names and descriptions are in `src/i18n/` (`skills`,
+`paths`). The path icons are `ui_path_<path>`.
 
 ### Animals
 
@@ -474,9 +541,10 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom (food); wood, leaves, stone (materials); stone axe (tool) |
+| Items | coconut, berries, mushroom, cooked fish (food); wood, leaves, stone, fish (materials; fish is raw); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), bridge (6 wood, 3 leaves) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
+| Skills | Survival: small sips, small appetite, thick skin. Crafting: fishing rod, patient angler, handy builder. Explorer: green thumb, night eyes, animal friend |
 | Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves) |
 
 ---
@@ -548,9 +616,9 @@ The render loop runs at full frame rate while the animator is busy, and every
 | Tap a far explored cell | Walk there along the shortest known path |
 | Tap a far cell that cannot be reached | Step in that direction |
 | Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
-| Bag / Build / Sleep buttons | Open the panels, or sleep |
+| Bag / Build / Skills / Sleep buttons | Open the panels, or sleep |
 | 🌐 button (Bag panel and explorer picker) | Switch between English and German |
-| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `z`: sleep. `Esc`: close a panel. |
+| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `z`: sleep. `Esc`: close a panel. |
 
 Auto-walk (travel and hold) stops when:
 
@@ -567,13 +635,14 @@ Auto-walk (travel and hold) stops when:
 - On start, the game loads the save. If the save is missing or broken, a new
   island starts.
 - The save holds: seed, random number state, turn, tiles, explored cells,
-  objects, animals, player, home, needs, inventory, warnings and the last 30
-  log lines. It is about 30 KB (15 KB on islands from before the larger
+  objects, animals, player, home, needs, inventory, XP, learned skills,
+  warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 2. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 1 saves still
-  load: their log lines were English text and become `legacy` messages.
+- `SAVE_VERSION` is 3. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 2 saves load
+  with 0 XP and no skills. Version 1 saves also load: their log lines were
+  English text and become `legacy` messages.
 - The chosen explorer (female or male) is saved as `pwagame.body`.
 - The language is saved as `pwagame.lang`.
 - The Bag panel has "New island" (tap two times to confirm).
@@ -606,7 +675,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
@@ -636,6 +705,10 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Springs and chests | `worldgen.ts` → `SPRINGS`, `HOME_SPRINGS`, `CHESTS` | 8, 2, [2, 3, 3] |
 | Bridge span | `pathing.ts` → `BRIDGE_SPAN` | 3 cells |
 | River drink | `game.ts` → `RIVER_DRINK` | 35 |
+| XP per gather, per fish | `game.ts` → `GATHER_XP`, `CATCH_XP` | 1, 2 |
+| Skill point thresholds | `skills.ts` → `FIRST_POINT_XP`, `POINT_XP_STEP` | 10, 5 |
+| Bite chance | `game.ts` → `BITE_CHANCE`, `PATIENT_BITE_CHANCE` | 0.4, 0.7 |
+| Skill effects | `game.ts` → `SMALL_SIPS`, `SMALL_APPETITE`, `THICK_SKIN`, `GREEN_THUMB`, `NIGHT_EYES` | 0.8, 0.8, 0.7, 0.7, 2 |
 | Beach width, hills | `worldgen.ts` → `BEACH_WIDTH`, `HILL_MIN_DIST` | 3, 5 |
 | Object density | `worldgen.ts` → `SCATTER` | chance per cell and biome |
 | Step speed | `animator.ts` → `STEP_MS` | 130 ms |
@@ -651,6 +724,8 @@ Also run `npm run build` (typecheck and build) before you commit.
 - There is no goal or ending yet. The raft sprite exists for a future
   "build a raft" goal.
 - There is no sound.
+- The balance of XP and skill costs has not been tested with real play.
+- The player has no fishing pose. Fishing shows the normal lunge.
 - Where the river meets the sea, the two water colours meet in a hard line.
 - Cave floor next to the river has no bank tile.
 - The game has not been tested on a real phone.

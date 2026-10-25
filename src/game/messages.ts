@@ -1,6 +1,7 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
 import type { ObjectKind } from './defs/objects';
+import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
 
 // What the game wants to say, as data. The game layer never builds text:
@@ -39,8 +40,17 @@ export type Msg =
   | { key: 'wakeAtCamp' }
   | { key: 'pinch'; animal: AnimalKind }
   | { key: 'snatch'; animal: AnimalKind; item: ItemId }
+  | { key: 'cook'; item: ItemId }
+  | { key: 'needFire' }
+  /** A recipe or skill needs this skill learned first. */
+  | { key: 'needSkill'; skill: SkillId }
+  | { key: 'needPoints' }
+  | { key: 'skillPoint' }
+  | { key: 'learn'; skill: SkillId }
+  | { key: 'catch' }
+  | { key: 'noBite' }
   /** A line from a save made before messages were data; shown as it is. */
   | { key: 'legacy'; text: string };
 
-/** What a floating number counts: "+2 wood", "+35 water". */
-export type FloatWhat = { item: ItemId } | { need: NeedId };
+/** What a floating number counts: "+2 wood", "+35 water", "+1 XP". */
+export type FloatWhat = { item: ItemId } | { need: NeedId } | { xp: true };

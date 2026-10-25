@@ -2,6 +2,7 @@ import type { AnimalKind } from '../game/defs/animals';
 import type { ItemId } from '../game/defs/items';
 import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
+import type { PathId, SkillId } from '../game/defs/skills';
 import type { FloatWhat, Msg } from '../game/messages';
 import type { NeedId } from '../game/needs';
 
@@ -37,11 +38,25 @@ export interface Strings {
     dawn: string;
     dusk: string;
     night: string;
+    skills: string;
+    learn: string;
+    learned: string;
+    /** Bag note for food that must be cooked first. */
+    raw: string;
+    skillsHint: string;
+    /** "2 skill points". */
+    skillPoints(n: number): string;
+    /** "XP 12 / 25 to the next point". */
+    xpToNext(have: number, need: number): string;
+    /** "Costs 2 points". */
+    skillCost(n: number): string;
   };
   /** "Day 2 · 6:00". */
   clock(turn: number): string;
   needs: Record<NeedId, string>;
   recipes: Record<RecipeId, { name: string; description: string }>;
+  paths: Record<PathId, string>;
+  skills: Record<SkillId, { name: string; description: string }>;
   /** Bag line: "3 × coconuts". */
   itemStack(id: ItemId, count: number): string;
   /** "a coconut", "3 pieces of wood". */
