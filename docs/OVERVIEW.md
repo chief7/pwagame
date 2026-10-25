@@ -447,6 +447,11 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 - Characters have 4 facings × 3 frames (stand, step 1, step 2). The left
   facing is the right facing, mirrored.
 - The gallery page (`/sprites.html`) shows every sprite.
+- The preview page (`/preview.html?show=…`) shows chosen sprites in close-up,
+  their animation frames, and a scene at game size next to existing sprites.
+  The `add-content` skill uses it for proposals. Parameters: `show` (sprites,
+  comma-separated; join animation frames with `|`), `bg` (ground tile),
+  `compare` (existing sprites), `ms` (time per frame).
 
 ### Renderer
 
@@ -510,6 +515,26 @@ Auto-walk (travel and hold) stops when:
 - The chosen explorer (female or male) is saved as `pwagame.body`.
 - The Bag panel has "New island" (tap two times to confirm).
 
+**Test a special situation in the browser.** You can start the game in any
+state: edit a save and load it before the game starts. The game saves on
+`pagehide`, so do not edit `localStorage` and then reload the same page (the
+game writes its own state over your edit). Instead, inject the edited save
+before the page loads, for example with Playwright:
+
+```js
+await page.addInitScript((json) => {
+  if (!sessionStorage.getItem('injected')) {
+    localStorage.setItem('pwagame.save', json);
+    sessionStorage.setItem('injected', '1');
+  }
+}, JSON.stringify(editedSave));
+await page.goto('http://localhost:5173/');
+```
+
+Useful edits: move `player.x` / `player.y`, set `turn` (for example 140 is
+22:00 on day 1), set `explored` to all `"1"`, and add objects to `objects`
+as `[cellIndex, kind]` (cellIndex = y × width + x).
+
 ---
 
 ## 10. Tests
@@ -521,6 +546,10 @@ Run `npm test`. The tests are in:
 | `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
+
+To add content, use the `add-content` skill (`.claude/skills/add-content/`).
+It makes a proposal with rendered sprites first, and builds only after
+approval.
 
 Also run `npm run build` (typecheck and build) before you commit.
 

@@ -48,6 +48,10 @@ npm run preview   # serve the build (service worker is only active here)
 
 ## Adding things
 
+In Claude Code, run `/add-content <idea>`. The skill proposes the content with
+rendered sprites, waits for your approval or changes, and then builds it.
+The details below are for manual changes.
+
 Content lives in data registries under `src/game/defs/`. Each entry needs a
 matching sprite (see below); the sprite test fails if one is missing.
 
