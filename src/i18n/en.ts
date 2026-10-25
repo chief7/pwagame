@@ -78,6 +78,7 @@ const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: s
   bear: { name: 'cave bear', shoo: 'The cave bear grumbles and shuffles away.', hurt: 'The cave bear wakes up and swipes at you!' },
   rabbit: { name: 'rabbit', shoo: 'The rabbit twitches its nose and hops away.' },
   squirrel: { name: 'squirrel', shoo: 'The squirrel chatters at you and runs up a tree.' },
+  dog: { name: 'stray dog', shoo: 'The dog wags its tail.' },
   goat: {
     name: 'mountain goat', shoo: 'You wave your arms. The goat bleats and jumps away over the rocks.',
     hurt: 'Bonk! The mountain goat butts you with its horns.', alert: 'A mountain goat lowers its horns and runs at you!',
@@ -149,6 +150,10 @@ export const en: Strings = {
     endTitle: 'You did it!',
     endText: 'A ship saw your beacon and took you on board. The next island is coming soon! Until then, you can stay here or start a new island.',
     stay: 'Stay on this island',
+    yourDog: 'Your dog',
+    dogNeeds: (food, water) => `Food ${food} · Water ${water}`,
+    dogTired: 'Tired. Give it food, and walk past water so it can drink.',
+    feedDog: 'Feed dog',
   },
   levels: {
     1: {
@@ -296,6 +301,17 @@ export const en: Strings = {
         ? 'You light the beacon. Smoke rises high into the sky, and soon a ship comes to take you on board!'
         : 'You push the boat into the waves and sail away!';
       case 'landIsland': return 'After a long trip, your boat lands on a new island. Tall trees and snowy mountains! It is colder here.';
+      case 'dogSniff': return 'A stray dog sniffs your hand. It looks hungry. Bring it something to eat.';
+      case 'dogAdopt': return `You give the dog ${itemCount(msg.item, 1)}. It wags its tail and follows you. You have a dog!`;
+      case 'dogBark': return `Woof! Your dog barks, and the ${ANIMAL[msg.animal].name} runs away.`;
+      case 'dogFeed': return `Your dog eats ${itemCount(msg.item, 1)} and wags its tail.`;
+      case 'dogFull': return 'Your dog is not hungry.';
+      case 'dogFar': return 'Your dog is too far away. Go to it first.';
+      case 'dogLow': return msg.need === 'food'
+        ? 'Your dog is hungry. Feed it from your bag.'
+        : 'Your dog is thirsty. Walk past a spring or the river.';
+      case 'dogTired': return 'Your dog is too hungry or thirsty to help. It trails slowly behind you.';
+      case 'dogBack': return 'Your dog jumps up, happy again!';
       case 'snowCold': return 'Brr! The snow is cold, even in the day. A fire or a shelter helps up here.';
       case 'legacy': return msg.text;
     }

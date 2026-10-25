@@ -332,6 +332,148 @@ describe('Game: sailing to island 2', () => {
   });
 });
 
+describe('Game: the dog', () => {
+  /** A sandbox with your dog just west of the explorer. */
+  function withDog(seed: number) {
+    const game = sandbox(seed);
+    game.dog = { id: 500, x: game.player.x - 1, y: game.player.y, facing: 'down', food: 80, water: 80, tired: false };
+    return game;
+  }
+  const near = (game: Game) => Math.max(Math.abs(game.dog!.x - game.player.x), Math.abs(game.dog!.y - game.player.y));
+
+  it('puts one stray dog on each island, far from camp', () => {
+    for (const seed of [1, 2, 3]) {
+      const game = new Game(seed);
+      const strays = game.animals.filter((a) => a.kind === 'dog');
+      expect(strays).toHaveLength(1);
+      expect(Math.max(Math.abs(strays[0].x - game.home.x), Math.abs(strays[0].y - game.home.y))).toBeGreaterThanOrEqual(25);
+    }
+  });
+
+  it('adopts the stray dog for a snack, raw fish first', () => {
+    const game = sandbox(50);
+    game.inventory.take('coconut', 2);
+    const stray = { id: 77, kind: 'dog' as const, x: game.player.x + 1, y: game.player.y, facing: 'down' as const, flee: 0 };
+    game.animals = [stray];
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'dogSniff' });
+    expect(game.dog).toBeNull();
+
+    game.inventory.add('apple', 2);
+    game.inventory.add('fish', 1);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('fish')).toBe(0);
+    expect(game.inventory.count('apple')).toBe(2);
+    expect(game.dog).toMatchObject({ id: 77, tired: false });
+    expect(game.animals.some((a) => a.kind === 'dog')).toBe(false);
+    expect(game.log.some((e) => e.msg.key === 'dogAdopt' && e.msg.item === 'fish')).toBe(true);
+    // No new stray once you have a dog.
+    for (let i = 0; i < 60; i++) game.wait();
+    expect(game.animals.some((a) => a.kind === 'dog')).toBe(false);
+  });
+
+  it('follows you, and swaps places when you walk into it', () => {
+    const game = withDog(51);
+    for (let i = 0; i < 3; i++) {
+      game.move(1, 0);
+      expect(near(game)).toBeLessThanOrEqual(1);
+    }
+    const dog = { x: game.dog!.x, y: game.dog!.y };
+    const from = { x: game.player.x, y: game.player.y };
+    expect(game.move(dog.x - from.x, dog.y - from.y)).toBe(true);
+    expect(game.player).toMatchObject(dog);
+    expect(near(game)).toBeLessThanOrEqual(1);
+  });
+
+  it('barks small nuisance animals away, but not the big wild ones', () => {
+    const game = withDog(52);
+    const monkey = { id: 90, kind: 'monkey' as const, x: game.player.x + 2, y: game.player.y, facing: 'down' as const, flee: 0 };
+    const boar = { id: 91, kind: 'boar' as const, x: game.player.x, y: game.player.y + 3, facing: 'down' as const, flee: 0 };
+    game.animals = [monkey, boar];
+    game.inventory.add('apple', 1);
+    game.wait();
+    expect(monkey.flee).toBeGreaterThan(0);
+    expect(boar.flee).toBe(0);
+    expect(game.log.some((e) => e.msg.key === 'dogBark' && e.msg.animal === 'monkey')).toBe(true);
+    expect(game.inventory.count('apple')).toBe(1);
+  });
+
+  it('gets hungry and thirsty; you feed it from the bag when it is close', () => {
+    const game = withDog(53);
+    game.wait();
+    expect(game.dog!.food).toBeCloseTo(80 - 0.3, 5);
+    expect(game.dog!.water).toBeCloseTo(80 - 0.35, 5);
+    game.dog!.food = 99;
+    game.inventory.add('apple', 2);
+    expect(game.feedDog('apple')).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'dogFull' });
+    game.dog!.food = 50;
+    expect(game.feedDog('apple')).toBe(true);
+    expect(game.dog!.food).toBeCloseTo(62 - 0.3, 5);
+    game.dog!.x = game.player.x - 3;
+    expect(game.feedDog('apple')).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'dogFar' });
+    expect(game.feedDog('wood')).toBe(false);
+  });
+
+  it('drinks with you, and by itself next to fresh water', () => {
+    const game = withDog(54);
+    game.dog!.water = 20;
+    game.needs.water = 40;
+    place(game, 1, 0, 'spring');
+    game.move(1, 0);
+    expect(game.dog!.water).toBeGreaterThan(60);
+    game.dog!.water = 20;
+    game.needs.water = 100;
+    game.dog!.x = game.player.x + 1;
+    game.dog!.y = game.player.y + 1;
+    game.wait();
+    expect(game.dog!.water).toBeGreaterThan(60);
+  });
+
+  it('gets tired when Food or Water runs out: no barking, until it is fed', () => {
+    const game = withDog(55);
+    game.dog!.food = 0.1;
+    game.wait();
+    expect(game.dog!.tired).toBe(true);
+    expect(game.log.some((e) => e.msg.key === 'dogTired')).toBe(true);
+    const crab = { id: 92, kind: 'crab' as const, x: game.player.x + 2, y: game.player.y, facing: 'down' as const, flee: 0 };
+    game.animals = [crab];
+    game.wait();
+    expect(game.log.some((e) => e.msg.key === 'dogBark')).toBe(false);
+    game.dog!.x = game.player.x - 1;
+    game.dog!.y = game.player.y;
+    game.inventory.add('berries', 1);
+    expect(game.feedDog('berries')).toBe(true);
+    expect(game.dog!.tired).toBe(false);
+    expect(game.log.some((e) => e.msg.key === 'dogBack')).toBe(true);
+  });
+
+  it('comes along after fainting, to the next island, and through a save', () => {
+    const game = withDog(56);
+    game.needs.health = 0.5;
+    game.needs.food = 0;
+    game.wait();
+    expect(near(game)).toBeLessThanOrEqual(1);
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.dog).toEqual(game.dog);
+
+    for (const [i, o] of game.objects) if (o.kind.startsWith('boat_')) game.objects.set(i, { kind: 'boat_ready' });
+    game.map.explored.fill(1);
+    game.sail();
+    expect(game.level).toBe(2);
+    expect(near(game)).toBeLessThanOrEqual(1);
+    expect(game.animals.some((a) => a.kind === 'dog')).toBe(false);
+  });
+
+  it('loads version 5 saves without a dog', () => {
+    const { dog: _dog, ...v5 } = { ...new Game(57).toSave(), v: 5 };
+    const game = Game.fromSave(JSON.parse(JSON.stringify(v5)));
+    expect(game.dog).toBeNull();
+    expect(game.toSave().v).toBe(SAVE_VERSION);
+  });
+});
+
 describe('clock', () => {
   it('starts in the morning and cycles through night', () => {
     expect(phase(0)).toBe('day');
@@ -855,7 +997,9 @@ describe('Game: wild animals', () => {
   it('a snake bites when you stand next to it', () => {
     const game = meadow(41, wild('snake', 1));
     const bites = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 10 && !bites.length; i++) {
+      // Keep it next to you: it may wander off before it bites.
+      Object.assign(game.animals[0], { x: game.player.x + 1, y: game.player.y });
       game.wait();
       bites.push(...game.takeEvents().filter((e) => e.type === 'hit'));
     }

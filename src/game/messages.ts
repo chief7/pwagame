@@ -71,6 +71,18 @@ export type Msg =
   | { key: 'landIsland'; level: LevelId }
   /** Stepped onto snow: it is cold up here. */
   | { key: 'snowCold' }
+  /** Walked into the stray dog without any food for it. */
+  | { key: 'dogSniff' }
+  | { key: 'dogAdopt'; item: ItemId }
+  | { key: 'dogBark'; animal: AnimalKind }
+  | { key: 'dogFeed'; item: ItemId }
+  | { key: 'dogFull' }
+  | { key: 'dogFar' }
+  | { key: 'dogLow'; need: 'food' | 'water' }
+  /** The dog's Food or Water ran out. */
+  | { key: 'dogTired' }
+  /** Fed and watered again after being tired. */
+  | { key: 'dogBack' }
   /** A line from a save made before messages were data; shown as it is. */
   | { key: 'legacy'; text: string };
 

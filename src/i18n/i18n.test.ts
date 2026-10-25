@@ -21,6 +21,8 @@ function everyMessage(): Msg[] {
     { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'faintWhy', empty: [] }, { key: 'faintWhy', empty: ['food', 'water', 'energy', 'warmth'] }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
     { key: 'needFire' }, { key: 'needPoints' }, { key: 'skillPoint' }, { key: 'catch' }, { key: 'noBite' },
     { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalFound', obj: 'beacon_site' }, { key: 'snowCold' },
+    { key: 'dogSniff' }, { key: 'dogFull' }, { key: 'dogFar' }, { key: 'dogTired' }, { key: 'dogBack' },
+    { key: 'dogLow', need: 'food' }, { key: 'dogLow', need: 'water' },
   ];
   for (const level of [1, 2] as const) {
     msgs.push({ key: 'goalReady', level }, { key: 'sailAway', level }, { key: 'landIsland', level });
@@ -39,8 +41,10 @@ function everyMessage(): Msg[] {
   }
   for (const animal of ANIMAL_KINDS) {
     msgs.push({ key: 'shoo', animal }, { key: 'pinch', animal }, { key: 'hurt', animal }, { key: 'alert', animal });
+    msgs.push({ key: 'dogBark', animal });
     for (const item of ITEM_IDS) msgs.push({ key: 'snatch', animal, item });
   }
+  for (const item of ITEM_IDS) msgs.push({ key: 'dogAdopt', item }, { key: 'dogFeed', item });
   for (const item of ITEM_IDS) msgs.push({ key: 'eat', item }, { key: 'make', item }, { key: 'cook', item }, { key: 'haveTool', item }, { key: 'needTool', obj: 'bramble', item });
   return msgs;
 }
@@ -100,6 +104,10 @@ describe('i18n', () => {
     expect(de.message({ key: 'goalNeeds', stage: 'hull', left: [['stone', 6]] })).toBe('Das Boot braucht 6 Steine für den Rumpf.');
     expect(de.message({ key: 'gather', obj: 'tree_apple', got: [['apple', 2]] })).toBe('Du pflückst Äpfel und bekommst 2 Äpfel.');
     expect(de.message({ key: 'look', obj: 'beacon_site' })).toBe('Ein alter Steinkreis.');
+    expect(de.message({ key: 'dogBark', animal: 'monkey' })).toBe('Wuff! Dein Hund bellt, und der Affe rennt weg.');
+    expect(de.message({ key: 'dogAdopt', item: 'fish' })).toBe(
+      'Du gibst dem Hund einen Fisch. Er wedelt mit dem Schwanz und folgt dir. Du hast einen Hund!',
+    );
   });
 
   it('keeps English as it was', () => {

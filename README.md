@@ -70,6 +70,12 @@ npm run preview   # serve the build (service worker is only active here)
   signal beacon on the peak in three steps (stone base, wood pile, tinder),
   then light it so a passing ship takes you on board. The next island is not
   built yet, so you can stay or start a new one.
+- **The dog:** a stray dog lives far from camp on each island. Walk into it
+  with food to adopt it. Your dog follows you and barks crabs, monkeys,
+  squirrels and snakes away. It needs food (Feed dog in the Bag, raw fish
+  works too) and water (it drinks with you and next to springs and rivers).
+  If its food or water runs out it is too tired to help until you look
+  after it.
 - **Saving:** the game saves itself to the browser after every action.
 
 ## Controls

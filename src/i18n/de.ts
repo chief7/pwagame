@@ -137,6 +137,7 @@ const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }
   bear: { g: 'm', word: 'Höhlenbär', shoo: 'Der Höhlenbär brummt und tapst davon.', hurt: 'Der Höhlenbär wacht auf und haut nach dir!' },
   rabbit: { g: 'm', word: 'Hase', shoo: 'Der Hase zuckt mit der Nase und hoppelt davon.' },
   squirrel: { g: 'n', word: 'Eichhörnchen', shoo: 'Das Eichhörnchen schimpft und flitzt einen Baum hinauf.' },
+  dog: { g: 'm', word: 'Hund', adj: 'streunend', shoo: 'Der Hund wedelt mit dem Schwanz.' },
   goat: {
     g: 'f', word: 'Bergziege', shoo: 'Du fuchtelst mit den Armen. Die Ziege meckert und springt über die Felsen davon.',
     hurt: 'Bums! Die Bergziege stößt dich mit den Hörnern.', alert: 'Eine Bergziege senkt die Hörner und rennt auf dich zu!',
@@ -210,6 +211,10 @@ export const de: Strings = {
     endTitle: 'Geschafft!',
     endText: 'Ein Schiff hat dein Leuchtfeuer gesehen und dich an Bord geholt. Die nächste Insel kommt bald! Bis dahin kannst du hierbleiben oder eine neue Insel starten.',
     stay: 'Auf dieser Insel bleiben',
+    yourDog: 'Dein Hund',
+    dogNeeds: (food, water) => `Essen ${food} · Wasser ${water}`,
+    dogTired: 'Müde. Gib ihm Essen und geh an Wasser vorbei, damit er trinken kann.',
+    feedDog: 'Füttern',
   },
   levels: {
     1: {
@@ -363,6 +368,17 @@ export const de: Strings = {
         ? 'Du zündest das Leuchtfeuer an. Rauch steigt hoch in den Himmel, und bald holt dich ein Schiff an Bord!'
         : 'Du schiebst das Boot in die Wellen und segelst davon!';
       case 'landIsland': return 'Nach einer langen Fahrt landet dein Boot auf einer neuen Insel. Hohe Bäume und verschneite Berge! Hier ist es kälter.';
+      case 'dogSniff': return 'Ein streunender Hund schnuppert an deiner Hand. Er sieht hungrig aus. Bring ihm etwas zu essen.';
+      case 'dogAdopt': return `Du gibst dem Hund ${itemCount(msg.item, 1)}. Er wedelt mit dem Schwanz und folgt dir. Du hast einen Hund!`;
+      case 'dogBark': return `Wuff! Dein Hund bellt, und ${phrase(ANIMAL[msg.animal], 'nom', 'the')} rennt weg.`;
+      case 'dogFeed': return `Dein Hund frisst ${itemCount(msg.item, 1)} und wedelt mit dem Schwanz.`;
+      case 'dogFull': return 'Dein Hund hat keinen Hunger.';
+      case 'dogFar': return 'Dein Hund ist zu weit weg. Geh zuerst zu ihm.';
+      case 'dogLow': return msg.need === 'food'
+        ? 'Dein Hund hat Hunger. Füttere ihn aus deiner Tasche.'
+        : 'Dein Hund hat Durst. Geh an einer Quelle oder am Fluss vorbei.';
+      case 'dogTired': return 'Dein Hund ist zu hungrig oder durstig, um zu helfen. Er trottet langsam hinter dir her.';
+      case 'dogBack': return 'Dein Hund springt auf und ist wieder fröhlich!';
       case 'snowCold': return 'Brr! Der Schnee ist kalt, auch am Tag. Ein Feuer oder ein Unterschlupf hilft hier oben.';
       case 'legacy': return msg.text;
     }

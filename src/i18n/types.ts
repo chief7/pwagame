@@ -64,6 +64,11 @@ export interface Strings {
     endTitle: string;
     endText: string;
     stay: string;
+    /** The dog's row in the Bag panel. */
+    yourDog: string;
+    dogNeeds(food: number, water: number): string;
+    dogTired: string;
+    feedDog: string;
   };
   /** Each island's goal: the goal card, and the question before leaving. */
   levels: Record<LevelId, {

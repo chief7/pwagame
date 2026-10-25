@@ -161,6 +161,7 @@ All actions return `true` when time passed and `false` when nothing happened.
 | `travelStep(x, y)` | One step on the shortest known path to a cell. Used for tap-to-travel. |
 | `wait()` | Passes one turn. |
 | `eat(item)` | Eats one food item from the bag. |
+| `feedDog(item)` | Gives the dog one food item from the bag (see 4.13). |
 | `build(recipe)` | Builds in front of the player, or makes an item for the bag. |
 | `learn(skill)` | Spends skill points on a skill. No turn passes. |
 | `sail()` | Leaves the island on the finished goal (see 4.12). |
@@ -169,6 +170,8 @@ All actions return `true` when time passed and `false` when nothing happened.
 What `move` does when the target cell is not free:
 
 1. **Animal there:** shoo it. The animal runs away for 8 turns (calm animals do not run).
+   The stray dog is different: the player adopts it (see 4.13).
+   **Your dog there:** swap places with it.
 2. **Solid object there:** interact with it:
    - Spring: drink.
    - The island goal (the boat): give it materials (see 4.12).
@@ -352,6 +355,7 @@ Animals have a **temper**. They only react when the player is within their
 | `shy` | Moves away from the player. | piglet, bat, rabbit |
 | `grumpy` | If next to the player: `hitChance` (default 50%) per turn to hurt (−`damage` Health), then runs away for `fleeAfter` turns (default 4). | crab (−4), snake (70%, −8), cave bear (50%, −20) |
 | `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. | monkey, squirrel |
+| `stray` | Stays near its place (`notice` 0). Walking into it with food adopts it (see 4.13). | stray dog |
 | `charger` | Runs at the player, 2 cells per turn (`CHARGE_STEPS`), with the message `alert`. When it starts a turn next to the player, it knocks them over (−`damage` Health), then trots off for 10 turns. | wild boar (−12), mountain goat (−10) |
 | `chaser` | Follows the player for 6 turns (`CHASE_TURNS`, stored as `chase` on the animal) and stings each turn it is next to them (−3 Health). It gives up at once when the player stands off its habitat (sand, cave, shelter). Then it flies off for 8 turns. | wasps |
 
@@ -497,6 +501,42 @@ highest snow of the mountain. The player builds a signal beacon on it.
 All stages together need 22 wood, 16 stone and 20 leaves (8 of them for
 rope). There are no coconuts on island 2: apples, berries, mushrooms and
 fish are the food there.
+
+### 4.13 The dog
+
+Each island has one stray dog (`dog`, temper `stray`, on grass, 25 or more
+cells from camp) until the player has a dog.
+
+- **Adopt.** Walk into the stray dog with food in the bag. It eats one
+  item (raw fish first, else the food with the least Food) and becomes
+  `game.dog`. Without food, the log says `dogSniff` and no turn passes.
+  After that, no new stray dog appears.
+- **Follow.** The dog acts first in the animals' part of the turn
+  (`dogAct`). It steps towards the player when it is more than 1 cell away.
+  More than 12 cells away (`DOG_LOST`), it jumps next to the player. It
+  also comes along after fainting and to the next island
+  (`dogToPlayer`). Walking into the dog swaps places with it. Animals and
+  buildings cannot use its cell.
+- **Bark.** When a visible animal with `scaredByDog` (crab, monkey,
+  squirrel, snake) is within 3 cells (`DOG_BARK_RANGE`) and is not already
+  running, the dog barks (`dogBark`, a `lunge`). All such animals within 3
+  cells run away for 8 turns (`SHOO_TURNS`). Boars, goats, wasps and bears
+  do not care.
+- **Needs.** The dog has Food and Water (0 to 100). Each turn, Food drops
+  0.3 and Water 0.35 (`DOG_HUNGER`, `DOG_THIRST`; half while the player
+  sleeps). Below 25, the log warns one time (`dogLow`).
+- **Food.** "Feed dog" in the Bag panel (`feedDog`) gives the item's Food
+  value. Raw fish gives 30 (`DOG_RAW_FISH`). The dog must be within 2 cells
+  (`DOG_REACH`), else `dogFar`. At 98 Food or more, `dogFull`.
+- **Water.** The dog drinks (+50, `DOG_DRINK`) when the player drinks
+  within 3 cells of it, and by itself when it stands next to a spring or
+  the river with Water below 80.
+- **Tired.** When Food or Water is 0, the dog is tired (`dogTired`). It
+  trails behind every other turn, stays up to 2 cells away, does not bark
+  and shows `dog_rest`. It never dies. When Food and Water are both above 0
+  again, it is happy again (`dogBack`).
+- The Bag panel shows a dog row with its Food and Water, and a "Feed dog"
+  button on each item the dog can eat.
 
 ---
 
@@ -682,6 +722,7 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
 | Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
+| Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
 | Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow) |
 
 ---
@@ -759,6 +800,8 @@ The render loop runs at full frame rate while the animator is busy, and every
 | Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
 | Bag / Build / Skills / Sleep buttons | Open the panels, or sleep |
 | Grill button (above a campfire, with raw fish) | Cook one fish |
+| Feed dog (Bag panel) | Give the dog one item |
+| Walk into your dog | Swap places with it |
 | 🌐 button (Bag panel and explorer picker) | Switch between English and German |
 | Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `g`: grill a fish at the fire. `z`: sleep. `Esc`: close a panel. |
 
@@ -778,12 +821,14 @@ Auto-walk (travel and hold) stops when:
   island starts.
 - The save holds: seed, random number state, turn, tiles, explored cells,
   objects, animals, player, home, needs, inventory, XP, learned skills,
-  level, what the goal's stage already got (`goalGiven`), `sailed`,
+  level, what the goal's stage already got (`goalGiven`), `sailed`, the dog,
   warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 5. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 4 saves load
+- `SAVE_VERSION` is 6. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 6 added
+  `dog` (null before you adopt one); version 5 saves load without a dog.
+  Version 4 saves load
   with `sailed: false`: they had only one island, so a player who already
   sailed walks into the finished boat again and can sail to island 2. The
   tiles of island 2 (`Scree` 6, `Snow` 7) need no change to the save
@@ -825,7 +870,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
@@ -863,6 +908,10 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Where the goal goes | `worldgen.ts` → `GOAL_REGIONS` | far side, forest, home |
 | River drink | `game.ts` → `RIVER_DRINK` | 35 |
 | Snow cold | `game.ts` → `SNOW_CHILL` | 40 |
+| Dog hunger, thirst | `game.ts` → `DOG_HUNGER`, `DOG_THIRST` | 0.3, 0.35 per turn |
+| Dog start, raw fish, drink | `game.ts` → `DOG_START_FOOD`, `DOG_START_WATER`, `DOG_RAW_FISH`, `DOG_DRINK` | 40 (+ the snack), 60, 30, 50 |
+| Dog ranges | `game.ts` → `DOG_REACH`, `DOG_DRINK_RANGE`, `DOG_BARK_RANGE`, `DOG_LOST` | 2, 3, 3, 12 cells |
+| Shoo and bark | `game.ts` → `SHOO_TURNS` | 8 turns |
 | Island 2 beach, forest line, snow line | `worldgen.ts` → `MOUNTAIN_BEACH_WIDTH`, `FOREST_LINE`, `SNOW_LINE` | 2, 0.6, 0.93 |
 | Island 2 goal room | `worldgen.ts` → `GOAL_OPEN_SIDES` | 5 |
 | XP per gather, per fish | `game.ts` → `GATHER_XP`, `CATCH_XP` | 1, 2 |
@@ -884,6 +933,10 @@ Also run `npm run build` (typecheck and build) before you commit.
 - A wild animal only checks the distance from home when it appears. It can
   wander closer to camp later.
 - Animals have no walk frames. They hop when they move. They always face down.
+  The dog always faces right, and a tired dog shows its resting sprite also
+  while it walks.
+- The dog does not lie down while the player sleeps.
+- Only one dog: after the first is adopted, no other stray dog appears.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
 - Only two levels exist. After the beacon on island 2, there is no next
   island yet: the player stays on the island or starts a new one.

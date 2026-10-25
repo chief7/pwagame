@@ -370,6 +370,11 @@ button.primary {
   padding: 8px 14px;
 }
 
+.row-actions {
+  display: grid;
+  gap: 6px;
+}
+
 .costs {
   display: flex;
   flex-wrap: wrap;

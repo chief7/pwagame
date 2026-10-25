@@ -21,6 +21,18 @@ export interface Animal {
   chase?: number;
 }
 
+/** The explorer's dog, once adopted: it follows them and needs food and water. */
+export interface Dog {
+  id: number;
+  x: number;
+  y: number;
+  facing: Facing;
+  food: number;
+  water: number;
+  /** Food or Water ran out: it trails behind slowly and doesn't bark until both are back above 0. */
+  tired: boolean;
+}
+
 /** The player's id; animals count up from here. */
 export const PLAYER_ID = 1;
 

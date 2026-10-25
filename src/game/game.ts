@@ -1,4 +1,4 @@
-import { facingDelta, facingFor, PLAYER_ID, type Animal, type Player } from './actors';
+import { facingDelta, facingFor, PLAYER_ID, type Animal, type Dog, type Player } from './actors';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
@@ -48,7 +48,27 @@ const GREEN_THUMB = 0.7;
 const NIGHT_EYES = 2;
 /** How much colder it is out in the open on snow, day and night (see warmthTarget). */
 const SNOW_CHILL = 40;
-export const SAVE_VERSION = 5;
+/** Turns a shooed (or barked at) animal runs away. */
+const SHOO_TURNS = 8;
+/** How much the dog's Food and Water drop each turn (half while you sleep). */
+const DOG_HUNGER = 0.3;
+const DOG_THIRST = 0.35;
+/** The dog's Food and Water when you adopt it, before the snack you give it. */
+const DOG_START_FOOD = 40;
+const DOG_START_WATER = 60;
+/** Food a dog gets from a raw fish: people must cook it first, dogs don't. */
+const DOG_RAW_FISH = 30;
+/** Water the dog gets from one drink. */
+const DOG_DRINK = 50;
+/** The dog drinks along with you when it is this close. */
+const DOG_DRINK_RANGE = 3;
+/** You can feed the dog when it is this close. */
+const DOG_REACH = 2;
+/** Cells round the dog where it barks small nuisance animals away. */
+const DOG_BARK_RANGE = 3;
+/** This far behind, the dog gives up walking and catches up at once (after fainting, sailing…). */
+const DOG_LOST = 12;
+export const SAVE_VERSION = 6;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -111,6 +131,7 @@ export interface SaveData {
   /** What the explorer has handed over for the goal's current stage. */
   goalGiven: Items;
   sailed: boolean;
+  dog: Dog | null;
   warned: NeedId[];
   log: LogEntry[];
 }
@@ -134,6 +155,8 @@ export class Game {
   goalGiven: Items = {};
   /** The explorer left the island on the finished goal. */
   sailed = false;
+  /** The adopted dog, or null before you find one. */
+  dog: Dog | null = null;
   turn = 0;
   log: LogEntry[] = [];
   sleeping = false;
@@ -166,6 +189,7 @@ export class Game {
       this.level = save.level;
       this.goalGiven = save.goalGiven;
       this.sailed = save.sailed;
+      this.dog = save.dog;
       this.turn = save.turn;
       this.nextId = save.nextId;
       this.warned = new Set(save.warned);
@@ -198,6 +222,24 @@ export class Game {
 
   animalAt(x: number, y: number): Animal | undefined {
     return this.animals.find((a) => a.x === x && a.y === y);
+  }
+
+  dogAt(x: number, y: number): boolean {
+    return !!this.dog && this.dog.x === x && this.dog.y === y;
+  }
+
+  /** How much Food an item gives the dog (0 if it won't eat it). Dogs eat raw fish too. */
+  dogFoodValue(id: ItemId): number {
+    return id === 'fish' ? DOG_RAW_FISH : ITEMS[id].eat?.food ?? 0;
+  }
+
+  /** What in the bag the dog can eat: raw fish first, then the least filling food. */
+  dogFoods(): ItemId[] {
+    return this.inventory
+      .entries()
+      .map(([id]) => id)
+      .filter((id) => this.dogFoodValue(id) > 0)
+      .sort((a, b) => (a === 'fish' ? -1 : b === 'fish' ? 1 : this.dogFoodValue(a) - this.dogFoodValue(b)));
   }
 
   /** Floor that nothing solid stands on, or a bridge. Ignores animals. */
@@ -360,7 +402,23 @@ export class Game {
     const ny = p.y + dy;
     const animal = this.animalAt(nx, ny);
     if (animal) {
-      this.shoo(animal);
+      if (ANIMALS[animal.kind].temper === 'stray') {
+        if (!this.adopt(animal)) return false;
+      } else {
+        this.shoo(animal);
+      }
+      this.endTurn();
+      return true;
+    }
+    const dog = this.dog;
+    if (dog && this.dogAt(nx, ny)) {
+      // Walking into your dog swaps places, so it never blocks the way.
+      this.emit({ type: 'move', id: dog.id, fromX: dog.x, fromY: dog.y, toX: p.x, toY: p.y });
+      dog.x = p.x;
+      dog.y = p.y;
+      this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
+      p.x = nx;
+      p.y = ny;
       this.endTurn();
       return true;
     }
@@ -446,6 +504,30 @@ export class Game {
     return true;
   }
 
+  /** Give the dog something to eat from the bag. It has to be close by. */
+  feedDog(id: ItemId): boolean {
+    const dog = this.dog;
+    const value = this.dogFoodValue(id);
+    if (!dog || !value || this.inventory.count(id) === 0) return false;
+    const p = this.player;
+    if (Math.max(Math.abs(dog.x - p.x), Math.abs(dog.y - p.y)) > DOG_REACH) {
+      this.message({ key: 'dogFar' }, 'info');
+      return false;
+    }
+    if (dog.food >= 98) {
+      this.message({ key: 'dogFull' }, 'info');
+      return false;
+    }
+    this.inventory.take(id);
+    dog.food = Math.min(100, dog.food + value);
+    this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: dog.x, targetY: dog.y });
+    this.emit({ type: 'float', x: dog.x, y: dog.y, amount: value, what: { need: 'food' }, tone: 'good' });
+    this.message({ key: 'dogFeed', item: id }, 'good');
+    this.cheerUpDog();
+    this.endTurn();
+    return true;
+  }
+
   build(id: RecipeId): boolean {
     const recipe = RECIPES[id];
     const problem = this.buildProblem(id);
@@ -514,15 +596,16 @@ export class Game {
     this.sailAsked = false;
     this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
     this.animals = [];
+    this.dogToPlayer();
     this.populate();
     this.warned.clear();
     this.updateFov();
     this.message({ key: 'landIsland', level }, 'good');
   }
 
-  /** Fill a new island with its animals. */
+  /** Fill a new island with its animals (no stray dog once you have one). */
   private populate(): void {
-    for (const kind of islandAnimals(this.level)) {
+    for (const kind of this.islandAnimals()) {
       for (let n = 0; n < ANIMALS[kind].population; n++) this.spawnAnimal(kind, false);
     }
   }
@@ -577,6 +660,10 @@ export class Game {
     this.emit({ type: 'fade' });
     this.message({ key: 'wake', reason, turn: this.turn }, reason === 'cold' ? 'warn' : 'good');
     return true;
+  }
+
+  private islandAnimals(): AnimalKind[] {
+    return islandAnimals(this.level).filter((kind) => !this.dog || ANIMALS[kind].temper !== 'stray');
   }
 
   // ---- Interactions ------------------------------------------------------------------
@@ -704,14 +791,55 @@ export class Game {
     this.needs.water = Math.min(100, this.needs.water + amount);
     this.message(msg, 'good');
     this.emit({ type: 'float', x: this.player.x, y: this.player.y, amount, what: { need: 'water' }, tone: 'good' });
+    const dog = this.dog;
+    if (dog && Math.max(Math.abs(dog.x - this.player.x), Math.abs(dog.y - this.player.y)) <= DOG_DRINK_RANGE) this.dogDrinks();
     return true;
+  }
+
+  /**
+   * The stray dog eats a snack from the bag and becomes your dog. Without
+   * anything for it to eat it only sniffs your hand, and no time passes.
+   */
+  private adopt(a: Animal): boolean {
+    const p = this.player;
+    this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: a.x, targetY: a.y });
+    const [item] = this.dogFoods();
+    if (!item) {
+      this.message({ key: 'dogSniff' }, 'info');
+      return false;
+    }
+    this.inventory.take(item);
+    this.animals = this.animals.filter((other) => other !== a);
+    this.dog = {
+      id: a.id, x: a.x, y: a.y, facing: a.facing,
+      food: Math.min(100, DOG_START_FOOD + this.dogFoodValue(item)), water: DOG_START_WATER, tired: false,
+    };
+    this.emit({ type: 'sparkle', x: a.x, y: a.y });
+    this.message({ key: 'dogAdopt', item }, 'good');
+    return true;
+  }
+
+  private dogDrinks(): void {
+    const dog = this.dog!;
+    if (dog.water >= 98) return;
+    dog.water = Math.min(100, dog.water + DOG_DRINK);
+    this.emit({ type: 'float', x: dog.x, y: dog.y, amount: DOG_DRINK, what: { need: 'water' }, tone: 'good' });
+    this.cheerUpDog();
+  }
+
+  /** A tired dog that has Food and Water again follows you properly. */
+  private cheerUpDog(): void {
+    const dog = this.dog!;
+    if (!dog.tired || dog.food <= 0 || dog.water <= 0) return;
+    dog.tired = false;
+    this.message({ key: 'dogBack' }, 'good');
   }
 
   private shoo(a: Animal): void {
     const def = ANIMALS[a.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: a.x, targetY: a.y });
     this.message({ key: 'shoo', animal: a.kind }, 'info');
-    if (def.temper !== 'calm') a.flee = 8;
+    if (def.temper !== 'calm') a.flee = SHOO_TURNS;
     a.chase = 0;
   }
 
@@ -731,7 +859,7 @@ export class Game {
     for (const [dx, dy] of order) {
       const x = p.x + dx;
       const y = p.y + dy;
-      if (!this.map.isFloor(x, y) || this.objectAt(x, y) || this.animalAt(x, y)) continue;
+      if (!this.map.isFloor(x, y) || this.objectAt(x, y) || this.animalAt(x, y) || this.dogAt(x, y)) continue;
       if (OBJECTS[kind].walkable) return { kind, cells: [{ x, y }] };
       // Solid buildings must not cut off part of the island.
       const i = this.map.idx(x, y);
@@ -793,6 +921,7 @@ export class Game {
 
     this.animalsActing = true;
     const playerDist = distanceMap(this.map, p.x, p.y, (x, y) => this.isPassable(x, y));
+    if (this.dog) this.dogAct(this.dog, playerDist);
     for (const a of this.animals) this.animalAct(a, playerDist);
     this.animalsActing = false;
     if (this.turn % RESPAWN_EVERY === 0) this.topUpAnimals();
@@ -832,10 +961,96 @@ export class Game {
     this.animals = this.animals.filter((a) => a.x !== this.home.x || a.y !== this.home.y);
     this.player.x = this.home.x;
     this.player.y = this.home.y;
+    this.dogToPlayer();
     this.warned.clear();
     this.emit({ type: 'fade' });
     this.message({ key: 'wakeAtCamp' }, 'good');
     this.message({ key: 'faintWhy', empty }, 'warn');
+  }
+
+  // ---- The dog ----------------------------------------------------------------------
+
+  /**
+   * The dog's turn: it gets hungrier and thirstier, drinks when it stands by
+   * fresh water, follows you, and barks small nuisance animals away. A tired
+   * dog (Food or Water at 0) only trails behind every other turn and doesn't
+   * bark. Nothing worse happens to it.
+   */
+  private dogAct(dog: Dog, playerDist: Int32Array): void {
+    const p = this.player;
+    const slow = this.sleeping ? 0.5 : 1;
+    const before = { food: dog.food, water: dog.water };
+    dog.food = Math.max(0, dog.food - DOG_HUNGER * slow);
+    dog.water = Math.max(0, dog.water - DOG_THIRST * slow);
+    for (const need of ['food', 'water'] as const) {
+      if (before[need] >= LOW && dog[need] < LOW) this.message({ key: 'dogLow', need }, 'warn');
+    }
+    if (!dog.tired && (dog.food <= 0 || dog.water <= 0)) {
+      dog.tired = true;
+      this.message({ key: 'dogTired' }, 'warn');
+    }
+    if (this.sleeping) return;
+
+    const byWater = DIRS.some(([dx, dy]) => {
+      const obj = this.objectAt(dog.x + dx, dog.y + dy);
+      return this.map.get(dog.x + dx, dog.y + dy) === Tile.River || (!!obj && !!OBJECTS[obj.kind].drink);
+    });
+    if (byWater && dog.water < 80) this.dogDrinks();
+
+    const dist = Math.max(Math.abs(dog.x - p.x), Math.abs(dog.y - p.y));
+    if (dist > DOG_LOST) this.dogToPlayer();
+    else if (dist > (dog.tired ? 2 : 1) && (!dog.tired || this.turn % 2 === 0)) this.dogStep(dog, playerDist);
+    if (dog.tired) return;
+
+    const scared = this.animals.find(
+      (a) => ANIMALS[a.kind].scaredByDog && !a.flee && this.map.isVisible(a.x, a.y) &&
+        Math.max(Math.abs(a.x - dog.x), Math.abs(a.y - dog.y)) <= DOG_BARK_RANGE,
+    );
+    if (!scared) return;
+    this.emit({ type: 'lunge', id: dog.id, x: dog.x, y: dog.y, targetX: scared.x, targetY: scared.y });
+    this.message({ key: 'dogBark', animal: scared.kind }, 'good');
+    // One bark sends off every small nuisance close by.
+    for (const a of this.animals) {
+      if (ANIMALS[a.kind].scaredByDog && Math.max(Math.abs(a.x - dog.x), Math.abs(a.y - dog.y)) <= DOG_BARK_RANGE) {
+        a.flee = SHOO_TURNS;
+        a.chase = 0;
+      }
+    }
+  }
+
+  private dogCanStand(x: number, y: number): boolean {
+    return this.isPassable(x, y) && !this.animalAt(x, y) && !(x === this.player.x && y === this.player.y);
+  }
+
+  /** One step along the shortest way to the explorer. */
+  private dogStep(dog: Dog, playerDist: Int32Array): void {
+    let best: [number, number] | null = null;
+    let bestDist = playerDist[this.map.idx(dog.x, dog.y)];
+    for (const [dx, dy] of DIRS) {
+      const nx = dog.x + dx;
+      const ny = dog.y + dy;
+      if (!this.map.inBounds(nx, ny)) continue;
+      const d = playerDist[this.map.idx(nx, ny)];
+      if (d >= 0 && (bestDist < 0 || d < bestDist) && this.dogCanStand(nx, ny)) {
+        best = [nx, ny];
+        bestDist = d;
+      }
+    }
+    if (!best) return;
+    dog.facing = facingFor(best[0] - dog.x, best[1] - dog.y, dog.facing);
+    this.emit({ type: 'move', id: dog.id, fromX: dog.x, fromY: dog.y, toX: best[0], toY: best[1] });
+    [dog.x, dog.y] = best;
+  }
+
+  /** Put the dog next to the explorer (after fainting, or on a new island). */
+  private dogToPlayer(): void {
+    const dog = this.dog;
+    if (!dog) return;
+    const p = this.player;
+    const spot = DIRS.find(([dx, dy]) => this.dogCanStand(p.x + dx, p.y + dy));
+    if (!spot) return;
+    dog.x = p.x + spot[0];
+    dog.y = p.y + spot[1];
   }
 
   // ---- Animals ----------------------------------------------------------------------
@@ -942,6 +1157,7 @@ export class Game {
           return;
         }
         case 'calm':
+        case 'stray':
           break;
       }
     }
@@ -967,6 +1183,7 @@ export class Game {
       !this.objectAt(x, y) &&
       ANIMALS[a.kind].habitat.includes(this.map.get(x, y)) &&
       !this.animalAt(x, y) &&
+      !this.dogAt(x, y) &&
       !(x === this.player.x && y === this.player.y)
     );
   }
@@ -1017,7 +1234,7 @@ export class Game {
     for (let tries = 0; tries < 200; tries++) {
       const x = this.rng.int(0, this.map.width - 1);
       const y = this.rng.int(0, this.map.height - 1);
-      if (!def.habitat.includes(this.map.get(x, y)) || this.objectAt(x, y) || this.animalAt(x, y)) continue;
+      if (!def.habitat.includes(this.map.get(x, y)) || this.objectAt(x, y) || this.animalAt(x, y) || this.dogAt(x, y)) continue;
       if (Math.max(Math.abs(x - p.x), Math.abs(y - p.y)) < 8) continue;
       if (def.minHomeDistance && Math.max(Math.abs(x - this.home.x), Math.abs(y - this.home.y)) < def.minHomeDistance) continue;
       if (outOfSight && this.map.isVisible(x, y)) continue;
@@ -1028,7 +1245,7 @@ export class Game {
 
   /** Animals that wandered off are replaced, out of sight, over time. */
   private topUpAnimals(): void {
-    for (const kind of islandAnimals(this.level)) {
+    for (const kind of this.islandAnimals()) {
       if (this.animals.filter((a) => a.kind === kind).length < ANIMALS[kind].population) this.spawnAnimal(kind, true);
     }
   }
@@ -1095,6 +1312,7 @@ export class Game {
       level: this.level,
       goalGiven: { ...this.goalGiven },
       sailed: this.sailed,
+      dog: this.dog && { ...this.dog },
       warned: [...this.warned],
       log: this.log.slice(-30),
     };
@@ -1117,7 +1335,11 @@ export class Game {
     if (data.v === 4) {
       // Version 4 had only one island: sailing ended the game. Now the finished
       // boat takes you to island 2, so walking into it asks to set sail again.
-      data = { ...data, v: SAVE_VERSION, sailed: false };
+      data = { ...data, v: 5, sailed: false };
+    }
+    if (data.v === 5) {
+      // Version 5 had no dog yet.
+      data = { ...data, v: SAVE_VERSION, dog: null };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

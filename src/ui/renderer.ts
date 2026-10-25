@@ -179,6 +179,11 @@ export class Renderer {
       const pose = anim.pose(a.id, a.x, a.y, now);
       actors.push({ id: a.id, name: `animal_${a.kind}`, pose, bob: pose.hop ? 0 : anim.idleBob(a.id, now) });
     }
+    const dog = game.dog;
+    if (dog && map.isVisible(dog.x, dog.y)) {
+      const pose = anim.pose(dog.id, dog.x, dog.y, now);
+      actors.push({ id: dog.id, name: dog.tired ? 'dog_rest' : 'dog', pose, bob: pose.hop || dog.tired ? 0 : anim.idleBob(dog.id, now) });
+    }
     actors.push({
       id: player.id,
       name: characterName(this.body, player.facing, playerPose.frame),

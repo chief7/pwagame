@@ -349,7 +349,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLEl
   return node;
 }
 
-function row(image: string, title: string, note: Node | string, action?: HTMLButtonElement): HTMLElement {
+function row(image: string, title: string, note: Node | string, action?: HTMLElement): HTMLElement {
   return el('div', { className: 'row' }, [
     el('img', { src: image, alt: '' }),
     el('div', { className: 'row-text' }, [el('span', { className: 'row-title', textContent: title }), note]),
@@ -369,18 +369,38 @@ function renderSheet(): void {
     renderSkills(rows);
   } else if (sheetKind === 'bag') {
     const entries = game.inventory.entries();
+    const dog = game.dog;
+    if (dog) {
+      const note = el('div', {}, [
+        el('span', { className: 'row-note', textContent: words.ui.dogNeeds(Math.round(dog.food), Math.round(dog.water)) }),
+      ]);
+      if (dog.tired) note.append(el('span', { className: 'row-note locked', textContent: words.ui.dogTired }));
+      rows.append(row(icon(dog.tired ? 'dog_rest' : 'dog'), words.ui.yourDog, note));
+    }
     if (!entries.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmpty }));
     for (const [id, count] of entries) {
       const food = ITEMS[id].eat;
-      const button = food ? el('button', { type: 'button', textContent: words.ui.eat }) : undefined;
-      button?.addEventListener('click', () => {
-        if (game.eat(id)) afterTurn();
-        else updateHud();
-      });
+      const actions = el('div', { className: 'row-actions' });
+      if (food) {
+        const eat = el('button', { type: 'button', textContent: words.ui.eat });
+        eat.addEventListener('click', () => {
+          if (game.eat(id)) afterTurn();
+          else updateHud();
+        });
+        actions.append(eat);
+      }
+      if (dog && game.dogFoodValue(id) > 0) {
+        const feed = el('button', { type: 'button', textContent: words.ui.feedDog });
+        feed.addEventListener('click', () => {
+          if (game.feedDog(id)) afterTurn();
+          else updateHud();
+        });
+        actions.append(feed);
+      }
       const note = food
         ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
         : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : words.ui.forBuilding;
-      rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), button));
+      rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), actions.childElementCount ? actions : undefined));
     }
   } else {
     rows.append(goalCard());

@@ -8,13 +8,14 @@ import { Tile } from '../map';
 //   cheeky: comes over when you carry food and pinches a snack
 //   charger: runs at you when it sees you and knocks you over, then trots off
 //   chaser:  follows you for a while and stings you while it is next to you
+//   stray:   a lost dog that stays put; give it food and it becomes your dog
 // Wild animals live far from camp. They are the real danger on the island:
 // the Animal friend skill only makes them notice you later.
 
 export type AnimalKind =
   | 'crab' | 'turtle' | 'monkey' | 'piglet' | 'bat' | 'boar' | 'snake' | 'wasps' | 'bear'
-  | 'rabbit' | 'squirrel' | 'goat';
-export type Temper = 'calm' | 'shy' | 'grumpy' | 'cheeky' | 'charger' | 'chaser';
+  | 'rabbit' | 'squirrel' | 'goat' | 'dog';
+export type Temper = 'calm' | 'shy' | 'grumpy' | 'cheeky' | 'charger' | 'chaser' | 'stray';
 
 export interface AnimalDef {
   kind: AnimalKind;
@@ -39,12 +40,14 @@ export interface AnimalDef {
   minHomeDistance?: number;
   /** The islands (levels) it lives on; default only the first. */
   islands?: number[];
+  /** Your dog's bark makes it run away. */
+  scaredByDog?: true;
 }
 
 export const ANIMALS: Record<AnimalKind, AnimalDef> = {
-  crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6, damage: 4, islands: [1, 2] },
+  crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6, damage: 4, islands: [1, 2], scaredByDog: true },
   turtle: { kind: 'turtle', temper: 'calm', habitat: [Tile.Sand], notice: 0, wander: 0.15, population: 2 },
-  monkey: { kind: 'monkey', temper: 'cheeky', habitat: [Tile.Grass, Tile.Sand], notice: 5, wander: 0.5, population: 3 },
+  monkey: { kind: 'monkey', temper: 'cheeky', habitat: [Tile.Grass, Tile.Sand], notice: 5, wander: 0.5, population: 3, scaredByDog: true },
   piglet: { kind: 'piglet', temper: 'shy', habitat: [Tile.Grass], notice: 3, wander: 0.35, population: 3 },
   bat: { kind: 'bat', temper: 'shy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.8, population: 4, islands: [1, 2] },
   boar: {
@@ -53,7 +56,7 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
   },
   snake: {
     kind: 'snake', temper: 'grumpy', habitat: [Tile.Grass, Tile.Sand], notice: 1, wander: 0.1, population: 5,
-    damage: 8, hitChance: 0.7, wild: true, minHomeDistance: 25,
+    damage: 8, hitChance: 0.7, wild: true, minHomeDistance: 25, scaredByDog: true,
   },
   wasps: {
     kind: 'wasps', temper: 'chaser', habitat: [Tile.Grass], notice: 3, wander: 0.6, population: 3,
@@ -65,11 +68,13 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
   },
   // Island 2.
   rabbit: { kind: 'rabbit', temper: 'shy', habitat: [Tile.Grass], notice: 3, wander: 0.45, population: 4, islands: [2] },
-  squirrel: { kind: 'squirrel', temper: 'cheeky', habitat: [Tile.Grass], notice: 5, wander: 0.5, population: 3, islands: [2] },
+  squirrel: { kind: 'squirrel', temper: 'cheeky', habitat: [Tile.Grass], notice: 5, wander: 0.5, population: 3, islands: [2], scaredByDog: true },
   goat: {
     kind: 'goat', temper: 'charger', habitat: [Tile.Scree, Tile.Snow], notice: 4, wander: 0.3, population: 3,
     damage: 10, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [2],
   },
+  // A lost dog, one on each island, far from camp, until you adopt one.
+  dog: { kind: 'dog', temper: 'stray', habitat: [Tile.Grass], notice: 0, wander: 0.1, population: 1, minHomeDistance: 25, islands: [1, 2] },
 };
 
 export const ANIMAL_KINDS = Object.keys(ANIMALS) as AnimalKind[];
