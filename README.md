@@ -37,5 +37,19 @@ src/
     renderer.ts  canvas glyph renderer, camera centred on the player
     input.ts     key and tap → command mapping
   main.ts      wires game, renderer, HUD and input together
+  sprites/     pixel-art sprites, generated in code (no image files)
+    palette.ts   the shared colour palette
+    pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
+    terrain.ts   sand, water and 12 autotiling shore tiles (+ shoreTileName())
+    objects.ts   stones, logs, chests
+    palms.ts     three palm trees (24×32, overhang the tile above)
+    gallery.ts   the sprite gallery page
 public/        manifest, icons, service worker (offline cache)
 ```
+
+## Sprites
+
+Run `npm run dev` and open `/sprites.html` to see every sprite plus a small
+island composed from them. Terrain tiles are 16×16; objects are drawn
+bottom-centre on their tile. `bake()` turns a sprite into a canvas for
+`drawImage` (keep `imageSmoothingEnabled = false` when scaling up).
