@@ -1,9 +1,10 @@
 import './style.css';
-import { ITEMS, itemLabel, type ItemId } from './game/defs/items';
+import { ITEMS, type ItemId } from './game/defs/items';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { Game, type SaveData } from './game/game';
-import { LOW, NEED_IDS, NEED_LABELS } from './game/needs';
+import { LOW, NEED_IDS, type NeedId } from './game/needs';
+import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
 import { Animator, STEP_MS } from './ui/animator';
 import { commandForKey, directionFrom, type Command } from './ui/input';
 import { Renderer, type Body } from './ui/renderer';
@@ -20,6 +21,7 @@ const TRAVEL_STEP_MS = STEP_MS;
 const AMBIENT_FRAME_MS = 100;
 const SAVE_DELAY_MS = 800;
 const BODY_KEY = 'pwagame.body';
+const LANG_KEY = 'pwagame.lang';
 const SAVE_KEY = 'pwagame.save';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -46,6 +48,7 @@ const ui = {
   sheetBody: $('sheet-body'),
   sheetClose: $<HTMLButtonElement>('sheet-close'),
   picker: $('picker'),
+  pickerLang: $<HTMLButtonElement>('picker-lang'),
 };
 
 // ---- Storage (every access may throw in private modes) -------------------------
@@ -97,6 +100,44 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', saveNow);
 
+// ---- Language ---------------------------------------------------------------------
+
+const storedLang = readStore(LANG_KEY);
+setLang(isLang(storedLang) ? storedLang : preferredLang(navigator.languages ?? [navigator.language]));
+
+/** The language the switch button offers: the one that isn't on now. */
+function otherLang(): Lang {
+  return t().lang === 'en' ? 'de' : 'en';
+}
+
+function switchLang(): void {
+  const lang = otherLang();
+  setLang(lang);
+  writeStore(LANG_KEY, lang);
+  applyLang();
+}
+
+/** Put the current language into everything that is already on screen. */
+function applyLang(): void {
+  const words = t();
+  document.documentElement.lang = words.lang;
+  for (const node of document.querySelectorAll<HTMLElement>('[data-t]')) {
+    node.textContent = words.ui[node.dataset.t as keyof Strings['ui']] as string;
+  }
+  ui.pickerLang.textContent = langButtonLabel();
+  for (const [id, meter] of meters) {
+    meter.querySelector('.need-label')!.textContent = words.needs[id];
+    meter.setAttribute('aria-label', words.needs[id]);
+  }
+  updateHud();
+}
+
+function langButtonLabel(): string {
+  return `🌐 ${LANGUAGES[otherLang()].name}`;
+}
+
+ui.pickerLang.addEventListener('click', switchLang);
+
 // ---- Explorer choice ------------------------------------------------------------
 
 function chooseBody(body: Body): void {
@@ -120,14 +161,13 @@ if (rememberedBody === 'male' || rememberedBody === 'female') {
 
 // ---- HUD ---------------------------------------------------------------------
 
-const meters = new Map(
+const meters = new Map<NeedId, HTMLElement>(
   NEED_IDS.map((id) => {
     const el = document.createElement('div');
     el.className = 'need';
     el.style.setProperty('--fill', `var(--${id})`);
-    el.innerHTML = `<span class="need-label">${NEED_LABELS[id]}</span><div class="need-bar"><div class="need-fill"></div></div>`;
+    el.innerHTML = `<span class="need-label"></span><div class="need-bar"><div class="need-fill"></div></div>`;
     el.setAttribute('role', 'meter');
-    el.setAttribute('aria-label', NEED_LABELS[id]);
     ui.needs.append(el);
     return [id, el] as const;
   }),
@@ -140,23 +180,24 @@ function updateHud(): void {
     el.classList.toggle('low', value < LOW);
     el.setAttribute('aria-valuenow', String(value));
   }
+  const words = t();
   const { x, y } = game.player;
-  const phaseLabel = { dawn: 'dawn', day: '', dusk: 'dusk', night: 'night' }[game.phase];
-  ui.clock.textContent = `${game.clock}${phaseLabel ? ` · ${phaseLabel}` : ''}`;
+  const phase = game.phase;
+  ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}`;
   const obj = game.objectAt(x, y);
   ui.shelter.textContent = game.nearFire(x, y)
-    ? 'By the fire'
+    ? words.ui.byFire
     : obj && OBJECTS[obj.kind].shelter
-      ? `In your ${OBJECTS[obj.kind].name}`
+      ? words.ui.inShelter(obj.kind)
       : game.shelterAt(x, y) > 0
-        ? 'In a cave'
+        ? words.ui.inCave
         : '';
 
   const recent = game.log.slice(-LOG_LINES);
   ui.log.replaceChildren(
     ...recent.map((entry, i) => {
       const li = document.createElement('li');
-      li.textContent = entry.text;
+      li.textContent = words.message(entry.msg);
       li.className = entry.tone + (i < recent.length - 1 ? ' old' : '');
       return li;
     }),
@@ -244,26 +285,29 @@ function row(image: string, title: string, note: Node | string, action?: HTMLBut
 }
 
 function renderSheet(): void {
-  ui.sheetTitle.textContent = sheetKind === 'bag' ? 'Your bag' : 'Build';
+  const words = t();
+  ui.sheetTitle.textContent = sheetKind === 'bag' ? words.ui.yourBag : words.ui.build;
   const rows = el('div', { className: 'rows' });
   if (sheetKind === 'bag') {
     const entries = game.inventory.entries();
-    if (!entries.length) rows.append(el('p', { className: 'empty', textContent: 'Your bag is empty. Bump into plants, logs and stones to gather things.' }));
+    if (!entries.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmpty }));
     for (const [id, count] of entries) {
       const food = ITEMS[id].eat;
-      const button = food ? el('button', { type: 'button', textContent: 'Eat' }) : undefined;
+      const button = food ? el('button', { type: 'button', textContent: words.ui.eat }) : undefined;
       button?.addEventListener('click', () => {
         if (game.eat(id)) afterTurn();
         else updateHud();
       });
-      const note = food ? Object.entries(food).map(([need, n]) => `+${n} ${need}`).join(' · ') : 'For building';
-      rows.append(row(icon(`item_${id}`), `${count} × ${ITEMS[id].plural}`, el('span', { className: 'row-note', textContent: note }), button));
+      const note = food
+        ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
+        : words.ui.forBuilding;
+      rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), button));
     }
   } else {
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
       const problem = game.buildProblem(id);
-      const button = el('button', { type: 'button', textContent: 'Build', disabled: !!problem, className: problem ? '' : 'primary' });
+      const button = el('button', { type: 'button', textContent: words.ui.build, disabled: !!problem, className: problem ? '' : 'primary' });
       button.addEventListener('click', () => {
         if (game.build(id)) {
           closeSheet();
@@ -274,26 +318,27 @@ function renderSheet(): void {
       for (const [item, need] of Object.entries(recipe.cost) as [ItemId, number][]) {
         const have = game.inventory.count(item);
         costs.append(
-          el('span', { className: `cost${have < need ? ' missing' : ''}`, title: itemLabel(item, need) }, [
-            el('img', { src: icon(`item_${item}`), alt: ITEMS[item].plural }),
+          el('span', { className: `cost${have < need ? ' missing' : ''}`, title: words.itemCount(item, need) }, [
+            el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, need) }),
             `${have}/${need}`,
           ]),
         );
       }
-      const note = el('div', {}, [el('span', { className: 'row-note', textContent: recipe.description }), costs]);
-      rows.append(row(icon(recipe.builds), recipe.name, note, button));
+      const { name, description } = words.recipes[id];
+      const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
+      rows.append(row(icon(recipe.builds), name, note, button));
     }
-    rows.append(el('p', { className: 'empty', textContent: 'Buildings go in front of you.' }));
+    rows.append(el('p', { className: 'empty', textContent: words.ui.buildHint }));
   }
 
   const foot = el('div', { className: 'sheet-foot' });
   if (sheetKind === 'bag') {
-    const change = el('button', { type: 'button', textContent: 'Change explorer' });
+    const change = el('button', { type: 'button', textContent: words.ui.changeExplorer });
     change.addEventListener('click', () => {
       closeSheet();
       ui.picker.hidden = false;
     });
-    const fresh = el('button', { type: 'button', textContent: confirmNewIsland ? 'Tap again to confirm' : 'New island' });
+    const fresh = el('button', { type: 'button', textContent: confirmNewIsland ? words.ui.confirmNewIsland : words.ui.newIsland });
     fresh.addEventListener('click', () => {
       if (!confirmNewIsland) {
         confirmNewIsland = true;
@@ -306,7 +351,9 @@ function renderSheet(): void {
       afterTurn();
       saveNow();
     });
-    foot.append(change, fresh);
+    const lang = el('button', { type: 'button', className: 'wide', textContent: langButtonLabel() });
+    lang.addEventListener('click', switchLang);
+    foot.append(change, fresh, lang);
   }
   ui.sheetBody.replaceChildren(rows, foot);
 }
@@ -461,7 +508,7 @@ new ResizeObserver(() => {
   requestFrame();
 }).observe(canvas);
 
-updateHud();
+applyLang();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {

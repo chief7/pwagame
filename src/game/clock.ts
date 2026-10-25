@@ -43,10 +43,3 @@ export function turnsUntilMorning(turn: number): number {
   const wait = (target - minutes + 24 * 60) % (24 * 60);
   return Math.ceil(wait / MINUTES_PER_TURN);
 }
-
-export function clockLabel(turn: number): string {
-  const m = Math.floor(minuteOfDay(turn));
-  const hh = Math.floor(m / 60);
-  const mm = String(m % 60).padStart(2, '0');
-  return `Day ${dayNumber(turn)} · ${hh}:${mm}`;
-}

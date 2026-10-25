@@ -1,4 +1,5 @@
 import type { GameEvent, Tone } from '../game/game';
+import { t as strings } from '../i18n';
 
 // Turns game events into short-lived visual effects. Everything is keyed by
 // time (ms, from performance.now()) so the renderer can ask "where is this
@@ -103,7 +104,7 @@ export class Animator {
           const key = `${e.x},${e.y}`;
           const n = stacked.get(key) ?? 0;
           stacked.set(key, n + 1);
-          this.float(e.x, e.y, e.text, TONE_COLORS[e.tone], t + n * 220);
+          this.float(e.x, e.y, strings().float(e.amount, e.what), TONE_COLORS[e.tone], t + n * 220);
           break;
         }
         case 'sparkle':

@@ -26,27 +26,28 @@
       <footer>
         <ul id="log" aria-live="polite"></ul>
         <div id="actions">
-          <button id="btn-bag" type="button">Bag</button>
-          <button id="btn-build" type="button">Build</button>
-          <button id="btn-sleep" type="button">Sleep</button>
+          <button id="btn-bag" type="button" data-t="bag">Bag</button>
+          <button id="btn-build" type="button" data-t="build">Build</button>
+          <button id="btn-sleep" type="button" data-t="sleep">Sleep</button>
         </div>
       </footer>
       <div id="sheet" class="sheet" hidden>
         <div class="sheet-panel" role="dialog" aria-labelledby="sheet-title">
           <div class="sheet-head">
             <h2 id="sheet-title"></h2>
-            <button id="sheet-close" type="button">Close</button>
+            <button id="sheet-close" type="button" data-t="close">Close</button>
           </div>
           <div id="sheet-body"></div>
         </div>
       </div>
       <div id="picker" class="overlay">
         <div class="panel">
-          <h1>Choose your explorer</h1>
+          <h1 data-t="chooseExplorer">Choose your explorer</h1>
           <div class="choices">
-            <button type="button" data-body="female"><canvas width="96" height="96"></canvas><span>Female</span></button>
-            <button type="button" data-body="male"><canvas width="96" height="96"></canvas><span>Male</span></button>
+            <button type="button" data-body="female"><canvas width="96" height="96"></canvas><span data-t="female">Female</span></button>
+            <button type="button" data-body="male"><canvas width="96" height="96"></canvas><span data-t="male">Male</span></button>
           </div>
+          <button id="picker-lang" class="lang-switch" type="button"></button>
         </div>
       </div>
     </div>

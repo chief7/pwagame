@@ -18,6 +18,7 @@ Contents:
 10. [Tests](#10-tests)
 11. [Tuning reference](#11-tuning-reference)
 12. [Known limits](#12-known-limits)
+13. [Languages](#13-languages)
 
 ---
 
@@ -95,7 +96,9 @@ flowchart TB
 | `src/ui/renderer.ts` | Draws terrain, objects, animals, the player, night light and effects on a canvas. |
 | `src/ui/animator.ts` | Turns game events into timed animations. |
 | `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
-| `src/main.ts` | Connects everything: HUD, Bag and Build panels, touch and keys, render loop, autosave. |
+| `src/main.ts` | Connects everything: HUD, Bag and Build panels, touch and keys, render loop, autosave, language switch. |
+| `src/game/messages.ts` | The `Msg` type: every log message as data (a key and its arguments). |
+| `src/i18n/*.ts` | All text the player sees, in English (`en.ts`) and German (`de.ts`). |
 | `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
 
 ### Key rule: the game layer has no DOM
@@ -114,7 +117,7 @@ after each action and gives them to the animator.
 | `move` | An actor moved one cell | Slide between cells, walk frames |
 | `lunge` | An actor reached towards a cell (gather, shoo, pinch, build) | Short push towards the target |
 | `hit` | An actor lost Health | White flash and a red number |
-| `float` | Show a short text at a cell (`+2 wood`, `+35 water`) | Text rises and fades |
+| `float` | Show a number at a cell (`+2 wood`, `+35 water`): `amount` and `what` (an item or a need) | Text rises and fades |
 | `sparkle` | Something good happened at a cell (chest, building) | Gold sparkles |
 | `fade` | Time jumped (sleep, faint, new island) | Screen fades in from dark |
 
@@ -369,10 +372,14 @@ sprite. The sprite test fails if a sprite is missing.
 | Recipes | `src/game/defs/recipes.ts` (`RECIPES`) | the sprite of the object it builds | Build panel |
 | Animals | `src/game/defs/animals.ts` (`ANIMALS`) | `animal_<kind>` | Spawning, animal behaviour |
 
+The registries hold no text. Names, gather texts and other words for each
+entry are in `src/i18n/en.ts` and `src/i18n/de.ts` (see §13). TypeScript
+gives an error if a language does not have words for an entry.
+
 ### Items
 
 ```ts
-coconut: { id: 'coconut', name: 'coconut', plural: 'coconuts', eat: { food: 18, water: 22 } },
+coconut: { id: 'coconut', eat: { food: 18, water: 22 } },
 ```
 
 - `eat` is optional. With `eat`, the item is food and shows an Eat button.
@@ -382,10 +389,9 @@ coconut: { id: 'coconut', name: 'coconut', plural: 'coconuts', eat: { food: 18, 
 
 | Field | Effect |
 |---|---|
-| `name` | Name in messages. |
 | `walkable` | The player can walk into it (shelters). Animals cannot. |
 | `blocksSight` | Blocks the field of view (trees, boulders). |
-| `gather` | `verb`, `yields` and `after` (see 4.6). |
+| `gather` | `yields` and `after` (see 4.6). The gather text ("You shake the palm tree") is in `src/i18n/`. |
 | `depletedSprite` | Sprite while waiting to regrow. |
 | `drink` | Water per drink. |
 | `shelter` | 0 to 1. Warmer nights, faster sleep, becomes home. |
@@ -401,15 +407,13 @@ a chance per biome. Or make it buildable with a recipe.
 ### Recipes
 
 ```ts
-campfire: { id: 'campfire', name: 'Campfire', builds: 'campfire',
-  description: 'Keeps you warm and lights up the night.', cost: { wood: 3, stone: 2 } },
+campfire: { id: 'campfire', builds: 'campfire', cost: { wood: 3, stone: 2 } },
 ```
 
 ### Animals
 
 ```ts
-crab: { kind: 'crab', name: 'crab', temper: 'grumpy', habitat: [Tile.Sand],
-  notice: 2, wander: 0.4, population: 6, bump: 'You shoo the crab away. …' },
+crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6 },
 ```
 
 Also add the kind to the `AnimalKind` type. A new temper needs new code in
@@ -491,6 +495,7 @@ The render loop runs at full frame rate while the animator is busy, and every
 | Tap a far cell that cannot be reached | Step in that direction |
 | Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
 | Bag / Build / Sleep buttons | Open the panels, or sleep |
+| 🌐 button (Bag panel and explorer picker) | Switch between English and German |
 | Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `z`: sleep. `Esc`: close a panel. |
 
 Auto-walk (travel and hold) stops when:
@@ -510,9 +515,11 @@ Auto-walk (travel and hold) stops when:
 - The save holds: seed, random number state, turn, tiles, explored cells,
   objects, animals, player, home, needs, inventory, warnings and the last 30
   log lines. It is about 15 KB.
-- `SAVE_VERSION` is 1. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves.
+- `SAVE_VERSION` is 2. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 1 saves still
+  load: their log lines were English text and become `legacy` messages.
 - The chosen explorer (female or male) is saved as `pwagame.body`.
+- The language is saved as `pwagame.lang`.
 - The Bag panel has "New island" (tap two times to confirm).
 
 **Test a special situation in the browser.** You can start the game in any
@@ -546,6 +553,7 @@ Run `npm test`. The tests are in:
 | `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
+| `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
 
 To add content, use the `add-content` skill (`.claude/skills/add-content/`).
 It makes a proposal with rendered sprites first, and builds only after
@@ -584,3 +592,37 @@ Also run `npm run build` (typecheck and build) before you commit.
   "build a raft" goal.
 - There is no sound.
 - The game has not been tested on a real phone.
+
+---
+
+## 13. Languages
+
+The game is in English and German. All text the player sees comes from
+`src/i18n/`. The game layer only sends data:
+
+- Log messages are `Msg` objects (`src/game/messages.ts`), for example
+  `{ key: 'eat', item: 'coconut' }`. The log stores these, not text. So when
+  the player switches the language, the old log lines change language too.
+- Floating numbers are `amount` plus `what` (an item or a need).
+- The clock is made from the turn (`strings.clock(turn)`).
+
+`src/i18n/index.ts` holds the current language. `t()` gives the words for
+it. `main.ts` reads `pwagame.lang` from `localStorage`. If there is no
+stored language, it uses German for a German browser and English for all
+others. The 🌐 button in the Bag panel and in the explorer picker switches
+the language. Static labels in `index.html` have a `data-t` attribute with
+the key of their text in `Strings.ui`.
+
+**German grammar.** Each German noun has a gender (`m`, `f`, `n`, `pl`), a
+word and, if necessary, an adjective stem. `phrase(noun, case, det)` in
+`de.ts` adds the correct article and adjective ending, for example
+"ein bemooster Stein", "an der jungen Palme", "in deinem Unterstand". Items
+also have a plural (`große Blätter`) and short forms for floating numbers.
+
+**To add a language,** add a file like `de.ts` that implements `Strings`,
+add it to `LANGUAGES` in `src/i18n/index.ts`, and add it to the `Lang`
+type. The language button then needs a menu instead of a toggle.
+
+**Not translated:** the sprite gallery and preview pages (developer tools)
+and the app name in the web manifest.
+

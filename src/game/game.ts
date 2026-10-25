@@ -1,12 +1,13 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Player } from './actors';
-import { clockLabel, daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
+import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMAL_KINDS, ANIMALS, type AnimalKind } from './defs/animals';
-import { ITEMS, itemLabel, type ItemId } from './defs/items';
+import { ITEMS, type ItemId } from './defs/items';
 import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPES, type RecipeId } from './defs/recipes';
 import { computeFov } from './fov';
 import { Inventory } from './inventory';
 import { GameMap, Tile } from './map';
+import type { FloatWhat, Msg, WakeReason } from './messages';
 import { freshNeeds, LOW, tickNeeds, type NeedId, type Needs } from './needs';
 import { DIRS, distanceMap } from './pathing';
 import { Rng } from './rng';
@@ -18,12 +19,12 @@ const CAVE_SHELTER = 0.5;
 const RESPAWN_EVERY = 50;
 const SLEEP_LIMIT = 200;
 const PINCH_DAMAGE = 4;
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
 export interface LogEntry {
-  text: string;
+  msg: Msg;
   tone: Tone;
 }
 
@@ -37,18 +38,14 @@ export type GameEvent = { late: boolean } & (
   | { type: 'move'; id: number; fromX: number; fromY: number; toX: number; toY: number }
   | { type: 'lunge'; id: number; x: number; y: number; targetX: number; targetY: number }
   | { type: 'hit'; id: number; x: number; y: number; damage: number }
-  | { type: 'float'; x: number; y: number; text: string; tone: Tone }
+  | { type: 'float'; x: number; y: number; amount: number; what: FloatWhat; tone: Tone }
   | { type: 'sparkle'; x: number; y: number }
   | { type: 'fade' }
 );
 type EventData = GameEvent extends infer E ? (E extends GameEvent ? Omit<E, 'late'> : never) : never;
 
-const LOW_MESSAGES: Partial<Record<NeedId, string>> = {
-  food: 'Your tummy rumbles. Time to find something to eat.',
-  water: "You're thirsty. Look for a spring or a coconut.",
-  energy: "You're getting sleepy. A rest would help.",
-  warmth: "Brr, you're getting cold. A fire or a shelter would help.",
-};
+/** Needs that get a warning when they run low. */
+const WARN_NEEDS = ['food', 'water', 'energy', 'warmth'] as const;
 
 export interface SaveData {
   v: number;
@@ -121,7 +118,7 @@ export class Game {
       for (const kind of ANIMAL_KINDS) {
         for (let n = 0; n < ANIMALS[kind].population; n++) this.spawnAnimal(kind, false);
       }
-      this.message('You wash up on a quiet island. Gather food and water, and build a shelter before night.', 'info');
+      this.message({ key: 'arrive' }, 'info');
     }
     this.updateFov();
   }
@@ -186,10 +183,6 @@ export class Game {
     return daylight(this.turn);
   }
 
-  get clock(): string {
-    return clockLabel(this.turn);
-  }
-
   get phase() {
     return phase(this.turn);
   }
@@ -200,9 +193,9 @@ export class Game {
   }
 
   /** Why a recipe can't be built right now, or null if it can. */
-  buildProblem(id: RecipeId): string | null {
-    if (!this.inventory.hasAll(RECIPES[id].cost)) return 'You need more materials.';
-    if (!this.buildSpot(RECIPES[id].builds)) return 'There is no room to build here.';
+  buildProblem(id: RecipeId): Msg | null {
+    if (!this.inventory.hasAll(RECIPES[id].cost)) return { key: 'needMaterials' };
+    if (!this.buildSpot(RECIPES[id].builds)) return { key: 'noRoom' };
     return null;
   }
 
@@ -234,13 +227,13 @@ export class Game {
       return true;
     }
     if (!this.isPassable(nx, ny)) {
-      if (this.map.get(nx, ny) === Tile.Water) this.message('The sea is too salty to drink. Look for fresh water.', 'info');
+      if (this.map.get(nx, ny) === Tile.Water) this.message({ key: 'seaSalty' }, 'info');
       return false;
     }
     this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
     p.x = nx;
     p.y = ny;
-    if (obj) this.message(`You step into the ${OBJECTS[obj.kind].name}. A good place to sleep.`, 'info');
+    if (obj) this.message({ key: 'stepInto', obj: obj.kind }, 'info');
     this.endTurn();
     return true;
   }
@@ -276,19 +269,20 @@ export class Game {
     const food = ITEMS[id].eat;
     if (!food || this.inventory.count(id) === 0) return false;
     if (this.needs.food >= 98 && (food.water ?? 0) === 0) {
-      this.message("You're too full to eat that.", 'info');
+      this.message({ key: 'tooFull' }, 'info');
       return false;
     }
     this.inventory.take(id);
-    const gains: string[] = [];
+    const gains: [NeedId, number][] = [];
     for (const need of ['food', 'water', 'energy'] as const) {
       const amount = food[need];
       if (!amount) continue;
       this.needs[need] = Math.min(100, this.needs[need] + amount);
-      gains.push(`+${amount} ${need}`);
+      gains.push([need, amount]);
     }
-    this.message(`You eat ${itemLabel(id, 1)}. Yum!`, 'good');
-    this.emit({ type: 'float', x: this.player.x, y: this.player.y, text: gains[0], tone: 'good' });
+    this.message({ key: 'eat', item: id }, 'good');
+    const [need, amount] = gains[0];
+    this.emit({ type: 'float', x: this.player.x, y: this.player.y, amount, what: { need }, tone: 'good' });
     this.endTurn();
     return true;
   }
@@ -297,13 +291,13 @@ export class Game {
     const recipe = RECIPES[id];
     const spot = this.buildSpot(recipe.builds);
     if (!spot || !this.inventory.takeAll(recipe.cost)) {
-      this.message(this.buildProblem(id) ?? "You can't build that here.", 'info');
+      this.message(this.buildProblem(id) ?? { key: 'noRoom' }, 'info');
       return false;
     }
     this.objects.set(this.map.idx(spot.x, spot.y), { kind: recipe.builds });
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: spot.x, targetY: spot.y });
     this.emit({ type: 'sparkle', x: spot.x, y: spot.y });
-    this.message(`You build a ${recipe.name.toLowerCase()}.`, 'good');
+    this.message({ key: 'build', obj: recipe.builds }, 'good');
     this.endTurn();
     return true;
   }
@@ -314,7 +308,7 @@ export class Game {
    */
   sleep(): boolean {
     if (this.needs.energy >= 95) {
-      this.message("You're not sleepy right now.", 'info');
+      this.message({ key: 'notSleepy' }, 'info');
       return false;
     }
     const p = this.player;
@@ -322,27 +316,27 @@ export class Game {
     const obj = this.objectAt(p.x, p.y);
     if (shelter > 0) {
       this.home = { x: p.x, y: p.y };
-      this.message(obj ? `You curl up in the ${OBJECTS[obj.kind].name} and fall asleep.` : 'You curl up in the cave and fall asleep.', 'info');
+      this.message({ key: 'fallAsleep', obj: obj?.kind }, 'info');
     } else {
-      this.message('You lie down on the ground and doze off.', 'info');
+      this.message({ key: 'dozeOff' }, 'info');
     }
     const keep = this.events.length;
     this.sleeping = true;
-    let reason = '';
+    let reason: WakeReason = 'none';
     for (let i = 0; i < SLEEP_LIMIT && this.sleeping; i++) {
       this.endTurn();
       if (!this.sleeping) break; // fainted
-      if (this.needs.energy >= 100) reason = 'You wake up feeling rested.';
-      else if (this.needs.warmth < 12) reason = 'Brr! Too cold to sleep. A fire or a shelter would help.';
-      else if (this.needs.food <= 0) reason = 'Your rumbling tummy wakes you up.';
-      else if (this.needs.water <= 0) reason = 'You wake up thirsty.';
-      if (reason) break;
+      if (this.needs.energy >= 100) reason = 'rested';
+      else if (this.needs.warmth < 12) reason = 'cold';
+      else if (this.needs.food <= 0) reason = 'hungry';
+      else if (this.needs.water <= 0) reason = 'thirsty';
+      if (reason !== 'none') break;
     }
     this.sleeping = false;
     // The UI only needs to show the night passing, not every animal step.
     this.events.length = keep;
     this.emit({ type: 'fade' });
-    this.message(`${reason || 'You wake up.'} (${this.clock})`, reason.startsWith('Brr') ? 'warn' : 'good');
+    this.message({ key: 'wake', reason, turn: this.turn }, reason === 'cold' ? 'warn' : 'good');
     return true;
   }
 
@@ -354,22 +348,22 @@ export class Game {
 
     if (def.drink) {
       if (this.needs.water >= 98) {
-        this.message("You're not thirsty.", 'info');
+        this.message({ key: 'notThirsty' }, 'info');
         return false;
       }
       this.needs.water = Math.min(100, this.needs.water + def.drink);
-      this.message('You drink the cool, fresh water. Lovely!', 'good');
-      this.emit({ type: 'float', x: this.player.x, y: this.player.y, text: `+${def.drink} water`, tone: 'good' });
+      this.message({ key: 'drink' }, 'good');
+      this.emit({ type: 'float', x: this.player.x, y: this.player.y, amount: def.drink, what: { need: 'water' }, tone: 'good' });
       return true;
     }
 
     const gather = def.gather;
     if (!gather) {
-      this.message(`A ${def.name}.`, 'info');
+      this.message({ key: 'look', obj: obj.kind }, 'info');
       return false;
     }
     if (obj.readyAt !== undefined && obj.readyAt > this.turn) {
-      this.message(`The ${def.name} has nothing left. Come back later.`, 'info');
+      this.message({ key: 'nothingLeft', obj: obj.kind }, 'info');
       return false;
     }
 
@@ -381,10 +375,9 @@ export class Game {
     }
     for (const [item, n] of got) {
       this.inventory.add(item, n);
-      this.emit({ type: 'float', x, y, text: `+${n} ${item}`, tone: 'loot' });
+      this.emit({ type: 'float', x, y, amount: n, what: { item }, tone: 'loot' });
     }
-    const list = got.map(([item, n]) => itemLabel(item, n)).join(' and ');
-    this.message(list ? `${gather.verb} and get ${list}.` : `${gather.verb}, but find nothing.`, 'loot');
+    this.message({ key: 'gather', obj: obj.kind, got }, 'loot');
 
     const after = gather.after;
     if ('remove' in after) this.objects.delete(this.map.idx(x, y));
@@ -398,7 +391,7 @@ export class Game {
   private shoo(a: Animal): void {
     const def = ANIMALS[a.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: a.x, targetY: a.y });
-    this.message(def.bump, 'info');
+    this.message({ key: 'shoo', animal: a.kind }, 'info');
     if (def.temper !== 'calm') a.flee = 8;
   }
 
@@ -456,10 +449,10 @@ export class Game {
   }
 
   private warnAboutNeeds(): void {
-    for (const [need, text] of Object.entries(LOW_MESSAGES) as [NeedId, string][]) {
+    for (const need of WARN_NEEDS) {
       if (this.needs[need] < LOW && !this.warned.has(need)) {
         this.warned.add(need);
-        this.message(text, 'warn');
+        this.message({ key: 'low', need }, 'warn');
       } else if (this.needs[need] >= LOW + 10) {
         this.warned.delete(need);
       }
@@ -469,7 +462,7 @@ export class Game {
   /** Nobody dies here: the explorer faints and wakes up at home the next morning. */
   private faint(): void {
     this.sleeping = false;
-    this.message('You feel woozy and sit down for a rest…', 'warn');
+    this.message({ key: 'faint' }, 'warn');
     this.turn += turnsUntilMorning(this.turn) || TURNS_PER_DAY;
     const n = this.needs;
     this.needs = {
@@ -484,7 +477,7 @@ export class Game {
     this.player.y = this.home.y;
     this.warned.clear();
     this.emit({ type: 'fade' });
-    this.message('You wake up back at camp, feeling better. Remember to eat, drink and keep warm!', 'good');
+    this.message({ key: 'wakeAtCamp' }, 'good');
   }
 
   // ---- Animals ----------------------------------------------------------------------
@@ -509,7 +502,7 @@ export class Game {
             this.emit({ type: 'lunge', id: a.id, x: a.x, y: a.y, targetX: p.x, targetY: p.y });
             this.needs.health = Math.max(0, this.needs.health - PINCH_DAMAGE);
             this.emit({ type: 'hit', id: p.id, x: p.x, y: p.y, damage: PINCH_DAMAGE });
-            this.message(`Ouch! The ${def.name} pinched you.`, 'warn');
+            this.message({ key: 'pinch', animal: a.kind }, 'warn');
             a.flee = 4;
             return;
           }
@@ -521,8 +514,8 @@ export class Game {
             const item = this.rng.pick(foods);
             this.inventory.take(item);
             this.emit({ type: 'lunge', id: a.id, x: a.x, y: a.y, targetX: p.x, targetY: p.y });
-            this.emit({ type: 'float', x: p.x, y: p.y, text: `-1 ${item}`, tone: 'warn' });
-            this.message(`The cheeky ${def.name} snatched ${itemLabel(item, 1)}!`, 'warn');
+            this.emit({ type: 'float', x: p.x, y: p.y, amount: -1, what: { item }, tone: 'warn' });
+            this.message({ key: 'snatch', animal: a.kind, item }, 'warn');
             a.flee = 12;
           } else {
             this.stepToward(a, playerDist);
@@ -637,10 +630,11 @@ export class Game {
     this.events.push({ ...event, late: this.animalsActing } as GameEvent);
   }
 
-  private message(text: string, tone: Tone): void {
+  private message(msg: Msg, tone: Tone): void {
     // Bumping the same thing again shouldn't fill the log with copies.
-    if (this.log.at(-1)?.text === text) return;
-    this.log.push({ text, tone });
+    const last = this.log.at(-1);
+    if (last && JSON.stringify(last.msg) === JSON.stringify(msg)) return;
+    this.log.push({ msg, tone });
     if (this.log.length > LOG_LIMIT) this.log.shift();
   }
 
@@ -672,6 +666,11 @@ export class Game {
   }
 
   static fromSave(data: SaveData): Game {
+    if (data.v === 1) {
+      // Version 1 kept log lines as English text. Everything else is the same.
+      const old = data.log as unknown as { text: string; tone: Tone }[];
+      data = { ...data, v: SAVE_VERSION, log: old.map(({ text, tone }) => ({ msg: { key: 'legacy', text }, tone })) };
+    }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);
   }

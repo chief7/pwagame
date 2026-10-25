@@ -19,8 +19,9 @@ Write all messages to the user in the style from `CLAUDE.md` (ASD-STE100).
 
 1. Read `docs/OVERVIEW.md` completely. It explains the registries, the
    mechanics, the sprite rules and the tuning values.
-2. Read the registry files the idea touches (`src/game/defs/*.ts`), and the
-   sprite files of similar content (`src/sprites/*.ts`).
+2. Read the registry files the idea touches (`src/game/defs/*.ts`), the
+   word files (`src/i18n/en.ts`, `src/i18n/de.ts`), and the sprite files of
+   similar content (`src/sprites/*.ts`).
 3. Make sure the working tree is clean (`git status`). Create a branch from
    `main`: `git checkout -b content/<slug>` (for example `content/fishing-rod`).
    All work for this content stays on that branch until phase 2 ends.
@@ -119,6 +120,7 @@ Numbers (compared with existing content):
 
 Changes:
 - Data: <registry entries, SCATTER chances, recipe cost>
+- Words: <English and German names and messages; German gender>
 - Sprites: <names, sizes>; animation: <frames and speed, or "none">
 - Engine change: <none / describe it and why it is necessary>
 - Save: <no change / SAVE_VERSION must increase because ...>
@@ -158,6 +160,11 @@ different (a number, a new engine change), stop and ask before you continue.
 1. **Data.** Add the entries to the registries and their TypeScript types
    (`ItemId`, `ObjectKind`, `RecipeId`, `AnimalKind`). Add world placement in
    `SCATTER` (`src/game/worldgen.ts`) if the content appears in the world.
+   Add the words in **both** `src/i18n/en.ts` and `src/i18n/de.ts`: names,
+   gather texts, shoo texts, recipe names and descriptions. German nouns
+   need their gender (and an adjective stem if they have one). New messages
+   are new `Msg` keys in `src/game/messages.ts`; the game layer never builds
+   text itself.
 2. **Engine changes** (only if approved). Keep the game layer free of DOM
    code. Send events for the UI instead of drawing from game code. If the
    save shape changes, increase `SAVE_VERSION`.

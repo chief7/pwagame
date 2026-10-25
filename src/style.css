@@ -316,6 +316,10 @@ button.primary {
   margin-top: 16px;
 }
 
+.sheet-foot .wide {
+  grid-column: 1 / -1;
+}
+
 /* ---- Explorer picker ---------------------------------------------------------- */
 
 .overlay {
@@ -353,6 +357,10 @@ button.primary {
   justify-items: center;
   gap: 8px;
   padding: 16px 8px;
+}
+
+.lang-switch {
+  margin-top: 16px;
 }
 
 .choices canvas {

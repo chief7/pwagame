@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSprites, grassTileName, shoreTileName } from '../sprites';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
-import { Game } from './game';
+import { Game, SAVE_VERSION } from './game';
 import { Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
 import { distanceMap } from './pathing';
@@ -168,7 +168,7 @@ describe('Game: gathering and eating', () => {
 describe('Game: building and sleeping', () => {
   it('builds a campfire from wood and stone in front of the explorer', () => {
     const game = sandbox(6);
-    expect(game.buildProblem('campfire')).toMatch(/materials/);
+    expect(game.buildProblem('campfire')).toEqual({ key: 'needMaterials' });
     expect(game.build('campfire')).toBe(false);
     game.inventory.add('wood', 3);
     game.inventory.add('stone', 2);
@@ -204,7 +204,7 @@ describe('Game: building and sleeping', () => {
     game.needs.warmth = 40;
     game.sleep();
     expect(game.needs.energy).toBeLessThan(100);
-    expect(game.log.at(-1)?.text).toMatch(/cold/);
+    expect(game.log.at(-1)?.msg).toMatchObject({ key: 'wake', reason: 'cold' });
   });
 });
 
@@ -218,7 +218,7 @@ describe('Game: no harsh endings', () => {
     expect(game.player).toMatchObject(home);
     expect(game.needs.health).toBeGreaterThan(50);
     expect(game.phase).toBe('dawn');
-    expect(game.log.some((m) => /wake up back at camp/.test(m.text))).toBe(true);
+    expect(game.log.some((m) => m.msg.key === 'wakeAtCamp')).toBe(true);
   });
 
   it('a grumpy crab pinches when you linger, but never fatally', () => {
@@ -226,7 +226,7 @@ describe('Game: no harsh endings', () => {
     game.needs.health = 3;
     game.animals = [{ id: 99, kind: 'crab', x: game.player.x + 1, y: game.player.y, facing: 'down', flee: 0 }];
     for (let i = 0; i < 20; i++) game.wait();
-    expect(game.log.some((m) => /pinched/.test(m.text))).toBe(true);
+    expect(game.log.some((m) => m.msg.key === 'pinch')).toBe(true);
     expect(game.needs.health).toBeGreaterThan(0);
   });
 
@@ -262,6 +262,14 @@ describe('Game: saving', () => {
     copy.wait();
     expect(copy.toSave()).toEqual(game.toSave());
   });
+
+  it('loads version 1 saves, keeping their English log lines', () => {
+    const save = new Game(13).toSave();
+    const v1 = { ...save, v: 1, log: [{ text: 'You wash up on a quiet island.', tone: 'info' }] };
+    const game = Game.fromSave(JSON.parse(JSON.stringify(v1)));
+    expect(game.log).toEqual([{ msg: { key: 'legacy', text: 'You wash up on a quiet island.' }, tone: 'info' }]);
+    expect(game.toSave().v).toBe(SAVE_VERSION);
+  });
 });
 
 describe('Game events', () => {
@@ -281,7 +289,7 @@ describe('Game events', () => {
     place(game, 1, 0, 'stone_pebbles');
     game.takeEvents();
     game.move(1, 0);
-    expect(game.takeEvents().some((e) => e.type === 'float' && /stone/.test(e.text))).toBe(true);
+    expect(game.takeEvents().some((e) => e.type === 'float' && 'item' in e.what && e.what.item === 'stone')).toBe(true);
   });
 });
 

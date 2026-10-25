@@ -6,14 +6,6 @@ export type Needs = Record<NeedId, number>;
 
 export const NEED_IDS: NeedId[] = ['health', 'food', 'water', 'energy', 'warmth'];
 
-export const NEED_LABELS: Record<NeedId, string> = {
-  health: 'Health',
-  food: 'Food',
-  water: 'Water',
-  energy: 'Energy',
-  warmth: 'Warmth',
-};
-
 /** Below this a need counts as low and the explorer mentions it. */
 export const LOW = 25;
 
