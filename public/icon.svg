@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0b0d10"/>
+  <path d="M0 512V300c40-30 70-90 120-100s60 40 110 20 70-90 130-80 90 70 152 60v312z" fill="#5b4a36"/>
+  <path d="M0 512V380c50-20 90-60 150-50s90 50 150 40 120-40 212-20v162z" fill="#8a6f4d"/>
+  <text x="256" y="270" text-anchor="middle" dominant-baseline="middle" font-family="Menlo, Consolas, monospace" font-weight="bold" font-size="220" fill="#f2c14e">@</text>
+</svg>

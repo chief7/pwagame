@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#0b0d10" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="pwagame" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>pwagame</title>
+  </head>
+  <body>
+    <div id="app">
+      <header id="hud">
+        <div class="hp">
+          <div class="hp-bar"><div id="hp-fill"></div></div>
+          <span id="hp-text"></span>
+        </div>
+        <span id="stats"></span>
+      </header>
+      <canvas id="view"></canvas>
+      <footer>
+        <ul id="log" aria-live="polite"></ul>
+        <div id="actions">
+          <button id="btn-wait" type="button">Wait</button>
+          <button id="btn-drink" type="button">Tonic</button>
+          <button id="btn-descend" type="button">Descend</button>
+        </div>
+      </footer>
+      <div id="game-over" hidden>
+        <div class="panel">
+          <h1>You died</h1>
+          <p id="game-over-text"></p>
+          <button id="btn-restart" type="button">Try again</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
