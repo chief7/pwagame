@@ -42,6 +42,7 @@ src/
   ui/
     renderer.ts  sprite renderer (integer pixel scaling), camera centred on the player
     input.ts     keyboard mapping and tap/hold direction helper
+    animator.ts  turns game events into tweens, lunges, flashes, damage numbers, fades
   main.ts      wires game, renderer, HUD and input together
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
@@ -50,7 +51,7 @@ src/
     objects.ts   stones, logs, chests
     creatures.ts monsters and the raft
     palms.ts     three palm trees (24×32, overhang the tile above)
-    characters.ts  male and female explorer, 4 facings, recolourable via Look
+    characters.ts  male and female explorer, 4 facings × idle + 2 walk frames, recolourable
     gallery.ts   the sprite gallery page
 public/        manifest, icons, service worker (offline cache)
 ```

@@ -126,6 +126,39 @@ describe('Game', () => {
   });
 });
 
+describe('Game events', () => {
+  it('reports moves, then monster actions as late', () => {
+    const game = new Game(13);
+    clearAround(game, 2);
+    game.monsters = game.monsters.slice(0, 1);
+    const m = game.monsters[0];
+    m.x = game.player.x + 2;
+    m.y = game.player.y;
+    m.alert = 5;
+    game.takeEvents();
+    const { x } = game.player;
+    game.move(-1, 0);
+    const events = game.takeEvents();
+    expect(events[0]).toMatchObject({ type: 'move', id: game.player.id, fromX: x, toX: x - 1, late: false });
+    expect(events.slice(1).every((e) => e.late)).toBe(true);
+    expect(events.some((e) => e.type === 'move' && e.id === m.id)).toBe(true);
+    expect(game.takeEvents()).toEqual([]);
+  });
+
+  it('reports attacks with their outcome', () => {
+    const game = new Game(3);
+    clearAround(game);
+    const m = game.monsters[0];
+    m.x = game.player.x + 1;
+    m.y = game.player.y;
+    game.takeEvents();
+    game.move(1, 0);
+    const [attack, outcome] = game.takeEvents();
+    expect(attack).toMatchObject({ type: 'attack', id: game.player.id, targetX: m.x, late: false });
+    expect(['hit', 'miss']).toContain(outcome.type);
+  });
+});
+
 /** Turn the square around the player into open sand. */
 function clearAround(game: Game, r = 1): void {
   const { map } = game;

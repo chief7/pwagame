@@ -24,6 +24,23 @@ export interface LogEntry {
 
 export type TravelResult = 'moved' | 'arrived' | 'blocked';
 
+/**
+ * What happened during a turn, in order, for the UI to animate. `late`
+ * marks things that happened in the monsters' half of the turn.
+ */
+export type GameEvent = { late: boolean } & (
+  | { type: 'move'; id: number; fromX: number; fromY: number; toX: number; toY: number }
+  | { type: 'attack'; id: number; x: number; y: number; targetX: number; targetY: number }
+  | { type: 'hit'; id: number; x: number; y: number; damage: number }
+  | { type: 'miss'; id: number; x: number; y: number }
+  | { type: 'death'; id: number; kind: string; x: number; y: number }
+  | { type: 'chest'; x: number; y: number }
+  | { type: 'heal'; x: number; y: number; amount: number }
+  | { type: 'levelup'; x: number; y: number }
+  | { type: 'island' }
+);
+type EventData = GameEvent extends infer E ? (E extends GameEvent ? Omit<E, 'late'> : never) : never;
+
 export class Game {
   readonly seed: number;
   readonly rng: Rng;
@@ -33,6 +50,9 @@ export class Game {
   props = new Map<number, PropKind>();
   monsters: Actor[] = [];
   log: LogEntry[] = [];
+  /** Events since the UI last called takeEvents(). */
+  private events: GameEvent[] = [];
+  private monstersActing = false;
   depth = 0;
   turn = 0;
   level = 1;
@@ -46,6 +66,13 @@ export class Game {
     this.player = createPlayer();
     this.enterNextIsland();
     this.message('Washed ashore. Find the raft to sail on.', 'info');
+  }
+
+  /** Hand over (and forget) everything that happened since the last call. */
+  takeEvents(): GameEvent[] {
+    const events = this.events;
+    this.events = [];
+    return events;
   }
 
   get xpToNext(): number {
@@ -91,6 +118,7 @@ export class Game {
       return true;
     }
     if (!this.isPassable(nx, ny)) return false;
+    this.emit({ type: 'move', id: this.player.id, fromX: this.player.x, fromY: this.player.y, toX: nx, toY: ny });
     this.player.x = nx;
     this.player.y = ny;
     if (this.onRaft) this.message('A raft is tied up here. Tap Sail to set off.', 'info');
@@ -132,6 +160,7 @@ export class Game {
   sail(): boolean {
     if (this.over || !this.onRaft) return false;
     this.enterNextIsland();
+    this.emit({ type: 'island' });
     this.message(`You sail to island ${this.depth}.`, 'info');
     return true;
   }
@@ -149,6 +178,7 @@ export class Game {
     this.tonics--;
     const healed = Math.min(TONIC_HEAL, this.player.maxHp - this.player.hp);
     this.player.hp += healed;
+    this.emit({ type: 'heal', x: this.player.x, y: this.player.y, amount: healed });
     this.message(`You drink a tonic and recover ${healed} HP.`, 'good');
     this.endTurn();
     return true;
@@ -218,6 +248,7 @@ export class Game {
 
   private openChest(x: number, y: number): void {
     this.props.set(this.map.idx(x, y), 'chest_open');
+    this.emit({ type: 'chest', x, y });
     const found = this.rng.chance(0.3) ? 2 : 1;
     this.tonics += found;
     this.message(`You open the chest and find ${found === 1 ? 'a tonic' : 'two tonics'}.`, 'loot');
@@ -228,10 +259,12 @@ export class Game {
     if (this.turn % REGEN_EVERY === 0 && this.player.hp < this.player.maxHp) this.player.hp++;
 
     const dist = distanceMap(this.map, this.player.x, this.player.y, (x, y) => this.isPassable(x, y));
+    this.monstersActing = true;
     for (const m of this.monsters) {
       if (this.over) break;
       this.monsterAct(m, dist);
     }
+    this.monstersActing = false;
     this.updateFov();
   }
 
@@ -272,6 +305,7 @@ export class Game {
     if (!this.isPassable(x, y) || this.monsterAt(x, y)) return;
     if (x === this.player.x && y === this.player.y) return;
     m.facing = facingFor(x - m.x, y - m.y, m.facing);
+    this.emit({ type: 'move', id: m.id, fromX: m.x, fromY: m.y, toX: x, toY: y });
     m.x = x;
     m.y = y;
   }
@@ -280,12 +314,15 @@ export class Game {
     const isPlayer = attacker === this.player;
     const who = isPlayer ? 'You' : `The ${attacker.name}`;
     const whom = defender === this.player ? 'you' : `the ${defender.name}`;
+    this.emit({ type: 'attack', id: attacker.id, x: attacker.x, y: attacker.y, targetX: defender.x, targetY: defender.y });
     if (!this.rng.chance(0.85)) {
+      this.emit({ type: 'miss', id: defender.id, x: defender.x, y: defender.y });
       this.message(`${who} miss${isPlayer ? '' : 'es'} ${whom}.`, 'info');
       return;
     }
     const damage = Math.max(1, attacker.attack + this.rng.int(-1, 1) - defender.defense);
     defender.hp -= damage;
+    this.emit({ type: 'hit', id: defender.id, x: defender.x, y: defender.y, damage });
     this.message(`${who} hit${isPlayer ? '' : 's'} ${whom} for ${damage}.`, isPlayer ? 'info' : 'bad');
     if (defender.hp <= 0) this.kill(defender);
   }
@@ -298,6 +335,7 @@ export class Game {
       return;
     }
     this.monsters = this.monsters.filter((m) => m !== actor);
+    this.emit({ type: 'death', id: actor.id, kind: actor.kind, x: actor.x, y: actor.y });
     this.message(`The ${actor.name} dies.`, 'good');
     this.gainXp(actor.xp);
   }
@@ -312,6 +350,7 @@ export class Game {
       this.player.attack += 1;
       if (this.level % 2 === 0) this.player.defense += 1;
       this.message(`You reach level ${this.level}!`, 'good');
+      this.emit({ type: 'levelup', x: this.player.x, y: this.player.y });
     }
   }
 
@@ -333,6 +372,10 @@ export class Game {
         map.explored[i] = 1;
       },
     );
+  }
+
+  private emit(event: EventData): void {
+    this.events.push({ ...event, late: this.monstersActing } as GameEvent);
   }
 
   private message(text: string, tone: Tone): void {

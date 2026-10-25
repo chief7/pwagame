@@ -1,5 +1,6 @@
 import './style.css';
 import { Game } from './game/game';
+import { Animator, STEP_MS } from './ui/animator';
 import { commandForKey, directionFrom, type Command } from './ui/input';
 import { Renderer, type Body } from './ui/renderer';
 
@@ -8,14 +9,23 @@ const LOG_LINES = 4;
 const TAP_SLOP = 12;
 /** Press length before a touch becomes hold-to-walk. */
 const HOLD_DELAY = 280;
-const HOLD_STEP_MS = 140;
-const TRAVEL_STEP_MS = 90;
+/** Auto-moves run at the pace of the step animation so walking looks continuous. */
+const HOLD_STEP_MS = STEP_MS + 15;
+const TRAVEL_STEP_MS = STEP_MS;
+/** Between animations the scene still redraws for the sea and idle bobbing. */
+const AMBIENT_FRAME_MS = 100;
 const BODY_KEY = 'pwagame.body';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const canvas = $<HTMLCanvasElement>('view');
 const renderer = new Renderer(canvas);
+const anim = new Animator();
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+anim.reducedMotion = reducedMotion.matches;
+reducedMotion.addEventListener('change', () => {
+  anim.reducedMotion = reducedMotion.matches;
+});
 const ui = {
   hpFill: $('hp-fill'),
   hpText: $('hp-text'),
@@ -73,8 +83,31 @@ function run(cmd: Command): void {
   draw();
 }
 
+// ---- Render loop -------------------------------------------------------------
+//
+// Full frame rate while something is animating, a slow tick otherwise.
+
+let frameQueued = false;
+let ambientTimer: number | undefined;
+
+function requestFrame(): void {
+  clearTimeout(ambientTimer);
+  if (frameQueued) return;
+  frameQueued = true;
+  requestAnimationFrame(frame);
+}
+
+function frame(now: number): void {
+  frameQueued = false;
+  renderer.render(game, anim, now);
+  if (anim.busy(now)) requestFrame();
+  else ambientTimer = window.setTimeout(requestFrame, AMBIENT_FRAME_MS);
+}
+
+/** Pick up what just happened in the game: start its animations and refresh the HUD. */
 function draw(): void {
-  renderer.render(game);
+  anim.consume(game.takeEvents(), performance.now(), game.player.id);
+  requestFrame();
   const { player } = game;
   ui.hpFill.style.width = `${(player.hp / player.maxHp) * 100}%`;
   ui.hpText.textContent = `${player.hp}/${player.maxHp}`;
@@ -215,7 +248,7 @@ canvas.addEventListener('pointerup', (e) => endPress(e, false));
 canvas.addEventListener('pointercancel', (e) => endPress(e, true));
 
 function tap(x: number, y: number): void {
-  const target = renderer.cellAt(game, x, y);
+  const target = renderer.cellAt(x, y);
   const dx = target.x - game.player.x;
   const dy = target.y - game.player.y;
   if (dx === 0 && dy === 0) return run({ type: 'wait' });
@@ -244,12 +277,13 @@ ui.change.addEventListener('click', () => {
 function restart(): void {
   stopAuto();
   game = new Game();
+  anim.consume([{ type: 'island', late: false }], performance.now(), game.player.id);
   draw();
 }
 
 new ResizeObserver(() => {
   renderer.resize();
-  draw();
+  requestFrame();
 }).observe(canvas);
 
 const remembered = savedBody();
