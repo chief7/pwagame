@@ -115,3 +115,22 @@ export function palmYoung(): Sprite {
     ],
   });
 }
+
+/** Palms after their coconuts have been shaken down. */
+export function palmTallBare(): Sprite {
+  const s = palmTall();
+  return recolour(s, 'palm_tall_bare', [P.coconut, P.coconutLight], P.leafDark);
+}
+
+export function palmLeaningBare(): Sprite {
+  const s = palmLeaning();
+  return recolour(s, 'palm_leaning_bare', [P.coconut, P.coconutLight], P.leafDark);
+}
+
+function recolour(src: Sprite, name: string, from: string[], to: string): Sprite {
+  const out = new Sprite(name, src.width, src.height);
+  src.pixels.forEach((c, i) => {
+    out.pixels[i] = c && from.includes(c) ? to : c;
+  });
+  return out;
+}

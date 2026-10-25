@@ -172,3 +172,39 @@ export function chestOpen(): Sprite {
     '................',
   ], CHEST_KEY);
 }
+
+export function stalagmite(): Sprite {
+  const s = new Sprite('stalagmite');
+  // A lumpy cone of cave rock, lit from the left.
+  for (let y = 2; y <= 14; y++) {
+    const half = 0.5 + (y - 2) * 0.42;
+    for (let x = Math.floor(8 - half); x <= Math.ceil(7 + half); x++) {
+      const side = (x + 0.5 - 7.5) / (half + 0.5);
+      if (Math.abs(side) > 1) continue;
+      const n = hash2(x, y, 51);
+      s.set(x, y, side < -0.3 ? P.rockLight : side > 0.45 ? P.rockFaceDark : n < 0.2 ? P.rockDark : P.rock);
+    }
+  }
+  return s.outline().shadow(8, 14.8, 6, 1.2);
+}
+
+/** A small pool of fresh water ringed with stones. */
+export function spring(): Sprite {
+  const s = new Sprite('spring');
+  for (let y = 4; y <= 14; y++) {
+    for (let x = 1; x <= 14; x++) {
+      const d = Math.hypot((x + 0.5 - 8) / 6.5, (y + 0.5 - 9.5) / 4.8);
+      if (d > 1) continue;
+      if (d > 0.75) {
+        const n = hash2(x, y, 52);
+        s.set(x, y, y < 9 ? (n < 0.5 ? P.stoneLight : P.stone) : n < 0.5 ? P.stone : P.stoneDark);
+      } else {
+        s.set(x, y, y < 8 ? P.waterDeep : hash2(x, y, 53) < 0.12 ? P.waterGlint : P.waterShallow);
+      }
+    }
+  }
+  s.set(6, 9, P.foam);
+  s.set(7, 9, P.waterGlint);
+  s.set(10, 11, P.waterGlint);
+  return s.outline().shadow(8, 14.6, 7, 1.2);
+}

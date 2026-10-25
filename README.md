@@ -1,8 +1,9 @@
 # pwagame
 
-A turn-based, island-hopping roguelike built as an installable PWA for phones
-(works with a keyboard on desktop too). No game engine — everything is our own
-TypeScript on a 2D canvas.
+A gentle, kid-friendly survival game for phones, built as an installable PWA
+(works with a keyboard on desktop too). Wash up on an island, keep yourself
+fed, watered, rested and warm, and build a home. No game engine: everything
+is our own TypeScript on a 2D canvas.
 
 ## Run
 
@@ -14,44 +15,85 @@ npm run build     # typecheck + production build into dist/
 npm run preview   # serve the build (service worker is only active here)
 ```
 
+## How it plays
+
+- **Needs:** Health, Food, Water, Energy and Warmth (0–100). Food and Water
+  run down as time passes, Energy while awake, and Warmth drops at night out
+  in the open. An empty need slowly drains Health.
+- **No harsh endings:** when Health runs out you faint and wake up at home
+  the next morning with everything you carried. Animals can't be hurt;
+  bumping one shoos it away.
+- **Day and night:** a day is 240 turns. Nights are dark (you see less) and
+  cold; a campfire, a shelter or a cave keeps you warm.
+- **Gathering:** bump into things. Palms give coconuts and leaves, trees give
+  wood, berry bushes give berries; these regrow. Logs, pebbles, mushrooms and
+  chests are used up. Springs are fresh water; the sea is too salty.
+- **Building:** campfire, lean-to and hut, placed in front of you. Sleeping
+  in a shelter (or a cave) makes it home and rests you faster.
+- **Animals:** crabs pinch if you linger, monkeys snatch food, piglets and
+  bats keep their distance, turtles don't mind you.
+- **Saving:** the game saves itself to the browser after every action.
+
 ## Controls
 
-- **Touch:** tap next to your explorer to step (or attack / open a chest);
-  tap further away to walk there along a known path; press and hold to keep
-  walking towards your finger. Walking stops when a monster comes into view.
-  Tap your explorer to wait. Buttons: Wait, Tonic (heal), Sail (on the raft).
-- **Keyboard:** arrows / WASD / `hjklyubn` / numpad to move, `.` or `5` wait,
-  `q` drink tonic, `Enter` or `>` sail.
+- **Touch:** tap next to your explorer to step, or to gather, drink or shoo
+  what's there; tap further away to walk there along a known path; press and
+  hold to keep walking towards your finger. Walking stops when something new
+  comes into view. Tap your explorer to wait a turn. Buttons: Bag (eat, change
+  explorer, new island), Build, Sleep.
+- **Keyboard:** arrows / WASD / `hjkl` / numpad to move, `.` or `5` wait,
+  `i` bag, `b` build, `z` sleep, `Esc` closes panels.
 
-Each island has palms, stones, logs and 2–3 chests (bump to open for
-tonics). Find the raft to sail to the next, harder island.
+## Adding things
+
+Content lives in data registries under `src/game/defs/`. Each entry needs a
+matching sprite (see below); the sprite test fails if one is missing.
+
+- **Item:** add it to `ITEMS` in `items.ts` (give it `eat` to make it food)
+  and draw `item_<id>` in `sprites/creatures.ts` → `itemIcons()`.
+- **World object:** add it to `OBJECTS` in `objects.ts`. `gather` describes
+  what bumping it yields and whether it is removed, becomes something else or
+  regrows; `drink`, `shelter`, `warmthRadius`, `lightRadius`, `walkable` and
+  `blocksSight` add behaviour. Place it in the world via `SCATTER` in
+  `worldgen.ts`, or make it buildable.
+- **Recipe:** add it to `RECIPES` in `recipes.ts`; the Build panel lists it
+  automatically.
+- **Animal:** add it to `ANIMALS` in `animals.ts` with a temper (`calm`,
+  `shy`, `grumpy`, `cheeky`), habitat, notice range and population, and draw
+  `animal_<kind>`.
+- **Need:** `needs.ts` holds the rates and the warmth model.
 
 ## Layout
 
 ```
 src/
   game/        pure game logic, no DOM — unit-testable
-    rng.ts       seeded PRNG (mulberry32)
+    defs/        data registries: items, objects, recipes, animals
+    game.ts      actions, turn loop, needs, animals, fainting, sleep, save/load
+    needs.ts     the five needs and how they change each turn
+    clock.ts     time of day, daylight, phases
+    inventory.ts what the explorer carries
+    worldgen.ts  island generation: beach, forest, rocky hills and caves, scenery
     map.ts       tile grid + explored/visible layers
-    island.ts    cellular-automata islands (one landmass, coast cleaned for the shore tiles, raft far away)
-    props.ts     scenery and chest kinds (all block movement; some block sight)
     fov.ts       recursive shadowcasting field of view
-    pathing.ts   BFS distance maps (monster chasing, placement)
-    actors.ts    player + monster definitions
-    game.ts      turn loop, combat, AI, XP/levels, items, depth
+    pathing.ts   BFS distance maps (travel, animals, placement)
+    actors.ts    player and animal shapes
+    rng.ts       seeded PRNG (mulberry32), saveable
   ui/
-    renderer.ts  sprite renderer (integer pixel scaling), camera centred on the player
+    renderer.ts  sprite renderer (integer scaling), night lighting, camera
+    animator.ts  turns game events into tweens, lunges, flashes, floating text, fades
     input.ts     keyboard mapping and tap/hold direction helper
-    animator.ts  turns game events into tweens, lunges, flashes, damage numbers, fades
-  main.ts      wires game, renderer, HUD and input together
+  main.ts      HUD, Bag/Build panels, input, render loop, autosave
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
-    terrain.ts   sand, water and 12 autotiling shore tiles (+ shoreTileName())
-    objects.ts   stones, logs, chests
-    creatures.ts monsters and the raft
-    palms.ts     three palm trees (24×32, overhang the tile above)
-    characters.ts  male and female explorer, 4 facings × idle + 2 walk frames, recolourable
+    terrain.ts   sand, water, grass, rock, cave floor, shore and grass-edge transitions
+    forest.ts    trees, bushes, berry bushes, mushrooms
+    objects.ts   stones, logs, chests, stalagmite, spring
+    palms.ts     palm trees (24×32), with bare versions
+    structures.ts campfire (animated), lean-to, hut
+    creatures.ts animals, item icons, raft
+    characters.ts  male and female explorer, 4 facings × idle + 2 walk frames
     gallery.ts   the sprite gallery page
 public/        manifest, icons, service worker (offline cache)
 ```

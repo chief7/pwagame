@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSprites, shoreTileName, spriteGroups } from './index';
+import { buildSprites, grassTileName, shoreTileName, spriteGroups } from './index';
 import { fromRows } from './pixel';
 
 describe('sprites', () => {
@@ -14,13 +14,15 @@ describe('sprites', () => {
 
   it('includes the requested set', () => {
     const groups = Object.fromEntries(spriteGroups().map((g) => [g.title, g.sprites.length]));
-    expect(groups['Palm trees']).toBe(3);
-    for (const title of ['Sand', 'Shores', 'Stones', 'Logs', 'Chests', 'Monsters', 'Raft']) expect(groups[title]).toBeGreaterThan(0);
+    expect(groups['Palm trees']).toBeGreaterThanOrEqual(3);
+    for (const title of ['Sand', 'Shores', 'Grass', 'Forest', 'Rock and caves', 'Shelter', 'Stones', 'Logs', 'Chests', 'Animals', 'Items']) {
+      expect(groups[title]).toBeGreaterThan(0);
+    }
   });
 
   it('terrain tiles are opaque', () => {
     for (const [name, s] of buildSprites()) {
-      if (name === 'water' || name.startsWith('sand') || name.startsWith('shore')) {
+      if (/^(water|sand|shore|grass|rock_|cave_floor)/.test(name)) {
         expect(s.pixels.every((p) => p !== null)).toBe(true);
       }
     }
@@ -37,12 +39,18 @@ describe('sprites', () => {
     }
   });
 
-  it('has a sprite for every monster kind and prop kind', async () => {
-    const { MONSTER_TYPES } = await import('../game/actors');
-    const { PROP_KINDS } = await import('../game/props');
+  it('has a sprite for every animal, item and object (and their alternate looks)', async () => {
+    const { ANIMAL_KINDS } = await import('../game/defs/animals');
+    const { ITEM_IDS } = await import('../game/defs/items');
+    const { OBJECTS } = await import('../game/defs/objects');
     const sprites = buildSprites();
-    for (const t of MONSTER_TYPES) expect(sprites.has(`monster_${t.kind}`)).toBe(true);
-    for (const kind of PROP_KINDS) expect(sprites.has(kind)).toBe(true);
+    for (const kind of ANIMAL_KINDS) expect(sprites.has(`animal_${kind}`)).toBe(true);
+    for (const id of ITEM_IDS) expect(sprites.has(`item_${id}`)).toBe(true);
+    for (const def of Object.values(OBJECTS)) {
+      for (const name of [def.kind, def.depletedSprite, ...(def.frames ?? [])]) {
+        if (name) expect(sprites.has(name), name).toBe(true);
+      }
+    }
   });
 
   it('fromRows rejects ragged rows', () => {
@@ -67,6 +75,7 @@ describe('shoreTileName', () => {
     for (let mask = 0; mask < 256; mask++) {
       const water = offsets.filter((_, i) => mask & (1 << i));
       expect(sprites.has(shoreTileName(at(water)))).toBe(true);
+      expect(sprites.has(grassTileName(at(water)))).toBe(true);
     }
   });
 });

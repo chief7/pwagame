@@ -6,6 +6,15 @@ export class Rng {
     this.state = seed >>> 0;
   }
 
+  /** Current internal state, for saving. */
+  get state32(): number {
+    return this.state;
+  }
+
+  set state32(value: number) {
+    this.state = value >>> 0;
+  }
+
   /** Float in [0, 1). */
   next(): number {
     let t = (this.state = (this.state + 0x6d2b79f5) >>> 0);

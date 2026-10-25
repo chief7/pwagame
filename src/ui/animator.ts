@@ -1,4 +1,4 @@
-import type { GameEvent } from '../game/game';
+import type { GameEvent, Tone } from '../game/game';
 
 // Turns game events into short-lived visual effects. Everything is keyed by
 // time (ms, from performance.now()) so the renderer can ask "where is this
@@ -9,9 +9,15 @@ const LATE_DELAY_MS = 90;
 const LUNGE_MS = 160;
 const FLASH_MS = 140;
 const FLOAT_MS = 800;
-const DEATH_MS = 380;
 const SPARKLE_MS = 600;
-const FADE_MS = 550;
+const FADE_MS = 700;
+
+const TONE_COLORS: Record<Tone, string> = {
+  info: '#fff1b0',
+  good: '#8fd18b',
+  warn: '#ff8a73',
+  loot: '#f7d774',
+};
 
 interface Tween {
   fromX: number;
@@ -34,13 +40,6 @@ export interface FloatingText {
   y: number;
   text: string;
   color: string;
-  start: number;
-}
-
-export interface Ghost {
-  kind: string;
-  x: number;
-  y: number;
   start: number;
 }
 
@@ -68,7 +67,6 @@ export class Animator {
   private flashes = new Map<number, number>();
   private strides = new Map<number, number>();
   floats: FloatingText[] = [];
-  ghosts: Ghost[] = [];
   sparkles: Sparkle[] = [];
   private fadeStart = -Infinity;
   private busyUntil = 0;
@@ -76,6 +74,7 @@ export class Animator {
   reducedMotion = false;
 
   consume(events: readonly GameEvent[], now: number, playerId: number): void {
+    const stacked = new Map<string, number>();
     for (const e of events) {
       const t = now + (e.late ? LATE_DELAY_MS : 0);
       switch (e.type) {
@@ -90,34 +89,28 @@ export class Animator {
           this.extend(t + STEP_MS);
           break;
         }
-        case 'attack':
+        case 'lunge':
           if (this.reducedMotion) break;
           this.lunges.set(e.id, { dx: Math.sign(e.targetX - e.x), dy: Math.sign(e.targetY - e.y), start: t });
           this.extend(t + LUNGE_MS);
           break;
         case 'hit':
           this.flashes.set(e.id, t + LUNGE_MS / 2);
-          this.float(e.x, e.y, `-${e.damage}`, e.id === playerId ? '#ff8a73' : '#fff1b0', t + LUNGE_MS / 2);
+          this.float(e.x, e.y, `-${e.damage}`, e.id === playerId ? TONE_COLORS.warn : TONE_COLORS.info, t + LUNGE_MS / 2);
           break;
-        case 'miss':
-          this.float(e.x, e.y, 'miss', '#c9d2d9', t + LUNGE_MS / 2);
+        case 'float': {
+          // Several floats on one cell in a batch rise one after another.
+          const key = `${e.x},${e.y}`;
+          const n = stacked.get(key) ?? 0;
+          stacked.set(key, n + 1);
+          this.float(e.x, e.y, e.text, TONE_COLORS[e.tone], t + n * 220);
           break;
-        case 'death':
-          this.ghosts.push({ kind: e.kind, x: e.x, y: e.y, start: t + LUNGE_MS / 2 });
-          this.extend(t + LUNGE_MS / 2 + DEATH_MS);
-          break;
-        case 'chest':
+        }
+        case 'sparkle':
           this.sparkles.push({ x: e.x, y: e.y, start: t });
           this.extend(t + SPARKLE_MS);
           break;
-        case 'heal':
-          this.float(e.x, e.y, `+${e.amount}`, '#8fd18b', t);
-          break;
-        case 'levelup':
-          this.float(e.x, e.y, 'level up!', '#f2c14e', t + 200);
-          this.sparkles.push({ x: e.x, y: e.y, start: t + 200 });
-          break;
-        case 'island':
+        case 'fade':
           this.reset();
           this.fadeStart = now;
           this.extend(now + FADE_MS);
@@ -181,10 +174,9 @@ export class Animator {
   }
 
   readonly floatMs = FLOAT_MS;
-  readonly deathMs = DEATH_MS;
   readonly sparkleMs = SPARKLE_MS;
 
-  /** Opacity of the black cover after sailing (1 → 0). */
+  /** Opacity of the dark cover after sleeping or fainting (1 → 0). */
   fade(now: number): number {
     const p = (now - this.fadeStart) / FADE_MS;
     return p >= 1 || p < 0 ? 0 : 1 - p;
@@ -193,7 +185,6 @@ export class Animator {
   /** True while anything is mid-animation and frames should run flat out. */
   busy(now: number): boolean {
     this.floats = this.floats.filter((f) => now - f.start < FLOAT_MS);
-    this.ghosts = this.ghosts.filter((g) => now - g.start < DEATH_MS);
     this.sparkles = this.sparkles.filter((s) => now - s.start < SPARKLE_MS);
     return now < this.busyUntil || this.floats.length > 0;
   }
@@ -218,7 +209,6 @@ export class Animator {
     this.lunges.clear();
     this.flashes.clear();
     this.floats = [];
-    this.ghosts = [];
     this.sparkles = [];
   }
 }

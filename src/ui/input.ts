@@ -1,14 +1,15 @@
 export type Command =
   | { type: 'move'; dx: number; dy: number }
   | { type: 'wait' }
-  | { type: 'sail' }
-  | { type: 'drink' };
+  | { type: 'sleep' }
+  | { type: 'bag' }
+  | { type: 'build' };
 
 const KEY_DIRS: Record<string, [number, number]> = {
   ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
   w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0],
   k: [0, -1], j: [0, 1], h: [-1, 0], l: [1, 0],
-  y: [-1, -1], u: [1, -1], b: [-1, 1], n: [1, 1],
+  y: [-1, -1], u: [1, -1], n: [1, 1],
   '8': [0, -1], '2': [0, 1], '4': [-1, 0], '6': [1, 0],
   '7': [-1, -1], '9': [1, -1], '1': [-1, 1], '3': [1, 1],
   Home: [-1, -1], PageUp: [1, -1], End: [-1, 1], PageDown: [1, 1],
@@ -19,8 +20,9 @@ export function commandForKey(e: KeyboardEvent): Command | null {
   if (dir) return { type: 'move', dx: dir[0], dy: dir[1] };
   switch (e.key) {
     case '.': case '5': case ' ': case 'Clear': return { type: 'wait' };
-    case '>': case 'Enter': return { type: 'sail' };
-    case 'q': return { type: 'drink' };
+    case 'z': return { type: 'sleep' };
+    case 'i': return { type: 'bag' };
+    case 'b': return { type: 'build' };
   }
   return null;
 }

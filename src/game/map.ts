@@ -1,8 +1,10 @@
 export const Tile = {
   Water: 0,
   Sand: 1,
-  /** The raft that carries the player to the next island. */
-  Raft: 2,
+  Grass: 2,
+  /** Solid rock of the hills: blocks movement and sight. */
+  Rock: 3,
+  CaveFloor: 4,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -39,8 +41,19 @@ export class GameMap {
     if (this.inBounds(x, y)) this.tiles[this.idx(x, y)] = tile;
   }
 
+  /** Anything that isn't sea (rock counts as land). */
   isLand(x: number, y: number): boolean {
     return this.get(x, y) !== Tile.Water;
+  }
+
+  /** Ground you can stand on, ignoring objects. */
+  isFloor(x: number, y: number): boolean {
+    const t = this.get(x, y);
+    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor;
+  }
+
+  isOpaque(x: number, y: number): boolean {
+    return this.get(x, y) === Tile.Rock;
   }
 
   isVisible(x: number, y: number): boolean {

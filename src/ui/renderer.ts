@@ -1,8 +1,8 @@
-import type { Actor } from '../game/actors';
+import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
 import { hash2 } from '../sprites/pixel';
-import { bake, buildSprites, shoreTileName, type Sprite } from '../sprites';
+import { bake, buildSprites, grassTileName, shoreTileName, type Sprite } from '../sprites';
 import { characterName } from '../sprites/characters';
 import type { Animator } from './animator';
 
@@ -18,6 +18,10 @@ const MAX_CELL_CSS = 48;
 /** How often the sea swaps glint patterns. */
 const WATER_FRAME_MS = 750;
 const WATER_TILES = ['water', 'water_2', 'water_3'];
+const FIRE_FRAME_MS = 220;
+/** Night tint; its alpha comes from how dark a cell is. */
+const NIGHT_RGB = '10, 16, 42';
+const NIGHT_MAX = 0.62;
 
 interface Baked {
   sprite: Sprite;
@@ -122,53 +126,46 @@ export class Renderer {
     }
 
     // Actors are drawn in the row they're nearest to, so they tuck behind
-    // palms in the row below while walking.
-    const actors: { actor: Actor; name: string; pose: ReturnType<Animator['pose']>; bob: number }[] = [];
-    for (const m of game.monsters) {
-      if (!map.isVisible(m.x, m.y)) continue;
-      const pose = anim.pose(m.id, m.x, m.y, now);
-      actors.push({ actor: m, name: `monster_${m.kind}`, pose, bob: pose.hop ? 0 : anim.idleBob(m.id, now) });
+    // trees in the row below while walking.
+    const actors: { id: number; name: string; pose: ReturnType<Animator['pose']>; bob: number }[] = [];
+    for (const a of game.animals) {
+      if (!map.isVisible(a.x, a.y)) continue;
+      const pose = anim.pose(a.id, a.x, a.y, now);
+      actors.push({ id: a.id, name: `animal_${a.kind}`, pose, bob: pose.hop ? 0 : anim.idleBob(a.id, now) });
     }
     actors.push({
-      actor: player,
+      id: player.id,
       name: characterName(this.body, player.facing, playerPose.frame),
       pose: { ...playerPose, hop: 0 },
-      bob: playerPose.frame || game.over ? 0 : anim.idleBob(player.id, now),
+      bob: playerPose.frame ? 0 : anim.idleBob(player.id, now),
     });
+    const fireFrame = anim.reducedMotion ? 0 : Math.floor(now / FIRE_FRAME_MS);
 
-    // Row by row so tall sprites (palms) overlap whatever stands behind them.
-    // Extra rows below the screen let their crowns reach up into view.
+    // Row by row so tall sprites (trees, huts) overlap whatever stands behind them.
+    // Extra rows below the screen let their tops reach up into view.
     for (let y = y0; y <= y1 + 2; y++) {
       for (let x = x0; x <= x1; x++) {
         if (!map.isExplored(x, y)) continue;
-        const sx = o.x + x * cell;
-        const sy = o.y + y * cell;
-        if (map.get(x, y) === Tile.Raft) this.drawStanding('raft', sx, sy);
-        const prop = game.propAt(x, y);
-        if (prop) this.drawStanding(prop, sx, sy);
-      }
-      for (const ghost of anim.ghosts) {
-        if (ghost.y !== y || !map.isVisible(ghost.x, ghost.y)) continue;
-        const p = anim.progress(ghost.start, anim.deathMs, now);
-        if (p === null) continue;
-        this.drawDeath(`monster_${ghost.kind}`, o.x + ghost.x * cell, o.y + ghost.y * cell, p);
+        const obj = game.objectAt(x, y);
+        if (!obj) continue;
+        const frames = OBJECTS[obj.kind].frames;
+        const name = frames ? frames[fireFrame % frames.length] : game.objectSprite(obj);
+        this.drawStanding(name, o.x + x * cell, o.y + y * cell);
       }
       for (const a of actors) {
         if (Math.round(a.pose.y) !== y) continue;
         const sx = Math.round(o.x + a.pose.x * cell);
         const sy = Math.round(o.y + a.pose.y * cell - (a.pose.hop + a.bob) * this.scale);
-        ctx.globalAlpha = a.actor === player && game.over ? 0.4 : 1;
         this.drawStanding(a.name, sx, sy);
         if (a.pose.flash > 0) {
           ctx.globalAlpha = a.pose.flash * 0.85;
           this.drawStanding(a.name, sx, sy, true);
-        }
-        ctx.globalAlpha = 1;
-        if (a.actor !== player && a.actor.hp < a.actor.maxHp) {
-          this.drawHealth(Math.round(o.x + a.pose.x * cell), Math.round(o.y + a.pose.y * cell), a.actor.hp / a.actor.maxHp);
+          ctx.globalAlpha = 1;
         }
       }
     }
+
+    this.drawNight(game, o, x0, y0, x1, y1, playerPose);
 
     // Remembered cells dim; unknown cells stay hidden, even under overhanging crowns.
     for (let y = y0; y <= y1; y++) {
@@ -191,22 +188,27 @@ export class Renderer {
     }
   }
 
-  private drawDeath(name: string, sx: number, sy: number, p: number): void {
-    const { ctx, scale, cell } = this;
-    // The body flashes, fades and sinks while a puff of dust spreads out.
-    ctx.globalAlpha = 1 - p;
-    this.drawStanding(name, sx, Math.round(sy + p * 3 * scale), p < 0.3);
-    ctx.globalAlpha = (1 - p) * 0.8;
-    ctx.fillStyle = '#efe6d2';
-    const cx = sx + cell / 2;
-    const cy = sy + cell * 0.75;
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      const r = (0.15 + p * 0.45) * cell;
-      const size = Math.max(1, Math.round((1 - p) * 2)) * scale;
-      ctx.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.5), size, size);
+  /**
+   * Darken the scene by time of day. Campfires light a pool around them and
+   * the explorer always sees a little around themselves.
+   */
+  private drawNight(game: Game, o: { x: number; y: number }, x0: number, y0: number, x1: number, y1: number, pose: { x: number; y: number }): void {
+    const day = game.daylight;
+    if (day >= 1) return;
+    const lights = game.lights();
+    const { ctx, cell } = this;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        let light = Math.max(day, 0.45 - Math.hypot(x - pose.x, y - pose.y) * 0.12);
+        for (const [lx, ly, r] of lights) {
+          light = Math.max(light, 1 - Math.hypot(x - lx, y - ly) / (r + 1));
+        }
+        const dark = (1 - Math.min(1, light)) * NIGHT_MAX;
+        if (dark <= 0.01) continue;
+        ctx.fillStyle = `rgba(${NIGHT_RGB}, ${dark.toFixed(3)})`;
+        ctx.fillRect(o.x + x * cell, o.y + y * cell, cell, cell);
+      }
     }
-    ctx.globalAlpha = 1;
   }
 
   private drawSparkles(anim: Animator, map: GameMap, o: { x: number; y: number }, now: number): void {
@@ -258,6 +260,19 @@ export class Renderer {
     ctx.drawImage(baked.canvas, 0, 0, target.width, target.height);
   }
 
+  /** A sprite as an image URL at a whole-number scale, for HTML panels. */
+  iconURL(name: string, scale = 3): string {
+    const baked = this.sprites.get(name);
+    if (!baked) return '';
+    const c = document.createElement('canvas');
+    c.width = baked.sprite.width * scale;
+    c.height = baked.sprite.height * scale;
+    const ctx = c.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(baked.canvas, 0, 0, c.width, c.height);
+    return c.toDataURL();
+  }
+
   private drawTile(name: string, sx: number, sy: number): void {
     const baked = this.sprites.get(name);
     if (baked) this.ctx.drawImage(baked.canvas, sx, sy, this.cell, this.cell);
@@ -292,35 +307,38 @@ export class Renderer {
     return baked.flash;
   }
 
-  private drawHealth(sx: number, sy: number, fraction: number): void {
-    const pad = 2 * this.scale;
-    const width = this.cell - pad * 2;
-    this.ctx.fillStyle = 'rgba(20, 12, 4, 0.6)';
-    this.ctx.fillRect(sx + pad, sy, width, this.scale);
-    this.ctx.fillStyle = '#e0583a';
-    this.ctx.fillRect(sx + pad, sy, Math.max(this.scale, width * fraction), this.scale);
-  }
-
   private terrainFor(map: GameMap): string[] {
     let names = this.terrain.get(map);
     if (names) return names;
     names = [];
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        if (!map.isLand(x, y)) {
-          names.push('~');
-          continue;
-        }
-        const shore = shoreTileName((dx, dy) => !map.isLand(x + dx, y + dy));
-        if (shore !== 'sand') {
-          names.push(shore);
-          continue;
-        }
-        const roll = hash2(x, y, 52);
-        names.push(roll < 0.72 ? 'sand' : roll < 0.94 ? 'sand_ripples' : 'sand_shell');
+        names.push(this.terrainName(map, x, y));
       }
     }
     this.terrain.set(map, names);
     return names;
+  }
+
+  private terrainName(map: GameMap, x: number, y: number): string {
+    const roll = hash2(x, y, 52);
+    switch (map.get(x, y)) {
+      case Tile.Water:
+        return '~';
+      case Tile.Sand: {
+        const shore = shoreTileName((dx, dy) => !map.isLand(x + dx, y + dy));
+        if (shore !== 'sand') return shore;
+        return roll < 0.72 ? 'sand' : roll < 0.94 ? 'sand_ripples' : 'sand_shell';
+      }
+      case Tile.Grass: {
+        const edge = grassTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Sand);
+        if (edge !== 'grass') return edge;
+        return roll < 0.88 ? 'grass' : 'grass_flowers';
+      }
+      case Tile.Rock:
+        return map.get(x, y + 1) === Tile.Rock ? 'rock_top' : 'rock_face';
+      default:
+        return roll < 0.8 ? 'cave_floor' : 'cave_floor_2';
+    }
   }
 }

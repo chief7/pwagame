@@ -1,14 +1,22 @@
 :root {
+  color-scheme: dark;
   --bg: #0b0d10;
   --panel: #14181d;
+  --raised: #1d232a;
+  --raised-active: #2a323b;
   --border: #262c33;
-  --text: #d8d2c4;
+  --text: #e2dccd;
   --muted: #8b8577;
   --good: #8fd18b;
-  --bad: #ef7a6a;
-  --loot: #e9a3c0;
+  --warn: #ff9a7a;
+  --loot: #f7d774;
   --accent: #f2c14e;
-  color-scheme: dark;
+  --health: #ef6f6c;
+  --food: #f2a541;
+  --water: #4fb3d9;
+  --energy: #b39ddb;
+  --warmth: #ff7f50;
+  --track: #2a2f36;
 }
 
 * {
@@ -37,38 +45,76 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+/* ---- HUD ------------------------------------------------------------------ */
+
 #hud {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  display: grid;
+  gap: 6px;
   padding: 8px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
 }
 
-.hp {
-  display: flex;
-  align-items: center;
+.needs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
-.hp-bar {
-  width: 96px;
-  height: 8px;
-  background: #3a1d1a;
-  border-radius: 4px;
+.need {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.need-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.need.low .need-label {
+  color: var(--warn);
+}
+
+.need-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track);
   overflow: hidden;
 }
 
-#hp-fill {
+.need-fill {
   height: 100%;
-  background: var(--bad);
-  transition: width 0.15s;
+  background: var(--fill);
+  transition: width 0.2s;
 }
 
-#stats {
+.need.low .need-fill {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#shelter {
+  color: var(--good);
 }
 
 #view {
@@ -78,6 +124,8 @@ body {
   display: block;
   touch-action: none;
 }
+
+/* ---- Footer: log and actions --------------------------------------------------- */
 
 footer {
   background: var(--panel);
@@ -97,9 +145,7 @@ footer {
 }
 
 #log li {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
 }
 
 #log li.old {
@@ -107,7 +153,7 @@ footer {
 }
 
 #log .good { color: var(--good); }
-#log .bad { color: var(--bad); }
+#log .warn { color: var(--warn); }
 #log .loot { color: var(--loot); }
 
 #actions {
@@ -119,7 +165,7 @@ footer {
 button {
   font: inherit;
   color: var(--text);
-  background: #1d232a;
+  background: var(--raised);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 12px 8px;
@@ -128,7 +174,12 @@ button {
 }
 
 button:active:not(:disabled) {
-  background: #2a323b;
+  background: var(--raised-active);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 button:disabled {
@@ -136,14 +187,136 @@ button:disabled {
   cursor: default;
 }
 
-#btn-sail.ready {
+button.primary {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-#game-over h1 {
-  color: var(--bad);
+/* ---- Bottom sheet (bag, build) ----------------------------------------------- */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.45);
 }
+
+.sheet[hidden],
+.overlay[hidden] {
+  display: none;
+}
+
+.sheet-panel {
+  width: 100%;
+  max-width: 520px;
+  max-height: 75dvh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.sheet-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sheet-head button {
+  min-height: 36px;
+  padding: 6px 12px;
+}
+
+.rows {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.row img {
+  width: 40px;
+  height: 40px;
+  image-rendering: pixelated;
+}
+
+.row-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.row-title {
+  font-weight: bold;
+}
+
+.row-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.row button {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.costs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost img {
+  width: 20px;
+  height: 20px;
+}
+
+.cost.missing {
+  color: var(--warn);
+}
+
+.empty {
+  color: var(--muted);
+  padding: 8px 0;
+}
+
+.sheet-foot {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ---- Explorer picker ---------------------------------------------------------- */
 
 .overlay {
   position: fixed;
@@ -154,13 +327,19 @@ button:disabled {
   padding: 16px;
 }
 
-.overlay[hidden] {
-  display: none;
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 320px;
+  width: 100%;
+  text-align: center;
 }
 
-.panel-actions {
-  display: grid;
-  gap: 8px;
+.panel h1 {
+  margin: 0 0 16px;
+  font-size: 20px;
 }
 
 .choices {
@@ -182,22 +361,8 @@ button:disabled {
   image-rendering: pixelated;
 }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 320px;
-  width: 100%;
-  text-align: center;
-}
-
-.panel h1 {
-  margin: 0 0 16px;
-  font-size: 20px;
-}
-
-.panel p {
-  color: var(--muted);
-  margin: 0 0 16px;
+@media (prefers-reduced-motion: reduce) {
+  .need.low .need-fill {
+    animation: none;
+  }
 }

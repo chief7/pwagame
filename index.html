@@ -16,29 +16,28 @@
   <body>
     <div id="app">
       <header id="hud">
-        <div class="hp">
-          <div class="hp-bar"><div id="hp-fill"></div></div>
-          <span id="hp-text"></span>
+        <div id="needs" class="needs"></div>
+        <div class="status">
+          <span id="clock"></span>
+          <span id="shelter"></span>
         </div>
-        <span id="stats"></span>
       </header>
       <canvas id="view"></canvas>
       <footer>
         <ul id="log" aria-live="polite"></ul>
         <div id="actions">
-          <button id="btn-wait" type="button">Wait</button>
-          <button id="btn-drink" type="button">Tonic</button>
-          <button id="btn-sail" type="button">Sail</button>
+          <button id="btn-bag" type="button">Bag</button>
+          <button id="btn-build" type="button">Build</button>
+          <button id="btn-sleep" type="button">Sleep</button>
         </div>
       </footer>
-      <div id="game-over" class="overlay" hidden>
-        <div class="panel">
-          <h1>You died</h1>
-          <p id="game-over-text"></p>
-          <div class="panel-actions">
-            <button id="btn-restart" type="button">Try again</button>
-            <button id="btn-change" type="button">Change explorer</button>
+      <div id="sheet" class="sheet" hidden>
+        <div class="sheet-panel" role="dialog" aria-labelledby="sheet-title">
+          <div class="sheet-head">
+            <h2 id="sheet-title"></h2>
+            <button id="sheet-close" type="button">Close</button>
           </div>
+          <div id="sheet-body"></div>
         </div>
       </div>
       <div id="picker" class="overlay">

@@ -53,14 +53,14 @@ export function waterVariants(): Sprite[] {
 }
 
 export type Side = 'n' | 's' | 'e' | 'w';
-export type ShoreKind = 'edge' | 'outer' | 'inner';
+export type EdgeKind = 'edge' | 'outer' | 'inner';
 
-/** Distance of the coastline from a tile edge; period 16 so neighbours line up. */
+/** Distance of a boundary from a tile edge; period 16 so neighbours line up. */
 function coast(t: number): number {
   return 6 + Math.round(Math.sin((t / TILE) * Math.PI * 2) * 1.2);
 }
 
-/** How far (x, y) is inland from the water on one side; negative means in the water. */
+/** How far (x, y) is inside the tile's own ground from the boundary on one side; negative is across it. */
 function inland(side: Side, x: number, y: number): number {
   switch (side) {
     case 'n': return y - coast(x);
@@ -70,15 +70,29 @@ function inland(side: Side, x: number, y: number): number {
   }
 }
 
+const EDGE_SETS: [EdgeKind, Side[]][] = [
+  ['edge', ['n']], ['edge', ['s']], ['edge', ['w']], ['edge', ['e']],
+  ['outer', ['n', 'w']], ['outer', ['n', 'e']], ['outer', ['s', 'w']], ['outer', ['s', 'e']],
+  ['inner', ['n', 'w']], ['inner', ['n', 'e']], ['inner', ['s', 'w']], ['inner', ['s', 'e']],
+];
+
 /**
- * Sand tile with water on one side ('edge'), on two adjacent sides with land
- * in the opposite corner ('outer'), or only in one corner ('inner').
+ * A family of 12 transition tiles: the tile's own ground with something
+ * else along one side ('edge'), two adjacent sides ('outer') or one
+ * corner ('inner'). `paint` gets the signed distance from the boundary.
  */
-export function shore(kind: ShoreKind, sides: readonly Side[]): Sprite {
-  const name = `shore_${kind}_${sides.join('')}`;
-  return new Sprite(name).paint((x, y) => {
-    const d = sides.map((side) => inland(side, x, y));
-    const f = kind === 'inner' ? Math.max(...d) : Math.min(...d);
+function transitionSet(prefix: string, paint: (f: number, x: number, y: number) => Color): Sprite[] {
+  return EDGE_SETS.map(([kind, sides]) =>
+    new Sprite(`${prefix}_${kind}_${sides.join('')}`).paint((x, y) => {
+      const d = sides.map((side) => inland(side, x, y));
+      return paint(kind === 'inner' ? Math.max(...d) : Math.min(...d), x, y);
+    }),
+  );
+}
+
+/** Sand with the sea along its edges. */
+export function shoreSet(): Sprite[] {
+  return transitionSet('shore', (f, x, y) => {
     if (f < -3) return waterPixel(x, y);
     if (f < -1) return hash2(x, y, 9) < 0.15 ? P.water : P.waterShallow;
     if (f < 0) return hash2(x, y, 10) < 0.2 ? P.waterShallow : P.foam;
@@ -87,31 +101,118 @@ export function shore(kind: ShoreKind, sides: readonly Side[]): Sprite {
   });
 }
 
-export function shoreSet(): Sprite[] {
-  return [
-    shore('edge', ['n']), shore('edge', ['s']), shore('edge', ['w']), shore('edge', ['e']),
-    shore('outer', ['n', 'w']), shore('outer', ['n', 'e']), shore('outer', ['s', 'w']), shore('outer', ['s', 'e']),
-    shore('inner', ['n', 'w']), shore('inner', ['n', 'e']), shore('inner', ['s', 'w']), shore('inner', ['s', 'e']),
-  ];
+/** Grass with beach sand along its edges. */
+export function grassEdgeSet(): Sprite[] {
+  return transitionSet('grass', (f, x, y) => {
+    if (f < 0) return sandPixel(x, y, 1);
+    if (f < 1) return hash2(x, y, 12) < 0.5 ? P.grassEdge : P.grassDark;
+    return grassPixel(x, y, 4);
+  });
 }
 
 /**
- * Pick the terrain sprite for a land cell from which neighbours are water.
- * Returns 'sand' when no water is adjacent. Land strips one tile wide
- * (water on opposite sides) aren't covered by this set.
+ * Pick the transition tile for a cell from which neighbours are "other"
+ * ground. Returns `plain` when none are. Strips one tile wide (other ground
+ * on opposite sides) aren't covered; the world generator avoids them.
  */
-export function shoreTileName(isWater: (dx: number, dy: number) => boolean): string {
-  const n = isWater(0, -1);
-  const s = isWater(0, 1);
-  const w = isWater(-1, 0);
-  const e = isWater(1, 0);
+export function transitionTileName(prefix: string, plain: string, isOther: (dx: number, dy: number) => boolean): string {
+  const n = isOther(0, -1);
+  const s = isOther(0, 1);
+  const w = isOther(-1, 0);
+  const e = isOther(1, 0);
   const vert = n ? 'n' : s ? 's' : '';
   const horiz = w ? 'w' : e ? 'e' : '';
-  if (vert && horiz) return `shore_outer_${vert}${horiz}`;
-  if (vert) return `shore_edge_${vert}`;
-  if (horiz) return `shore_edge_${horiz}`;
+  if (vert && horiz) return `${prefix}_outer_${vert}${horiz}`;
+  if (vert) return `${prefix}_edge_${vert}`;
+  if (horiz) return `${prefix}_edge_${horiz}`;
   for (const [dx, dy, name] of [[-1, -1, 'nw'], [1, -1, 'ne'], [-1, 1, 'sw'], [1, 1, 'se']] as const) {
-    if (isWater(dx, dy)) return `shore_inner_${name}`;
+    if (isOther(dx, dy)) return `${prefix}_inner_${name}`;
   }
-  return 'sand';
+  return plain;
+}
+
+/** Shore tile for a land cell given which neighbours are water ('sand' when none). */
+export function shoreTileName(isWater: (dx: number, dy: number) => boolean): string {
+  return transitionTileName('shore', 'sand', isWater);
+}
+
+/** Grass tile for a grass cell given which neighbours are sand ('grass' when none). */
+export function grassTileName(isSand: (dx: number, dy: number) => boolean): string {
+  return transitionTileName('grass', 'grass', isSand);
+}
+
+// ---- Forest floor, rock and caves ---------------------------------------------
+
+function grassPixel(x: number, y: number, seed: number): Color {
+  // Short vertical blades: two-pixel strokes in a darker green.
+  if (hash2(x, y >> 1, seed + 20) < 0.12) return P.grassMid;
+  const n = hash2(x, y, seed);
+  if (n < 0.06) return P.grassDark;
+  if (n > 0.93) return P.grassLight;
+  return P.grass;
+}
+
+export function grass(): Sprite {
+  return new Sprite('grass').paint((x, y) => grassPixel(x, y, 4));
+}
+
+export function grassFlowers(): Sprite {
+  const s = new Sprite('grass_flowers').paint((x, y) => grassPixel(x, y, 5));
+  for (const [x, y, c] of [
+    [3, 4, P.flowerYellow], [4, 4, P.flowerYellow], [3, 3, P.flowerYellow], [4, 5, P.grassDark],
+    [11, 9, P.flowerWhite], [12, 9, P.flowerWhite], [11, 10, P.flowerWhite], [12, 10, P.flowerYellow],
+    [6, 12, P.shell], [7, 12, P.shell], [7, 13, P.grassDark],
+  ] as const) s.set(x, y, c);
+  return s;
+}
+
+function rockPixel(x: number, y: number): Color {
+  // Chunky boulders on an 8px grid (every other column shifted down half a
+  // lump), each lit from the top left with dark seams between them.
+  const col = x >> 3;
+  const yy = (y + (col % 2) * 4) % TILE;
+  const lx = x & 7;
+  const ly = yy & 7;
+  if (lx === 7 || ly === 7) return P.rockFaceDark;
+  if (lx === 0 || ly === 0) return hash2(x, y, 30) < 0.7 ? P.rockLight : P.rock;
+  if (lx === 6 || ly === 6) return P.rockDark;
+  return hash2(x, y, 31) < 0.15 ? P.rockDark : P.rock;
+}
+
+/** Top of the rocky hills. */
+export function rockTop(): Sprite {
+  return new Sprite('rock_top').paint(rockPixel);
+}
+
+/** Rock with its cliff face showing, for rock above open ground. */
+export function rockFace(): Sprite {
+  return new Sprite('rock_face').paint((x, y) => {
+    if (y < 5) return rockPixel(x, y);
+    if (y === 5) return P.rockLight;
+    if (y === TILE - 1) return P.rockFaceDark;
+    // Vertical strata, offset per column group.
+    const band = (x + (hash2(x >> 2, 0, 32) < 0.5 ? 0 : 1)) % 4;
+    if (band === 0) return P.rockFaceDark;
+    if (hash2(x, y, 33) < 0.1) return P.rockFaceLight;
+    return P.rockFace;
+  });
+}
+
+function caveFloorPixel(x: number, y: number, seed: number): Color {
+  const n = hash2(x, y, seed);
+  if (n < 0.12) return P.caveFloorDark;
+  if (n > 0.9) return P.caveFloorLight;
+  return P.caveFloor;
+}
+
+export function caveFloor(): Sprite {
+  return new Sprite('cave_floor').paint((x, y) => caveFloorPixel(x, y, 40));
+}
+
+export function caveFloorPebbles(): Sprite {
+  const s = new Sprite('cave_floor_2').paint((x, y) => caveFloorPixel(x, y, 41));
+  for (const [x, y, c] of [
+    [4, 5, P.stone], [5, 5, P.stoneDark], [10, 11, P.stoneLight], [11, 11, P.stone], [11, 12, P.stoneDark], [7, 13, P.stone],
+  ] as const) s.set(x, y, c);
+  return s;
 }
