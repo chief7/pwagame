@@ -13,6 +13,7 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   fish: { one: 'fish', many: 'fish', short: ['fish', 'fish'] },
   cooked_fish: { one: 'cooked fish', many: 'cooked fish', short: ['cooked fish', 'cooked fish'] },
   fishing_rod: { one: 'fishing rod', many: 'fishing rods', short: ['rod', 'rods'] },
+  rope: { one: 'rope', many: 'ropes', short: ['rope', 'ropes'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -41,6 +42,11 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   bramble: { name: 'bramble thicket', gather: 'You chop through the brambles' },
   bridge_ns: { name: 'bridge' },
   bridge_ew: { name: 'bridge' },
+  boat_wreck: { name: 'old boat wreck' },
+  boat_hull: { name: 'boat' },
+  boat_mast: { name: 'boat' },
+  boat_sail: { name: 'boat' },
+  boat_ready: { name: 'boat' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -68,6 +74,12 @@ const obj = (kind: ObjectKind) => OBJECT[kind].name;
 
 function itemCount(id: keyof typeof ITEM, count: number): string {
   return count === 1 ? a(ITEM[id].one) : `${count} ${ITEM[id].many}`;
+}
+
+/** "20 pieces of wood and 6 stones". */
+function itemList(items: [keyof typeof ITEM, number][]): string {
+  const parts = items.map(([id, n]) => itemCount(id, n));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts.join('');
 }
 
 function clock(turn: number): string {
@@ -109,6 +121,20 @@ export const en: Strings = {
     skillPoints: (n) => `${n} skill ${n === 1 ? 'point' : 'points'}`,
     xpToNext: (have, need) => `XP ${have} / ${need} to the next point`,
     skillCost: (n) => `Costs ${n} ${n === 1 ? 'point' : 'points'}`,
+    goalTitle: 'Island goal: repair the boat',
+    goalFind: 'Find the old boat. It lies on a beach on the far side of the island.',
+    goalMissing: 'This island has no boat. Start a new island in your bag to get one.',
+    goalStep: (index, count, stage) => `Step ${index + 1} of ${count}: ${en.stages[stage]}`,
+    goalHint: 'Walk into the boat to give it what you carry.',
+    goalReady: 'The boat is ready! Walk into it to set sail.',
+    goalSailed: 'You sailed away from this island.',
+    sailTitle: 'Set sail?',
+    sailText: 'The boat is ready. Do you want to sail away from the island?',
+    setSail: 'Set sail!',
+    notYet: 'Not yet',
+    endTitle: 'You did it!',
+    endText: 'You sailed away from the island. The next island is coming soon! Until then, you can stay here or start a new island.',
+    stay: 'Stay on this island',
   },
   clock,
   needs: NEEDS,
@@ -117,11 +143,13 @@ export const en: Strings = {
     lean_to: { name: 'Lean-to', description: 'A simple shelter. Sleep here to rest well and stay warmer.' },
     hut: { name: 'Hut', description: 'A cosy home. Toasty nights and the best sleep.' },
     axe: { name: 'Stone axe', description: 'Chops through brambles, and gets you more wood from trees.' },
+    rope: { name: 'Rope', description: 'Twisted from big leaves. The boat needs rope.' },
     bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
     fishing_rod: { name: 'Fishing rod', description: 'Walk into the sea with it to catch fish.' },
     cooked_fish: { name: 'Cook a fish', description: 'Stand next to a campfire. Cooked fish is tasty food.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
+  stages: { hull: 'Hull', mast: 'Mast', sail: 'Sail', supplies: 'Supplies' },
   skills: {
     small_sips: { name: 'Small sips', description: 'Your water goes down 20% slower.' },
     small_appetite: { name: 'Small appetite', description: 'Your food goes down 20% slower.' },
@@ -201,6 +229,17 @@ export const en: Strings = {
       case 'learn': return `You learned: ${en.skills[msg.skill].name}.`;
       case 'catch': return 'You cast your line… and catch a fish!';
       case 'noBite': return 'Nothing bites. Try again!';
+      case 'goalFound': return 'You find an old boat wreck on the beach! Maybe you can fix it and sail away.';
+      case 'goalNeeds': return `The boat needs ${itemList(msg.left)} for the ${en.stages[msg.stage].toLowerCase()}.`;
+      case 'goalGive': return `You give the boat ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;
+      case 'goalStage': return {
+        hull: 'The hull is finished! Now the boat needs a mast.',
+        mast: 'The mast stands tall! Now the boat needs a sail.',
+        sail: 'The sail is up! Now pack food for the trip.',
+        supplies: 'The supplies are on board. The boat is ready to sail!',
+      }[msg.stage];
+      case 'goalReady': return 'The boat is ready to sail.';
+      case 'sailAway': return 'You push the boat into the waves and sail away!';
       case 'legacy': return msg.text;
     }
   },

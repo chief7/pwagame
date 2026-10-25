@@ -514,3 +514,38 @@ button.primary {
     animation: none;
   }
 }
+
+/* ---- Island goal and the voyage ------------------------------------------------ */
+
+.row.goal {
+  grid-template-columns: 48px minmax(0, 1fr);
+  border-color: var(--accent);
+}
+
+.row.goal > img {
+  width: 48px;
+  height: 60px;
+}
+
+.row-note.goal-step {
+  display: block;
+  color: var(--text);
+  font-weight: bold;
+}
+
+.voyage {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.voyage img {
+  width: 120px;
+  height: 150px;
+  image-rendering: pixelated;
+}
+
+.voyage p {
+  margin: 0;
+}

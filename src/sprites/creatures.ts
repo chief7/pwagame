@@ -304,6 +304,19 @@ export function itemIcons(): Sprite[] {
         }
       }
     }),
+    icon('rope', (s) => {
+      // A coil of twisted leaf cord, two turns seen from above.
+      for (let y = 3; y <= 13; y++) {
+        for (let x = 2; x <= 13; x++) {
+          const d = Math.hypot((x + 0.5 - 8) / 5.5, (y + 0.5 - 8.5) / 4.8);
+          if (d > 1 || d < 0.35) continue;
+          const groove = Math.abs(d - 0.68) < 0.08;
+          const twist = (x + y) % 3 === 0;
+          const lit = x + y < 15;
+          s.set(x, y, groove ? P.strawDeep : twist ? P.strawDark : lit ? P.strawLight : P.straw);
+        }
+      }
+    }),
     icon('axe', (s) => {
       // Handle on a diagonal, a chipped stone head lashed on with leaf cord.
       for (let i = 0; i <= 10; i++) {

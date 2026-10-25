@@ -1,5 +1,6 @@
 import type { AnimalKind } from '../game/defs/animals';
 import type { ItemId } from '../game/defs/items';
+import type { StageId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
 import type { PathId, SkillId } from '../game/defs/skills';
@@ -50,6 +51,23 @@ export interface Strings {
     xpToNext(have: number, need: number): string;
     /** "Costs 2 points". */
     skillCost(n: number): string;
+    /** The goal card in the Build panel. */
+    goalTitle: string;
+    goalFind: string;
+    goalMissing: string;
+    /** "Step 2 of 4: Mast". */
+    goalStep(index: number, count: number, stage: StageId): string;
+    goalHint: string;
+    goalReady: string;
+    goalSailed: string;
+    /** The question before leaving, and the screen after. */
+    sailTitle: string;
+    sailText: string;
+    setSail: string;
+    notYet: string;
+    endTitle: string;
+    endText: string;
+    stay: string;
   };
   /** "Day 2 · 6:00". */
   clock(turn: number): string;
@@ -57,6 +75,8 @@ export interface Strings {
   recipes: Record<RecipeId, { name: string; description: string }>;
   paths: Record<PathId, string>;
   skills: Record<SkillId, { name: string; description: string }>;
+  /** Names of the goal's stages: "Hull". */
+  stages: Record<StageId, string>;
   /** Bag line: "3 × coconuts". */
   itemStack(id: ItemId, count: number): string;
   /** "a coconut", "3 pieces of wood". */

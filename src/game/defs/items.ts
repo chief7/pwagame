@@ -4,7 +4,7 @@
 
 export type ItemId =
   | 'coconut' | 'berries' | 'mushroom' | 'cooked_fish'
-  | 'wood' | 'leaves' | 'stone' | 'fish'
+  | 'wood' | 'leaves' | 'stone' | 'fish' | 'rope'
   | 'axe' | 'fishing_rod';
 
 export interface Food {
@@ -32,6 +32,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   leaves: { id: 'leaves' },
   stone: { id: 'stone' },
   fish: { id: 'fish', raw: true },
+  rope: { id: 'rope' },
   axe: { id: 'axe', tool: true },
   fishing_rod: { id: 'fishing_rod', tool: true },
 };

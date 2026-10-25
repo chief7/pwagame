@@ -72,6 +72,7 @@ const ITEM: ItemWords<CountNoun> = {
   fish: { g: 'm', word: 'Fisch', plural: 'Fische', short: ['Fisch', 'Fische'] },
   cooked_fish: { g: 'm', word: 'Fisch', adj: 'gebraten', plural: 'gebratene Fische', short: ['Bratfisch', 'Bratfische'] },
   fishing_rod: { g: 'f', word: 'Angelrute', plural: 'Angelruten', short: ['Angel', 'Angeln'] },
+  rope: { g: 'n', word: 'Seil', plural: 'Seile', short: ['Seil', 'Seile'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -100,6 +101,11 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   bramble: { g: 'n', word: 'Dornengestrüpp', gather: 'Du schlägst dich durch das Dornengestrüpp' },
   bridge_ns: { g: 'f', word: 'Brücke' },
   bridge_ew: { g: 'f', word: 'Brücke' },
+  boat_wreck: { g: 'n', word: 'Bootswrack', adj: 'alt' },
+  boat_hull: { g: 'n', word: 'Boot' },
+  boat_mast: { g: 'n', word: 'Boot' },
+  boat_sail: { g: 'n', word: 'Boot' },
+  boat_ready: { g: 'n', word: 'Boot' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -127,6 +133,12 @@ const obj = (kind: ObjectKind, c: Case, det: Det) => phrase(OBJECT[kind], c, det
 /** In the accusative, as items always are in messages: "eine Kokosnuss", "3 große Blätter". */
 function itemCount(id: keyof typeof ITEM, count: number): string {
   return count === 1 ? phrase(ITEM[id], 'acc', 'a') : `${count} ${ITEM[id].plural}`;
+}
+
+/** "20 Stück Holz und 6 Steine". */
+function itemList(items: [keyof typeof ITEM, number][]): string {
+  const parts = items.map(([id, n]) => itemCount(id, n));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} und ${parts.at(-1)}` : parts.join('');
 }
 
 function clock(turn: number): string {
@@ -168,6 +180,20 @@ export const de: Strings = {
     skillPoints: (n) => `${n} ${n === 1 ? 'Talentpunkt' : 'Talentpunkte'}`,
     xpToNext: (have, need) => `EP ${have} / ${need} bis zum nächsten Punkt`,
     skillCost: (n) => `Kostet ${n} ${n === 1 ? 'Punkt' : 'Punkte'}`,
+    goalTitle: 'Inselziel: Repariere das Boot',
+    goalFind: 'Finde das alte Boot. Es liegt an einem Strand auf der anderen Seite der Insel.',
+    goalMissing: 'Auf dieser Insel gibt es kein Boot. Starte in deiner Tasche eine neue Insel, um eins zu bekommen.',
+    goalStep: (index, count, stage) => `Schritt ${index + 1} von ${count}: ${de.stages[stage]}`,
+    goalHint: 'Lauf gegen das Boot, um ihm zu geben, was du dabeihast.',
+    goalReady: 'Das Boot ist fertig! Lauf dagegen, um loszusegeln.',
+    goalSailed: 'Du bist von dieser Insel weggesegelt.',
+    sailTitle: 'Lossegeln?',
+    sailText: 'Das Boot ist fertig. Willst du von der Insel wegsegeln?',
+    setSail: 'Lossegeln!',
+    notYet: 'Noch nicht',
+    endTitle: 'Geschafft!',
+    endText: 'Du bist von der Insel weggesegelt. Die nächste Insel kommt bald! Bis dahin kannst du hierbleiben oder eine neue Insel starten.',
+    stay: 'Auf dieser Insel bleiben',
   },
   clock,
   needs: NEEDS,
@@ -175,12 +201,14 @@ export const de: Strings = {
     campfire: { name: 'Lagerfeuer', description: 'Hält dich warm und macht die Nacht hell.' },
     lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf. Hier schläfst du gut und bleibst wärmer.' },
     hut: { name: 'Hütte', description: 'Ein gemütliches Zuhause. Warme Nächte und der beste Schlaf.' },
+    rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Das Boot braucht Seile.' },
     axe: { name: 'Steinaxt', description: 'Schlägt dir einen Weg durch Dornengestrüpp und bringt mehr Holz von Bäumen.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
     fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
+  stages: { hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte' },
   skills: {
     small_sips: { name: 'Kleine Schlucke', description: 'Dein Wasser sinkt 20 % langsamer.' },
     small_appetite: { name: 'Kleiner Hunger', description: 'Dein Essen sinkt 20 % langsamer.' },
@@ -260,6 +288,20 @@ export const de: Strings = {
       case 'learn': return `Du hast gelernt: ${de.skills[msg.skill].name}.`;
       case 'catch': return 'Du wirfst die Angel aus … und fängst einen Fisch!';
       case 'noBite': return 'Nichts beißt an. Versuch es noch mal!';
+      case 'goalFound': return 'Du findest ein altes Bootswrack am Strand! Vielleicht kannst du es reparieren und wegsegeln.';
+      case 'goalNeeds': {
+        const stage = { hull: 'den Rumpf', mast: 'den Mast', sail: 'das Segel', supplies: 'die Vorräte' }[msg.stage];
+        return `Das Boot braucht ${itemList(msg.left)} für ${stage}.`;
+      }
+      case 'goalGive': return `Du gibst dem Boot ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;
+      case 'goalStage': return {
+        hull: 'Der Rumpf ist fertig! Jetzt braucht das Boot einen Mast.',
+        mast: 'Der Mast steht! Jetzt braucht das Boot ein Segel.',
+        sail: 'Das Segel ist dran! Jetzt pack Essen für die Reise ein.',
+        supplies: 'Die Vorräte sind an Bord. Das Boot ist bereit zum Lossegeln!',
+      }[msg.stage];
+      case 'goalReady': return 'Das Boot ist bereit zum Lossegeln.';
+      case 'sailAway': return 'Du schiebst das Boot in die Wellen und segelst davon!';
       case 'legacy': return msg.text;
     }
   },

@@ -1,3 +1,4 @@
+import { levelDef } from './defs/levels';
 import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { GameMap, Tile } from './map';
 import { DIRS, distanceMap, reachWithBridges } from './pathing';
@@ -30,6 +31,8 @@ const MIN_FAR_SHARE = 0.15;
 const HOME_SPRINGS = 2;
 const SPRINGS = 8;
 const CHESTS = [2, 3, 3];
+/** Regions to put the island's goal in, most wanted first: as far from the start as possible. */
+const GOAL_REGIONS = [2, 1, 0];
 
 /** What grows where, as chance per free cell. */
 const SCATTER: Record<'sand' | 'grass' | 'cave', [ObjectKind, number][]> = {
@@ -53,9 +56,10 @@ const SCATTER: Record<'sand' | 'grass' | 'cave', [ObjectKind, number][]> = {
  * The island has three regions by walking distance from the start: the
  * home coast, then a wall of brambles, the wild forest, then a river, and
  * the far side. Everything can be reached by clearing brambles and
- * building bridges.
+ * building bridges. The island's goal (the old boat) lies on a beach of
+ * the far side.
  */
-export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIGHT): World {
+export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIGHT, goal: ObjectKind = levelDef(1).site): World {
   for (;;) {
     const map = landmass(width, height, rng);
     if (!map) continue;
@@ -65,7 +69,7 @@ export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIG
     connectFloor(map, start);
     const borders = addBorders(map, start);
     if (!borders) continue;
-    const objects = scatterObjects(map, rng, start, borders);
+    const objects = scatterObjects(map, rng, start, borders, goal);
     return { map, start, objects, region: borders.region };
   }
 }
@@ -394,7 +398,13 @@ function cleanRiverBanks(map: GameMap): void {
 
 // ---- Objects ---------------------------------------------------------------------
 
-function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number }, borders: Borders): Map<number, WorldObject> {
+function scatterObjects(
+  map: GameMap,
+  rng: Rng,
+  start: { x: number; y: number },
+  borders: Borders,
+  goal: ObjectKind,
+): Map<number, WorldObject> {
   const objects = new Map<number, WorldObject>(borders.brambles.map((i) => [i, { kind: 'bramble' }]));
   const { region } = borders;
   const forest = valueNoise(map.width, map.height, 6, rng);
@@ -434,10 +444,30 @@ function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number },
     const j = rng.int(0, n);
     [cells[n], cells[j]] = [cells[j], cells[n]];
   }
+
+  // The goal goes first, on a beach by the sea, with room round it so the
+  // big sprite stays clear of trees.
+  const byTheSea = (x: number, y: number) =>
+    map.get(x, y) === Tile.Sand && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.get(x + dx, y + dy) === Tile.Water);
+  let goalAt = -1;
+  for (const r of GOAL_REGIONS) {
+    goalAt = cells.find((i) => {
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      return region[i] === r && byTheSea(x, y) && !objects.has(i) && !nearStart(x, y) && !onBank(x, y) && place(i, goal);
+    }) ?? -1;
+    if (goalAt >= 0) break;
+  }
+  const nearGoal = (x: number, y: number) => {
+    if (goalAt < 0) return false;
+    const gx = goalAt % map.width;
+    return Math.max(Math.abs(x - gx), Math.abs(y - (goalAt - gx) / map.width)) <= 1;
+  };
+
   for (const i of cells) {
     const x = i % map.width;
     const y = (i - x) / map.width;
-    if (!map.isFloor(x, y) || objects.has(i) || nearStart(x, y) || onBank(x, y)) continue;
+    if (!map.isFloor(x, y) || objects.has(i) || nearStart(x, y) || onBank(x, y) || nearGoal(x, y)) continue;
     const tile = map.get(x, y);
     const biome = tile === Tile.Sand ? 'sand' : tile === Tile.Grass ? 'grass' : 'cave';
     const density = biome === 'grass' ? 0.4 + forest(x, y) * 1.2 : 1;
@@ -456,7 +486,7 @@ function scatterObjects(map: GameMap, rng: Rng, start: { x: number; y: number },
   const free = (i: number) => {
     const x = i % map.width;
     const y = (i - x) / map.width;
-    return map.isFloor(x, y) && !objects.has(i) && !nearStart(x, y) && !onBank(x, y);
+    return map.isFloor(x, y) && !objects.has(i) && !nearStart(x, y) && !onBank(x, y) && !nearGoal(x, y);
   };
   const springSpots = cells.filter((i) => free(i) && (map.tiles[i] === Tile.Grass || map.tiles[i] === Tile.CaveFloor));
   let springs = 0;

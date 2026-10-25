@@ -126,3 +126,125 @@ export function bridge(dir: 'ns' | 'ew'): Sprite {
   }
   return s.outline();
 }
+
+/** The stages of the island boat, from the old wreck on the beach to a boat ready to sail. */
+export type BoatStage = 'wreck' | 'hull' | 'mast' | 'sail' | 'ready';
+
+const BOAT_W = 24;
+const BOAT_H = 30;
+const DECK = 19;
+const KEEL = 26;
+
+/** Left and right edge of the hull at row y: a low stern on the left, a raked bow on the right. */
+function hullSpan(y: number): [number, number] {
+  const t = y - DECK;
+  return [Math.round(2 + t * 0.45), Math.round(22 - t * 1.05)];
+}
+
+function drawHull(s: Sprite): void {
+  for (let y = DECK; y <= KEEL; y++) {
+    const [x0, x1] = hullSpan(y);
+    for (let x = x0; x <= x1; x++) {
+      const row = y - DECK;
+      const seam = row % 3 === 2;
+      let c: string = row === 0 ? P.woodLight : seam ? P.woodDark : row < 3 ? P.wood : P.woodDark;
+      if (!seam && row > 0 && x <= x0 + 1) c = P.woodLight;
+      if (!seam && x >= x1 - 1 && row > 0) c = P.woodDeep;
+      if (y === KEEL) c = P.woodDeep;
+      s.set(x, y, c);
+    }
+  }
+  // Pegs along the top plank.
+  for (let x = 5; x <= 19; x += 4) s.set(x, DECK + 1, P.woodCut);
+}
+
+function drawWreck(s: Sprite): void {
+  // A grey keel along the sand and old ribs curving up from it.
+  const [k0, k1] = hullSpan(KEEL);
+  for (let x = k0 - 1; x <= k1 + 3; x++) s.set(x, KEEL, x < k0 + 3 ? P.driftLight : P.driftDark);
+  const ribs = [[5, DECK], [9, DECK + 1], [13, DECK - 1], [17, DECK + 3]];
+  for (const [rx, top] of ribs) {
+    for (let y = top; y < KEEL; y++) {
+      const [x0, x1] = hullSpan(y);
+      const bend = Math.round((KEEL - y) * 0.15);
+      s.set(Math.min(Math.max(rx - bend, x0), x1), y, y < top + 2 ? P.driftLight : P.drift);
+    }
+  }
+  // Tall stern and bow posts.
+  for (let y = DECK - 3; y < KEEL; y++) s.set(2 + Math.round((y - DECK + 3) * 0.3), y, y < DECK ? P.driftLight : P.drift);
+  for (let y = DECK - 1; y < KEEL; y++) s.set(23 - Math.round((y - DECK + 1) * 0.6), y, P.driftDark);
+}
+
+function drawMast(s: Sprite): void {
+  for (let y = 3; y < DECK; y++) {
+    s.set(11, y, P.woodLight);
+    s.set(12, y, P.wood);
+  }
+  s.set(11, 2, P.woodDark);
+  s.set(12, 2, P.woodDark);
+  // Boom along the bottom of the sail.
+  for (let x = 12; x <= 20; x++) s.set(x, 17, x === 20 ? P.woodDark : P.wood);
+}
+
+/** Ropes from the mast top to bow and stern; drawn after the outline so they stay thin. */
+function drawRigging(s: Sprite): void {
+  const top: [number, number] = [11, 4];
+  for (const [ex, ey] of [[2, DECK - 1], [22, DECK - 1]] as const) {
+    const n = Math.max(Math.abs(ex - top[0]), Math.abs(ey - top[1]));
+    for (let i = 1; i < n; i++) {
+      const x = Math.round(top[0] + ((ex - top[0]) * i) / n);
+      const y = Math.round(top[1] + ((ey - top[1]) * i) / n);
+      if (!s.get(x, y) || s.get(x, y) === P.outline) s.set(x, y, P.strawDeep);
+    }
+  }
+}
+
+function drawSail(s: Sprite): void {
+  // A triangle of woven, dried palm leaves: light near the mast, darker at the outer edge.
+  for (let y = 4; y <= 16; y++) {
+    const right = 13 + Math.round((y - 4) * 0.62);
+    for (let x = 13; x <= right; x++) {
+      const weave = (x + y) % 3 === 0;
+      const edge = x === right;
+      s.set(x, y, edge ? P.strawDark : weave ? P.strawDark : x < 15 ? P.strawLight : P.straw);
+    }
+  }
+}
+
+function drawSupplies(s: Sprite, frame: 0 | 1): void {
+  // A small crate and coconuts on the deck at the stern.
+  for (let y = 15; y <= 18; y++) {
+    for (let x = 3; x <= 7; x++) s.set(x, y, y === 15 ? P.woodLight : x === 5 ? P.woodDark : P.wood);
+  }
+  for (const [x, y] of [[8, 18], [9, 17], [9, 18]]) s.set(x, y, P.coconutLight);
+  // A red pennant at the mast top that waves.
+  const rows = frame === 0 ? [[13, 2], [13, 3], [14, 2], [14, 3], [15, 2], [16, 2]] : [[13, 2], [13, 3], [14, 3], [15, 3], [16, 4], [15, 2]];
+  for (const [x, y] of rows) s.set(x, y, y === 2 && x === 13 ? P.berryLight : P.berry);
+}
+
+function boatSprite(name: string, stage: BoatStage, frame: 0 | 1 = 0): Sprite {
+  const s = new Sprite(name, BOAT_W, BOAT_H);
+  if (stage === 'wreck') {
+    drawWreck(s);
+  } else {
+    drawHull(s);
+    if (stage !== 'hull') drawMast(s);
+    if (stage === 'sail' || stage === 'ready') drawSail(s);
+    if (stage === 'ready') drawSupplies(s, frame);
+  }
+  s.outline();
+  if (stage !== 'wreck' && stage !== 'hull') drawRigging(s);
+  return s.shadow(12, KEEL + 1.5, 11, 1.5);
+}
+
+/** The boat in each stage; the ready boat has two frames for its pennant. */
+export function boat(): Sprite[] {
+  return [
+    boatSprite('boat_wreck', 'wreck'),
+    boatSprite('boat_hull', 'hull'),
+    boatSprite('boat_mast', 'mast'),
+    boatSprite('boat_sail', 'sail'),
+    boatSprite('boat_ready', 'ready', 0),
+    boatSprite('boat_ready_2', 'ready', 1),
+  ];
+}

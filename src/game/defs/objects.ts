@@ -11,7 +11,8 @@ export type ObjectKind =
   | 'log' | 'log_pile' | 'log_driftwood'
   | 'chest_closed' | 'chest_open' | 'spring'
   | 'campfire' | 'lean_to' | 'hut'
-  | 'bramble' | 'bridge_ns' | 'bridge_ew';
+  | 'bramble' | 'bridge_ns' | 'bridge_ew'
+  | 'boat_wreck' | 'boat_hull' | 'boat_mast' | 'boat_sail' | 'boat_ready';
 
 export interface Yield {
   item: ItemId;
@@ -51,6 +52,8 @@ export interface ObjectDef {
   frames?: string[];
   /** Built over river cells rather than on the ground. */
   bridge?: true;
+  /** The island's goal (see levels.ts): walking into it hands over materials. */
+  goal?: true;
 }
 
 const def = (d: ObjectDef) => d;
@@ -125,6 +128,11 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   }),
   bridge_ns: def({ kind: 'bridge_ns', walkable: true, bridge: true }),
   bridge_ew: def({ kind: 'bridge_ew', walkable: true, bridge: true }),
+  boat_wreck: def({ kind: 'boat_wreck', goal: true }),
+  boat_hull: def({ kind: 'boat_hull', goal: true }),
+  boat_mast: def({ kind: 'boat_mast', goal: true }),
+  boat_sail: def({ kind: 'boat_sail', goal: true }),
+  boat_ready: def({ kind: 'boat_ready', goal: true, frames: ['boat_ready', 'boat_ready_2'] }),
 };
 
 export interface WorldObject {

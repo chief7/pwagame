@@ -2,6 +2,7 @@ import { facingDelta, facingFor, PLAYER_ID, type Animal, type Player } from './a
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMAL_KINDS, ANIMALS, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
+import { goalProgress, levelDef, type GoalStage } from './defs/levels';
 import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPES, type RecipeId } from './defs/recipes';
 import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
@@ -45,7 +46,7 @@ const THICK_SKIN = 0.7;
 const GREEN_THUMB = 0.7;
 /** Extra cells the explorer sees at night with Night eyes. */
 const NIGHT_EYES = 2;
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -55,6 +56,18 @@ export interface LogEntry {
 }
 
 export type TravelResult = 'moved' | 'arrived' | 'blocked';
+
+type Items = Partial<Record<ItemId, number>>;
+
+/** How far the island's goal has come, for the goal card in the Build panel. */
+export type GoalState =
+  /** An island from before goals: it has no goal object. */
+  | { state: 'missing' }
+  | { state: 'find' }
+  /** Building stage `index` of `count` on the goal object `obj`; `left` is what it still needs. */
+  | { state: 'build'; obj: ObjectKind; stage: GoalStage; index: number; count: number; left: Items }
+  | { state: 'ready' }
+  | { state: 'sailed' };
 
 /**
  * What happened during a turn, in order, for the UI to animate. `late`
@@ -91,6 +104,11 @@ export interface SaveData {
   inventory: Partial<Record<ItemId, number>>;
   xp: number;
   skills: SkillId[];
+  /** The island's number; each has its own goal (see levels.ts). */
+  level: number;
+  /** What the explorer has handed over for the goal's current stage. */
+  goalGiven: Items;
+  sailed: boolean;
   warned: NeedId[];
   log: LogEntry[];
 }
@@ -110,6 +128,10 @@ export class Game {
   /** Experience from gathering, building and fishing; it earns skill points. */
   xp = 0;
   skills = new Set<SkillId>();
+  level = 1;
+  goalGiven: Items = {};
+  /** The explorer left the island on the finished goal. */
+  sailed = false;
   turn = 0;
   log: LogEntry[] = [];
   sleeping = false;
@@ -118,6 +140,8 @@ export class Game {
   /** Events since the UI last called takeEvents(). */
   private events: GameEvent[] = [];
   private animalsActing = false;
+  /** The explorer walked into the finished goal: the UI asks whether to set sail. */
+  private sailAsked = false;
 
   constructor(seed = (Math.random() * 2 ** 32) >>> 0, save?: SaveData) {
     this.seed = seed;
@@ -137,6 +161,9 @@ export class Game {
       this.inventory = Inventory.from(save.inventory);
       this.xp = save.xp;
       this.skills = new Set(save.skills.filter((id) => id in SKILLS));
+      this.level = save.level;
+      this.goalGiven = save.goalGiven;
+      this.sailed = save.sailed;
       this.turn = save.turn;
       this.nextId = save.nextId;
       this.warned = new Set(save.warned);
@@ -268,6 +295,41 @@ export class Game {
       return OBJECTS[recipe.builds].bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
     return null;
+  }
+
+  /** Where the island's goal stands, or -1 on islands from before goals. */
+  private goalCell(): number {
+    for (const [i, obj] of this.objects) if (OBJECTS[obj.kind].goal) return i;
+    return -1;
+  }
+
+  goal(): GoalState {
+    if (this.sailed) return { state: 'sailed' };
+    const i = this.goalCell();
+    if (i < 0) return { state: 'missing' };
+    if (!this.map.explored[i]) return { state: 'find' };
+    const def = levelDef(this.level);
+    const obj = this.objects.get(i)!.kind;
+    const done = goalProgress(def, obj);
+    if (done >= def.stages.length) return { state: 'ready' };
+    const stage = def.stages[done];
+    return { state: 'build', obj, stage, index: done, count: def.stages.length, left: this.goalLeft(stage) };
+  }
+
+  private goalLeft(stage: GoalStage): Items {
+    const left: Items = {};
+    for (const [item, n] of Object.entries(stage.cost) as [ItemId, number][]) {
+      const still = n - (this.goalGiven[item] ?? 0);
+      if (still > 0) left[item] = still;
+    }
+    return left;
+  }
+
+  /** True once after the explorer walked into the finished goal. */
+  takeSailRequest(): boolean {
+    const asked = this.sailAsked;
+    this.sailAsked = false;
+    return asked;
   }
 
   /** Hand over (and forget) everything that happened since the last call. */
@@ -404,6 +466,15 @@ export class Game {
     return true;
   }
 
+  /** Leave the island on the finished goal. There is no next island yet, so play can go on here. */
+  sail(): boolean {
+    if (!this.sailed && this.goal().state !== 'ready') return false;
+    this.sailed = true;
+    this.emit({ type: 'fade' });
+    this.message({ key: 'sailAway' }, 'good');
+    return true;
+  }
+
   /** Spend skill points on a skill. Takes no time. */
   learn(id: SkillId): boolean {
     if (this.has(id)) return false;
@@ -463,6 +534,7 @@ export class Game {
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
 
     if (def.drink) return this.drink(def.drink, { key: 'drink' });
+    if (def.goal) return this.workOnGoal(x, y, obj);
 
     const gather = def.gather;
     if (!gather) {
@@ -503,6 +575,46 @@ export class Game {
       obj.kind = after.becomes;
       this.emit({ type: 'sparkle', x, y });
     } else obj.readyAt = this.turn + Math.round(after.regrow * (this.has('green_thumb') ? GREEN_THUMB : 1));
+    return true;
+  }
+
+  /**
+   * Hand the goal everything its current stage still needs from the bag.
+   * When the stage is complete the goal turns into its next form. Walking
+   * into the finished goal asks to set sail instead.
+   */
+  private workOnGoal(x: number, y: number, obj: WorldObject): boolean {
+    const def = levelDef(this.level);
+    const done = goalProgress(def, obj.kind);
+    if (done >= def.stages.length) {
+      this.sailAsked = true;
+      this.message({ key: 'goalReady' }, 'good');
+      return false;
+    }
+    const stage = def.stages[done];
+    const given: [ItemId, number][] = [];
+    for (const [item, still] of Object.entries(this.goalLeft(stage)) as [ItemId, number][]) {
+      const n = Math.min(still, this.inventory.count(item));
+      if (n <= 0) continue;
+      this.inventory.take(item, n);
+      this.goalGiven[item] = (this.goalGiven[item] ?? 0) + n;
+      given.push([item, n]);
+      this.emit({ type: 'float', x, y, amount: -n, what: { item }, tone: 'info' });
+    }
+    const left = Object.entries(this.goalLeft(stage)) as [ItemId, number][];
+    if (!given.length) {
+      this.message({ key: 'goalNeeds', stage: stage.id, left }, 'info');
+      return false;
+    }
+    this.gainXp(given.reduce((sum, [, n]) => sum + n, 0), x, y);
+    if (left.length) {
+      this.message({ key: 'goalGive', given, left }, 'good');
+      return true;
+    }
+    obj.kind = stage.becomes;
+    this.goalGiven = {};
+    this.emit({ type: 'sparkle', x, y });
+    this.message({ key: 'goalStage', stage: stage.id }, 'good');
     return true;
   }
 
@@ -633,7 +745,10 @@ export class Game {
     if (this.turn % RESPAWN_EVERY === 0) this.topUpAnimals();
 
     if (this.needs.health <= 0) this.faint();
+    const goal = this.goalCell();
+    const known = goal >= 0 && this.map.explored[goal] === 1;
     this.updateFov();
+    if (goal >= 0 && !known && this.map.explored[goal]) this.message({ key: 'goalFound', obj: this.objects.get(goal)!.kind }, 'good');
   }
 
   private warnAboutNeeds(): void {
@@ -922,6 +1037,9 @@ export class Game {
       inventory: this.inventory.toJSON(),
       xp: this.xp,
       skills: [...this.skills],
+      level: this.level,
+      goalGiven: { ...this.goalGiven },
+      sailed: this.sailed,
       warned: [...this.warned],
       log: this.log.slice(-30),
     };
@@ -935,7 +1053,11 @@ export class Game {
     }
     if (data.v === 2) {
       // Version 2 had no experience or skills yet.
-      data = { ...data, v: SAVE_VERSION, xp: 0, skills: [] };
+      data = { ...data, v: 3, xp: 0, skills: [] };
+    }
+    if (data.v === 3) {
+      // Version 3 had no island goal. Its island has no boat either (goal() says 'missing').
+      data = { ...data, v: SAVE_VERSION, level: 1, goalGiven: {}, sailed: false };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

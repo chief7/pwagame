@@ -1,5 +1,6 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
+import type { StageId } from './defs/levels';
 import type { ObjectKind } from './defs/objects';
 import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
@@ -53,6 +54,16 @@ export type Msg =
   | { key: 'learn'; skill: SkillId }
   | { key: 'catch' }
   | { key: 'noBite' }
+  /** The explorer first sees the island's goal. */
+  | { key: 'goalFound'; obj: ObjectKind }
+  /** Walked into the goal with nothing it needs. */
+  | { key: 'goalNeeds'; stage: StageId; left: [ItemId, number][] }
+  | { key: 'goalGive'; given: [ItemId, number][]; left: [ItemId, number][] }
+  /** A stage of the goal is finished. */
+  | { key: 'goalStage'; stage: StageId }
+  /** Walked into the finished goal. */
+  | { key: 'goalReady' }
+  | { key: 'sailAway' }
   /** A line from a save made before messages were data; shown as it is. */
   | { key: 'legacy'; text: string };
 

@@ -249,6 +249,8 @@ function afterTurn(): void {
   requestFrame();
   updateHud();
   saveSoon();
+  // Walking into the finished boat asks whether to leave (or shows the end again).
+  if (game.takeSailRequest()) openSheet(game.sailed ? 'end' : 'sail');
 }
 
 function run(cmd: Command): void {
@@ -265,7 +267,7 @@ function run(cmd: Command): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills';
+type SheetKind = 'bag' | 'build' | 'skills' | 'sail' | 'end';
 let sheetKind: SheetKind = 'bag';
 let confirmNewIsland = false;
 const icons = new Map<string, string>();
@@ -304,9 +306,13 @@ function row(image: string, title: string, note: Node | string, action?: HTMLBut
 
 function renderSheet(): void {
   const words = t();
-  ui.sheetTitle.textContent = { bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills }[sheetKind];
+  ui.sheetTitle.textContent = {
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, sail: words.ui.sailTitle, end: words.ui.endTitle,
+  }[sheetKind];
   const rows = el('div', { className: 'rows' });
-  if (sheetKind === 'skills') {
+  if (sheetKind === 'sail' || sheetKind === 'end') {
+    renderVoyage(rows);
+  } else if (sheetKind === 'skills') {
     renderSkills(rows);
   } else if (sheetKind === 'bag') {
     const entries = game.inventory.entries();
@@ -324,6 +330,7 @@ function renderSheet(): void {
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), button));
     }
   } else {
+    rows.append(goalCard());
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
       const problem = game.buildProblem(id);
@@ -334,16 +341,7 @@ function renderSheet(): void {
           afterTurn();
         }
       });
-      const costs = el('div', { className: 'costs' });
-      for (const [item, need] of Object.entries(game.recipeCost(id)) as [ItemId, number][]) {
-        const have = game.inventory.count(item);
-        costs.append(
-          el('span', { className: `cost${have < need ? ' missing' : ''}`, title: words.itemCount(item, need) }, [
-            el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, need) }),
-            `${have}/${need}`,
-          ]),
-        );
-      }
+      const costs = costList(game.recipeCost(id));
       const { name, description } = words.recipes[id];
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
@@ -369,17 +367,92 @@ function renderSheet(): void {
         renderSheet();
         return;
       }
-      game = new Game();
-      anim.consume([{ type: 'fade', late: false }], performance.now(), game.player.id);
-      closeSheet();
-      afterTurn();
-      saveNow();
+      startNewIsland();
     });
     const lang = el('button', { type: 'button', className: 'wide lang-switch' }, langButtonLabel());
     lang.addEventListener('click', switchLang);
     foot.append(change, fresh, lang);
   }
   ui.sheetBody.replaceChildren(rows, foot);
+}
+
+function startNewIsland(): void {
+  game = new Game();
+  anim.consume([{ type: 'fade', late: false }], performance.now(), game.player.id);
+  closeSheet();
+  afterTurn();
+  saveNow();
+}
+
+/** Item icons with "have/need" counts; red where the bag has too few. */
+function costList(cost: Partial<Record<ItemId, number>>): HTMLElement {
+  const words = t();
+  const costs = el('div', { className: 'costs' });
+  for (const [item, need] of Object.entries(cost) as [ItemId, number][]) {
+    const have = game.inventory.count(item);
+    costs.append(
+      el('span', { className: `cost${have < need ? ' missing' : ''}`, title: words.itemCount(item, need) }, [
+        el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, need) }),
+        `${have}/${need}`,
+      ]),
+    );
+  }
+  return costs;
+}
+
+/** The island goal at the top of the Build panel: what to do next for the boat. */
+function goalCard(): HTMLElement {
+  const words = t();
+  const goal = game.goal();
+  const note = el('div', {});
+  const say = (text: string) => note.append(el('span', { className: 'row-note', textContent: text }));
+  let sprite = 'boat_wreck';
+  switch (goal.state) {
+    case 'missing': say(words.ui.goalMissing); break;
+    case 'find': say(words.ui.goalFind); break;
+    case 'build':
+      sprite = goal.obj;
+      note.append(el('span', { className: 'row-note goal-step', textContent: words.ui.goalStep(goal.index, goal.count, goal.stage.id) }));
+      note.append(costList(goal.left));
+      say(words.ui.goalHint);
+      break;
+    case 'ready': sprite = 'boat_ready'; say(words.ui.goalReady); break;
+    case 'sailed': sprite = 'boat_ready'; say(words.ui.goalSailed); break;
+  }
+  const card = row(icon(sprite), words.ui.goalTitle, note);
+  card.classList.add('goal');
+  return card;
+}
+
+/** "Set sail?" before leaving, and the end screen after. */
+function renderVoyage(rows: HTMLElement): void {
+  const words = t();
+  const leaving = sheetKind === 'sail';
+  rows.append(
+    el('div', { className: 'voyage' }, [
+      el('img', { src: icon('boat_ready'), alt: '' }),
+      el('p', { textContent: leaving ? words.ui.sailText : words.ui.endText }),
+    ]),
+  );
+  const foot = el('div', { className: 'sheet-foot' });
+  if (leaving) {
+    const go = el('button', { type: 'button', className: 'primary', textContent: words.ui.setSail });
+    go.addEventListener('click', () => {
+      if (!game.sail()) return closeSheet();
+      afterTurn();
+      openSheet('end');
+    });
+    const wait = el('button', { type: 'button', textContent: words.ui.notYet });
+    wait.addEventListener('click', closeSheet);
+    foot.append(wait, go);
+  } else {
+    const stay = el('button', { type: 'button', textContent: words.ui.stay });
+    stay.addEventListener('click', closeSheet);
+    const fresh = el('button', { type: 'button', className: 'primary', textContent: words.ui.newIsland });
+    fresh.addEventListener('click', startNewIsland);
+    foot.append(stay, fresh);
+  }
+  rows.append(foot);
 }
 
 /** XP bar, points to spend, and each path's skills in the order they're learned. */

@@ -20,7 +20,13 @@ function everyMessage(): Msg[] {
     { key: 'notSleepy' }, { key: 'fallAsleep' }, { key: 'dozeOff' }, { key: 'notThirsty' }, { key: 'drink' },
     { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
     { key: 'needFire' }, { key: 'needPoints' }, { key: 'skillPoint' }, { key: 'catch' }, { key: 'noBite' },
+    { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalReady' }, { key: 'sailAway' },
+    { key: 'goalGive', given: [['wood', 1]], left: [['wood', 19], ['stone', 6]] },
+    { key: 'goalGive', given: [['rope', 2], ['wood', 3]], left: [['rope', 1]] },
   ];
+  for (const stage of ['hull', 'mast', 'sail', 'supplies'] as const) {
+    msgs.push({ key: 'goalStage', stage }, { key: 'goalNeeds', stage, left: [['coconut', 4], ['cooked_fish', 1]] });
+  }
   for (const skill of SKILL_IDS) msgs.push({ key: 'needSkill', skill }, { key: 'learn', skill });
   for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
   for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need });

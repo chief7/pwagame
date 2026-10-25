@@ -57,6 +57,12 @@ npm run preview   # serve the build (service worker is only active here)
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
   campfire (Build panel).
+- **Island goal:** an old boat wreck lies on a beach on the far side.
+  Repair it in four steps (hull, mast, sail, supplies) by walking into it
+  with what it needs; you can bring things in as many trips as you like.
+  Rope for the mast and sail is twisted from leaves (Build panel). The Build
+  panel shows the next step. When the boat is ready, walk into it to set
+  sail. The next island is not built yet, so you can stay or start a new one.
 - **Saving:** the game saves itself to the browser after every action.
 
 ## Controls

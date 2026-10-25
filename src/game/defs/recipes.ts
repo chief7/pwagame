@@ -6,7 +6,7 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'bridge' | 'fishing_rod' | 'cooked_fish';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish';
 
 export type Recipe = {
   id: RecipeId;
@@ -22,6 +22,7 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   lean_to: { id: 'lean_to', builds: 'lean_to', cost: { wood: 4, leaves: 5 } },
   hut: { id: 'hut', builds: 'hut', cost: { wood: 10, leaves: 8, stone: 4 } },
   axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
+  rope: { id: 'rope', makes: 'rope', cost: { leaves: 2 } },
   // Faces the way the explorer does; game.ts turns it into bridge_ew when needed.
   bridge: { id: 'bridge', builds: 'bridge_ns', cost: { wood: 6, leaves: 3 } },
   fishing_rod: { id: 'fishing_rod', makes: 'fishing_rod', cost: { wood: 3, leaves: 2 }, skill: 'fishing_rod' },

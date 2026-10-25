@@ -63,7 +63,7 @@ flowchart TB
     inv["inventory.ts"]
     world["worldgen.ts"]
     support["map.ts · fov.ts · pathing.ts · rng.ts · actors.ts"]
-    defs["defs/<br/>items · objects · recipes · animals · skills"]
+    defs["defs/<br/>items · objects · recipes · animals · skills · levels"]
   end
   subgraph Art["Sprite layer (pure data)"]
     sprites["sprites/<br/>pixel art generated in code"]
@@ -83,7 +83,7 @@ flowchart TB
 | Module | Responsibility |
 |---|---|
 | `src/game/game.ts` | The `Game` class. Holds all state. Runs actions and the turn. Sends events. Saves and loads. |
-| `src/game/defs/*.ts` | Data registries for items, world objects, recipes, animals and skills. |
+| `src/game/defs/*.ts` | Data registries for items, world objects, recipes, animals, skills and levels (island goals). |
 | `src/game/needs.ts` | The five needs and how one turn changes them. |
 | `src/game/clock.ts` | Time of day, daylight, day and night phases. |
 | `src/game/inventory.ts` | What the player carries (a count per item). |
@@ -96,7 +96,7 @@ flowchart TB
 | `src/ui/renderer.ts` | Draws terrain, objects, animals, the player, night light and effects on a canvas. |
 | `src/ui/animator.ts` | Turns game events into timed animations. |
 | `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
-| `src/main.ts` | Connects everything: HUD, Bag, Build and Skills panels, touch and keys, render loop, autosave, language switch. |
+| `src/main.ts` | Connects everything: HUD, Bag, Build and Skills panels, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
 | `src/game/messages.ts` | The `Msg` type: every log message as data (a key and its arguments). |
 | `src/i18n/*.ts` | All text the player sees, in English (`en.ts`) and German (`de.ts`). |
 | `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
@@ -163,6 +163,7 @@ All actions return `true` when time passed and `false` when nothing happened.
 | `eat(item)` | Eats one food item from the bag. |
 | `build(recipe)` | Builds in front of the player, or makes an item for the bag. |
 | `learn(skill)` | Spends skill points on a skill. No turn passes. |
+| `sail()` | Leaves the island on the finished goal (see 4.12). |
 | `sleep()` | Sleeps for many turns until a stop condition (see 4.4). |
 
 What `move` does when the target cell is not free:
@@ -170,6 +171,7 @@ What `move` does when the target cell is not free:
 1. **Animal there:** shoo it. The animal runs away for 8 turns (calm animals do not run).
 2. **Solid object there:** interact with it:
    - Spring: drink.
+   - The island goal (the boat): give it materials (see 4.12).
    - Object with `gather`: gather from it. If it `needs` a tool that the
      player does not carry (bramble: axe), say so. No turn passes.
    - Other object: show its name. No turn passes.
@@ -372,6 +374,7 @@ The player gets XP (experience):
 | Gather from an object | 1 |
 | Build or make a recipe | 1 for each item in its cost (campfire 5, hut 22, cook a fish 1) |
 | Catch a fish | 2 |
+| Give an item to the island goal (the boat) | 1 for each item |
 
 Each XP gain sends a `float` event (`what: { xp: true }`) next to the other
 floating text.
@@ -414,6 +417,45 @@ path. The Skills button shows a star when there are free points.
   at a campfire) makes a cooked fish: +40 Food, +10 Energy. This is the best
   food on the island (coconut 10, berries 7, mushroom 9), so fishing is the
   way to stay well fed.
+
+### 4.12 The island goal (levels)
+
+Each island is a **level** with one big goal: something the player builds
+in stages to leave the island. `src/game/defs/levels.ts` (`LEVELS`) holds
+each level's goal object (`site`) and its stages. Only level 1 exists now.
+
+Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
+
+| Stage | Cost | The boat becomes |
+|---|---|---|
+| Hull | 20 wood, 6 stone | `boat_hull` |
+| Mast | 10 wood, 6 rope | `boat_mast` |
+| Sail | 12 leaves, 3 rope | `boat_sail` |
+| Supplies | 4 coconuts, 3 cooked fish | `boat_ready` |
+
+Rope is a recipe: 2 leaves make 1 rope. All stages together need 30 wood,
+6 stone, 30 leaves, 4 coconuts and 3 cooked fish (about three huts, and
+fishing).
+
+How it works:
+
+- When the boat first comes into view, the log says so (`goalFound`).
+- Walking into the boat gives it everything from the bag that the current
+  stage still needs. Each item floats as a minus number and gives 1 XP.
+  `game.goalGiven` stores what the stage already got, so the player can
+  bring things in many trips. If the bag has nothing it needs, the log
+  lists what is missing (`goalNeeds`) and no turn passes.
+- When a stage is complete, the object becomes the next kind, with
+  sparkles. Objects with `goal: true` are goal objects; the stage is
+  found from the kind (`goalProgress()`), so it is not stored separately.
+- Walking into the finished boat sets a flag that the UI reads with
+  `game.takeSailRequest()`. The UI asks "Set sail?". `game.sail()` sets
+  `sailed`, sends a `fade` and the log line `sailAway`. The end screen says
+  that the next island comes soon. The player can stay on the island or
+  start a new island.
+- `game.goal()` gives the state for the goal card at the top of the Build
+  panel: `missing` (an old island without a boat), `find`, `build` (with
+  the stage and what it still needs), `ready` or `sailed`.
 
 ---
 
@@ -467,6 +509,10 @@ Steps:
    around the new object still touch each other. Then the generator adds 8
    springs (forest or cave, at least 2 on the home coast) and 8 chests
    (2 home, 3 forest, 3 far side; 10 or more cells from the start).
+   The island goal (the boat wreck) is placed first, before the scatter: on
+   a sand cell next to the sea, in the far side if possible
+   (`GOAL_REGIONS`: far side, then forest, then home coast). Its 8
+   neighbour cells stay free, so the big sprite is not hidden by trees.
 8. **Animals.** `Game` adds each animal kind up to its population, on its
    habitat, 8 or more cells from the start. Animals in other regions stay
    there.
@@ -487,6 +533,7 @@ sprite. The sprite test fails if a sprite is missing.
 | Items | `src/game/defs/items.ts` (`ITEMS`) | `item_<id>` | Bag panel, recipes, gathering, eating |
 | World objects | `src/game/defs/objects.ts` (`OBJECTS`) | `<kind>`, plus `depletedSprite` and `frames` if set | World, gathering, shelter, fire |
 | Recipes | `src/game/defs/recipes.ts` (`RECIPES`) | the sprite of the object it builds | Build panel |
+| Levels | `src/game/defs/levels.ts` (`LEVELS`) | the sprites of the goal objects | Island goal (see 4.12) |
 | Animals | `src/game/defs/animals.ts` (`ANIMALS`) | `animal_<kind>` | Spawning, animal behaviour |
 
 The registries hold no text. Names, gather texts and other words for each
@@ -518,6 +565,7 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `lightRadius` | Lights cells at night. |
 | `frames` | Sprite names for an animation (2 frames, 220 ms each). |
 | `bridge` | Built across river cells (see 4.8). The player can walk on it. |
+| `goal` | The island goal: walking into it gives it materials (see 4.12). |
 
 Also add the kind to the `ObjectKind` type.
 
@@ -556,10 +604,11 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish (food); wood, leaves, stone, fish (materials; fish is raw); stone axe, fishing rod (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
+| Items | coconut, berries, mushroom, cooked fish (food); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
 | Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend, wild sense |
+| Levels | 1: repair the boat (hull, mast, sail, supplies) |
 | Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves) |
 
 ---
@@ -577,7 +626,7 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 - `outline()` adds a 1 px dark outline. `shadow()` adds a soft ground shadow.
   Call `outline()` first.
 - Sizes: terrain tiles are 16 × 16. Most objects are 16 × 16. Palms and trees
-  are 24 × 32, the hut 24 × 28 and the lean-to 20 × 20. All are drawn
+  are 24 × 32, the boat 24 × 30, the hut 24 × 28 and the lean-to 20 × 20. All are drawn
   bottom-centre on their cell, so tall sprites overlap the cell above.
 - **Transition tiles** (shore, grass edges and river banks) are 12 tiles per
   set: 4 edges, 4 outer corners and 4 inner corners. `transitionTileName()`
@@ -651,12 +700,14 @@ Auto-walk (travel and hold) stops when:
   island starts.
 - The save holds: seed, random number state, turn, tiles, explored cells,
   objects, animals, player, home, needs, inventory, XP, learned skills,
+  level, what the goal's stage already got (`goalGiven`), `sailed`,
   warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 3. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 2 saves load
-  with 0 XP and no skills. Version 1 saves also load: their log lines were
+- `SAVE_VERSION` is 4. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 3 saves load
+  at level 1, but their island has no boat: the goal card tells the player
+  to start a new island. Version 2 saves load with 0 XP and no skills. Version 1 saves also load: their log lines were
   English text and become `legacy` messages.
 - The chosen explorer (female or male) is saved as `pwagame.body`.
 - The language is saved as `pwagame.lang`.
@@ -690,7 +741,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach), the island goal (stages, many trips, sailing), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
@@ -724,6 +775,8 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Region sizes | `worldgen.ts` → `HOME_SHARE`, `FOREST_SHARE`, `MIN_FAR_SHARE` | 0.38, 0.7, 0.15 |
 | Springs and chests | `worldgen.ts` → `SPRINGS`, `HOME_SPRINGS`, `CHESTS` | 8, 2, [2, 3, 3] |
 | Bridge span | `pathing.ts` → `BRIDGE_SPAN` | 3 cells |
+| Island goal stages | `levels.ts` → `LEVELS` | see 4.12 |
+| Where the goal goes | `worldgen.ts` → `GOAL_REGIONS` | far side, forest, home |
 | River drink | `game.ts` → `RIVER_DRINK` | 35 |
 | XP per gather, per fish | `game.ts` → `GATHER_XP`, `CATCH_XP` | 1, 2 |
 | Skill point thresholds | `skills.ts` → `FIRST_POINT_XP`, `POINT_XP_STEP` | 10, 5 |
@@ -744,8 +797,15 @@ Also run `npm run build` (typecheck and build) before you commit.
   wander closer to camp later.
 - Animals have no walk frames. They hop when they move. They always face down.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
-- There is no goal or ending yet. The raft sprite exists for a future
-  "build a raft" goal.
+- Only level 1 exists. After the player sails away, there is no next island
+  yet: the player stays on the island or starts a new one. Level 2 needs a
+  new island generator (another biome), and `sail()` must then load it.
+- Islands from saves before version 4 have no boat, so they have no goal.
+- The boat does not move when the player sails. The UI shows a fade and the
+  end screen.
+- Cheeky monkeys can take the coconuts and cooked fish that the player
+  carries for the supplies.
+- The raft sprite is not used.
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
 - The player has no fishing pose. Fishing shows the normal lunge.

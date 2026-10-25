@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildSprites, grassTileName, riverBankTileName, shoreTileName } from '../sprites';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
+import { LEVELS } from './defs/levels';
 import { pointsForXp, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
 import { Tile } from './map';
@@ -64,6 +65,24 @@ describe('generateWorld', () => {
       const where = (kind: string) => [...objects].filter(([, o]) => o.kind === kind).map(([i]) => region[i]);
       expect(where('spring').filter((r) => r === 0).length).toBeGreaterThanOrEqual(2);
       for (const r of [0, 1, 2]) expect(where('chest_closed')).toContain(r);
+    }
+  });
+
+  it('puts one old boat on a far-side beach by the sea, with room round it', () => {
+    for (const { map, objects, region } of worlds) {
+      const boats = [...objects].filter(([, o]) => o.kind === 'boat_wreck');
+      expect(boats).toHaveLength(1);
+      const [i] = boats[0];
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      expect(region[i]).toBe(2);
+      expect(map.get(x, y)).toBe(Tile.Sand);
+      expect([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.get(x + dx, y + dy) === Tile.Water)).toBe(true);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx || dy) expect(objects.has(map.idx(x + dx, y + dy)), `next to the boat at ${x},${y}`).toBe(false);
+        }
+      }
     }
   });
 
@@ -240,6 +259,88 @@ describe('Game: building and sleeping', () => {
     game.sleep();
     expect(game.needs.energy).toBeLessThan(100);
     expect(game.log.at(-1)?.msg).toMatchObject({ key: 'wake', reason: 'cold' });
+  });
+});
+
+describe('Game: the island goal (the boat)', () => {
+  const [hull, mast, sail, supplies] = LEVELS[0].stages;
+
+  it('twists rope from leaves', () => {
+    const game = sandbox(30);
+    game.inventory.add('leaves', 2);
+    expect(game.build('rope')).toBe(true);
+    expect(game.inventory.count('rope')).toBe(1);
+    expect(game.inventory.count('leaves')).toBe(0);
+  });
+
+  it('asks you to find the boat first, and says so when you see it', () => {
+    const game = sandbox(31);
+    expect(game.goal()).toEqual({ state: 'find' });
+    boatNextTo(game);
+    game.map.explored[game.map.idx(game.player.x + 1, game.player.y)] = 0;
+    game.wait();
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalFound', obj: 'boat_wreck' });
+    expect(game.goal()).toMatchObject({ state: 'build', obj: 'boat_wreck', index: 0, count: 4, left: hull.cost });
+  });
+
+  it('takes what it needs from the bag in as many trips as you like', () => {
+    const game = boatNextTo(sandbox(32));
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalNeeds', stage: 'hull', left: [['wood', 20], ['stone', 6]] });
+
+    game.inventory.add('wood', 12);
+    game.inventory.add('coconut', 3);
+    const xp = game.xp;
+    game.takeEvents();
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('wood')).toBe(0);
+    expect(game.inventory.count('coconut')).toBe(3 + 2);
+    expect(game.goalGiven).toEqual({ wood: 12 });
+    expect(game.xp).toBe(xp + 12);
+    expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'float', amount: -12, what: { item: 'wood' } }));
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', given: [['wood', 12]], left: [['wood', 8], ['stone', 6]] });
+
+    game.inventory.add('wood', 30);
+    game.inventory.add('stone', 6);
+    game.move(1, 0);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('boat_hull');
+    expect(game.inventory.count('wood')).toBe(22);
+    expect(game.goalGiven).toEqual({});
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalStage', stage: 'hull' });
+    expect(game.goal()).toMatchObject({ state: 'build', obj: 'boat_hull', index: 1, stage: mast });
+  });
+
+  it('is ready after four stages, then asks to sail, and you can sail away', () => {
+    const game = boatNextTo(sandbox(33));
+    for (const stage of [hull, mast, sail, supplies]) {
+      for (const [item, n] of Object.entries(stage.cost)) game.inventory.add(item as keyof typeof stage.cost, n);
+      expect(game.move(1, 0)).toBe(true);
+    }
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('boat_ready');
+    expect(game.goal()).toEqual({ state: 'ready' });
+    expect(game.takeSailRequest()).toBe(false);
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.takeSailRequest()).toBe(true);
+    expect(game.takeSailRequest()).toBe(false);
+    expect(game.sail()).toBe(true);
+    expect(game.sailed).toBe(true);
+    expect(game.goal()).toEqual({ state: 'sailed' });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway' });
+  });
+
+  it('cannot sail before the boat is ready', () => {
+    const game = boatNextTo(sandbox(34));
+    expect(game.sail()).toBe(false);
+    expect(game.sailed).toBe(false);
+  });
+
+  it('keeps the goal through a save', () => {
+    const game = boatNextTo(sandbox(35));
+    game.inventory.add('wood', 5);
+    game.move(1, 0);
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.goalGiven).toEqual({ wood: 5 });
+    expect(copy.goal()).toMatchObject({ state: 'build', left: { wood: 15, stone: 6 } });
   });
 });
 
@@ -651,6 +752,17 @@ describe('Game: saving', () => {
     expect(game.toSave().v).toBe(SAVE_VERSION);
   });
 
+  it('loads version 3 saves at level 1, on an island without a boat', () => {
+    const save = new Game(15).toSave();
+    const { level: _l, goalGiven: _g, sailed: _s, ...rest } = save;
+    const v3 = { ...rest, v: 3, objects: save.objects.filter(([, kind]) => !kind.startsWith('boat_')) };
+    const game = Game.fromSave(JSON.parse(JSON.stringify(v3)));
+    expect(game.level).toBe(1);
+    expect(game.sailed).toBe(false);
+    expect(game.goal()).toEqual({ state: 'missing' });
+    expect(game.toSave().v).toBe(SAVE_VERSION);
+  });
+
   it('loads version 2 saves with no XP or skills yet, and keeps skills', () => {
     const { xp: _xp, skills: _skills, ...v2 } = { ...new Game(14).toSave(), v: 2 };
     const game = Game.fromSave(JSON.parse(JSON.stringify(v2)));
@@ -713,6 +825,14 @@ function sandbox(seed: number): Game {
 
 function place(game: Game, dx: number, dy: number, kind: Parameters<Game['objects']['set']>[1]['kind']): void {
   game.objects.set(game.map.idx(game.player.x + dx, game.player.y + dy), { kind });
+}
+
+/** Move the island's boat to just east of the explorer, where they can see it. */
+function boatNextTo(game: Game): Game {
+  for (const [i, o] of game.objects) if (o.kind.startsWith('boat_')) game.objects.delete(i);
+  place(game, 1, 0, 'boat_wreck');
+  game.map.explored[game.map.idx(game.player.x + 1, game.player.y)] = 1;
+  return game;
 }
 
 /** A river `width` cells wide just east of the explorer, running north–south. */
