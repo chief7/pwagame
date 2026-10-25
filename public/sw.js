@@ -1,6 +1,6 @@
 // Offline support: network-first for pages (so updates land), cache-first
 // for everything else (Vite's hashed assets never change once built).
-const CACHE = 'pwagame-v1';
+const CACHE = 'pwagame-v2';
 const PRECACHE = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (event) => {

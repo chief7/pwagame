@@ -1,0 +1,79 @@
+import { character } from './characters';
+import { palmTall } from './palms';
+import { PALETTE as P } from './palette';
+import { fromRows, hash2, Sprite, type Color } from './pixel';
+import { water } from './terrain';
+
+// Interface icons and the app icon, in the same pixel style as the world.
+
+/** Globe for the language switch. */
+export function globe(): Sprite {
+  return fromRows('ui_globe', [
+    '................',
+    '................',
+    '.....wwwwww.....',
+    '....wwgggwww....',
+    '...wwggggwwww...',
+    '...wwwgggwwgg...',
+    '..wwwwwgwwgggw..',
+    '..wwwwwwwwggww..',
+    '..wwggwwwwwwww..',
+    '..wwgggwwwwwgw..',
+    '...wwggwwwwgg...',
+    '...wwwgwwwwww...',
+    '....wwwwwwww....',
+    '.....wwwwww.....',
+    '................',
+    '................',
+  ], { '.': null, w: P.water, g: P.leaf }).outline();
+}
+
+function rgb(color: string): [number, number, number, number] {
+  if (color.startsWith('#')) {
+    const n = parseInt(color.slice(1), 16);
+    return [n >> 16, (n >> 8) & 255, n & 255, 1];
+  }
+  const [r, g, b, a = 1] = color.match(/[\d.]+/g)!.map(Number);
+  return [r, g, b, a];
+}
+
+/** Paint `top` over `under`, blending translucent pixels such as shadows. */
+function over(under: Color, top: Color): Color {
+  if (!top) return under;
+  const [r, g, b, a] = rgb(top);
+  if (a >= 1 || !under) return top;
+  const [r0, g0, b0] = rgb(under);
+  const mix = (c: number, c0: number) => Math.round(c * a + c0 * (1 - a)).toString(16).padStart(2, '0');
+  return `#${mix(r, r0)}${mix(g, g0)}${mix(b, b0)}`;
+}
+
+/** Draw `s` onto `into` with its bottom-centre at (cx, bottom). */
+function stamp(into: Sprite, s: Sprite, cx: number, bottom: number): void {
+  const x0 = cx - Math.floor(s.width / 2);
+  const y0 = bottom - s.height;
+  for (let y = 0; y < s.height; y++) {
+    for (let x = 0; x < s.width; x++) into.set(x0 + x, y0 + y, over(into.get(x0 + x, y0 + y), s.get(x, y)));
+  }
+}
+
+/**
+ * App icon: the explorer under a palm on a small island in the sea. The
+ * scene is 32×32; a bigger `size` adds sea around it (for the maskable icon).
+ * Scaled up whole-pixel for the PNG and SVG icons (npm run icons).
+ */
+export function appIcon(size = 32): Sprite {
+  const sea = water();
+  const o = Math.floor((size - 32) / 2);
+  const s = new Sprite(size === 32 ? 'app_icon' : `app_icon_${size}`, size, size).paint((x, y) => sea.get(x % 16, y % 16));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.hypot((x + 0.5 - o - 16) / 14, (y + 0.5 - o - 23) / 7.5);
+      if (d > 1.12) continue;
+      const sandColor = d > 1 ? P.foam : d > 0.86 ? P.sandWet : hash2(x, y, 9) < 0.12 ? P.sandMid : y - o < 19 ? P.sandLight : P.sand;
+      s.set(x, y, sandColor);
+    }
+  }
+  stamp(s, palmTall(), o + 11, o + 27);
+  stamp(s, character('female', 'down'), o + 22, o + 29);
+  return s;
+}

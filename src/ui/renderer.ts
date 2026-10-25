@@ -23,6 +23,8 @@ const FIRE_FRAME_MS = 220;
 /** Night tint; its alpha comes from how dark a cell is. */
 const NIGHT_RGB = '10, 16, 42';
 const NIGHT_MAX = 0.62;
+/** Same pixel font as the page (src/fonts.css). */
+const FONT = "'Pixelify Sans', ui-monospace, Menlo, Consolas, monospace";
 
 interface Baked {
   sprite: Sprite;
@@ -234,7 +236,7 @@ export class Renderer {
 
   private drawFloats(anim: Animator, map: GameMap, o: { x: number; y: number }, now: number): void {
     const { ctx, scale, cell } = this;
-    ctx.font = `bold ${7 * scale}px ui-monospace, Menlo, Consolas, monospace`;
+    ctx.font = `bold ${7 * scale}px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';

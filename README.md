@@ -107,8 +107,12 @@ src/
     palms.ts     palm trees (24×32), with bare versions
     structures.ts campfire (animated), lean-to, hut, bridges
     creatures.ts animals, item icons, raft
+    ui.ts        interface icons (globe) and the app icon
     characters.ts  male and female explorer, 4 facings × idle + 2 walk frames
     gallery.ts   the sprite gallery page
+  fonts/       Pixelify Sans pixel font (OFL), loaded by fonts.css
+scripts/
+  app-icons.mjs  writes the app icons in public/ from the app icon sprite
 public/        manifest, icons, service worker (offline cache)
 ```
 
@@ -118,3 +122,6 @@ Run `npm run dev` and open `/sprites.html` to see every sprite plus a small
 island composed from them. Terrain tiles are 16×16; objects are drawn
 bottom-centre on their tile. `bake()` turns a sprite into a canvas for
 `drawImage` (keep `imageSmoothingEnabled = false` when scaling up).
+
+The app icons in `public/` are made from the `appIcon()` sprite in
+`sprites/ui.ts`. After you change it, run `npm run icons`.

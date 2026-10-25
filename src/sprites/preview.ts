@@ -1,3 +1,4 @@
+import '../fonts.css';
 import { bake, buildSprites, type Sprite } from './index';
 
 // Dev page for reviewing new sprites before they go into the game.
@@ -28,7 +29,7 @@ const style = document.createElement('style');
 style.textContent = `
   :root { color-scheme: dark; --bg: #101418; --panel: #171d22; --border: #27313a; --text: #dcd5c6; --muted: #8a9096; --bad: #ff8a73; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace; }
   main { max-width: 1100px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left)); display: grid; gap: 28px; }
   h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
   .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }

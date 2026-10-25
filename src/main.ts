@@ -26,6 +26,9 @@ const SAVE_KEY = 'pwagame.save';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+// The canvas only uses a web font once it has loaded; ask for the bold face early.
+void document.fonts?.load(`bold 16px 'Pixelify Sans'`);
+
 const canvas = $<HTMLCanvasElement>('view');
 const renderer = new Renderer(canvas);
 const anim = new Animator();
@@ -124,7 +127,7 @@ function applyLang(): void {
   for (const node of document.querySelectorAll<HTMLElement>('[data-t]')) {
     node.textContent = words.ui[node.dataset.t as keyof Strings['ui']] as string;
   }
-  ui.pickerLang.textContent = langButtonLabel();
+  ui.pickerLang.replaceChildren(...langButtonLabel());
   for (const [id, meter] of meters) {
     meter.querySelector('.need-label')!.textContent = words.needs[id];
     meter.setAttribute('aria-label', words.needs[id]);
@@ -132,8 +135,9 @@ function applyLang(): void {
   updateHud();
 }
 
-function langButtonLabel(): string {
-  return `🌐 ${LANGUAGES[otherLang()].name}`;
+/** Globe icon and the name of the other language. */
+function langButtonLabel(): (Node | string)[] {
+  return [el('img', { src: icon('ui_globe'), alt: '' }), LANGUAGES[otherLang()].name];
 }
 
 ui.pickerLang.addEventListener('click', switchLang);
@@ -351,7 +355,7 @@ function renderSheet(): void {
       afterTurn();
       saveNow();
     });
-    const lang = el('button', { type: 'button', className: 'wide', textContent: langButtonLabel() });
+    const lang = el('button', { type: 'button', className: 'wide lang-switch' }, langButtonLabel());
     lang.addEventListener('click', switchLang);
     foot.append(change, fresh, lang);
   }

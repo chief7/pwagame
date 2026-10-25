@@ -1,3 +1,4 @@
+import '../fonts.css';
 import { bake, buildSprites, shoreTileName, spriteGroups, type Sprite } from './index';
 
 // Dev page listing every sprite, plus a little island built from them.
@@ -34,7 +35,7 @@ const PROPS: [string, number, number][] = [
 const css = `
   :root { color-scheme: dark; --bg: #101418; --panel: #171d22; --border: #27313a; --text: #dcd5c6; --muted: #8a9096; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 ui-monospace, Menlo, Consolas, monospace; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace; }
   main { max-width: 960px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left)); display: grid; gap: 28px; }
   h1 { font-size: 20px; margin: 0; }
   h2 { font-size: 13px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }

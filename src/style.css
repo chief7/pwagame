@@ -1,3 +1,5 @@
+@import './fonts.css';
+
 :root {
   color-scheme: dark;
   --bg: #0b0d10;
@@ -29,7 +31,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.35 ui-monospace, Menlo, Consolas, monospace;
+  font: 15px/1.35 'Pixelify Sans', ui-monospace, Menlo, Consolas, monospace;
   overscroll-behavior: none;
   -webkit-user-select: none;
   user-select: none;
@@ -359,8 +361,22 @@ button.primary {
   padding: 16px 8px;
 }
 
-.lang-switch {
+#picker-lang {
   margin-top: 16px;
+}
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.lang-switch img {
+  width: 32px;
+  height: 32px;
+  margin: -8px 0;
+  image-rendering: pixelated;
 }
 
 .choices canvas {
