@@ -63,7 +63,13 @@ npm run preview   # serve the build (service worker is only active here)
   with what it needs; you can bring things in as many trips as you like.
   Rope for the mast and sail is twisted from leaves (Build panel). The Build
   panel shows the next step. When the boat is ready, walk into it to set
-  sail. The next island is not built yet, so you can stay or start a new one.
+  sail to the second island. You keep your bag, XP, skills and needs.
+- **Island 2 (Pine Ridge):** a cold island with a northern forest (spruces,
+  birches, apple trees, ferns) and a mountain of cliffs and scree with snow
+  on the peak. Snow is cold even in the day: bring wood for a fire. Build a
+  signal beacon on the peak in three steps (stone base, wood pile, tinder),
+  then light it so a passing ship takes you on board. The next island is not
+  built yet, so you can stay or start a new one.
 - **Saving:** the game saves itself to the browser after every action.
 
 ## Controls
@@ -116,7 +122,7 @@ src/
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
-    worldgen.ts  island generation: beach, forest, rocky hills and caves, bramble wall, river, scenery
+    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow), bramble wall, river, scenery
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view
     pathing.ts   BFS distance maps (travel, animals, placement), reach across bridgeable rivers

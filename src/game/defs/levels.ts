@@ -6,7 +6,10 @@ import type { ObjectKind } from './objects';
 // start (an old wreck, a broken bridge…); walking into it hands over what it
 // still needs. Stage names and messages live in src/i18n/.
 
-export type StageId = 'hull' | 'mast' | 'sail' | 'supplies';
+export type StageId = 'hull' | 'mast' | 'sail' | 'supplies' | 'base' | 'pyre' | 'tinder';
+export type LevelId = 1 | 2;
+/** How world generation shapes the island: palms and beaches, or forest and mountains. */
+export type Biome = 'tropical' | 'mountain';
 
 export interface GoalStage {
   id: StageId;
@@ -17,7 +20,8 @@ export interface GoalStage {
 }
 
 export interface LevelDef {
-  level: number;
+  level: LevelId;
+  biome: Biome;
   /** The goal object as world generation places it, before any stage is built. */
   site: ObjectKind;
   stages: GoalStage[];
@@ -26,6 +30,7 @@ export interface LevelDef {
 export const LEVELS: LevelDef[] = [
   {
     level: 1,
+    biome: 'tropical',
     site: 'boat_wreck',
     stages: [
       { id: 'hull', cost: { wood: 20, stone: 6 }, becomes: 'boat_hull' },
@@ -34,7 +39,28 @@ export const LEVELS: LevelDef[] = [
       { id: 'supplies', cost: { coconut: 4, cooked_fish: 3 }, becomes: 'boat_ready' },
     ],
   },
+  {
+    // Pine Ridge: a signal beacon on the snowy peak, so a passing ship sees you.
+    level: 2,
+    biome: 'mountain',
+    site: 'beacon_site',
+    stages: [
+      { id: 'base', cost: { stone: 16 }, becomes: 'beacon_base' },
+      { id: 'pyre', cost: { wood: 18, rope: 4 }, becomes: 'beacon_pyre' },
+      { id: 'tinder', cost: { leaves: 12, wood: 4 }, becomes: 'beacon_ready' },
+    ],
+  },
 ];
+
+/** The island after this one, or null on the last island. */
+export function nextLevel(level: number): LevelId | null {
+  return LEVELS.find((l) => l.level === level + 1)?.level ?? null;
+}
+
+/** The level a goal stage belongs to. */
+export function stageLevel(stage: StageId): LevelId {
+  return LEVELS.find((l) => l.stages.some((s) => s.id === stage))!.level;
+}
 
 export function levelDef(level: number): LevelDef {
   return LEVELS.find((l) => l.level === level) ?? LEVELS[0];

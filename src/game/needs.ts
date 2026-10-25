@@ -24,6 +24,8 @@ export interface Conditions {
   thirst?: number;
   hunger?: number;
   chill?: number;
+  /** Extra cold out in the open, day and night (snow on the peaks). */
+  cold?: number;
 }
 
 const RATES = {
@@ -44,7 +46,7 @@ export function warmthTarget(c: Conditions): number {
   if (c.nearFire) return 100;
   const night = 1 - c.daylight;
   const exposure = 1 - c.shelter;
-  return 100 - night * exposure * 95;
+  return Math.max(0, 100 - exposure * (night * 95 + (c.cold ?? 0)));
 }
 
 /** Advance needs by one turn. Mutates and returns `n`. */

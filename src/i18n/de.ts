@@ -1,4 +1,5 @@
 import { dayNumber, minuteOfDay } from '../game/clock';
+import { stageLevel, type StageId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
 import type { AnimalWords, ItemWords, ObjectWords, Strings } from './types';
 
@@ -71,6 +72,7 @@ const ITEM: ItemWords<CountNoun> = {
   axe: { g: 'f', word: 'Steinaxt', plural: 'Steinäxte', short: ['Axt', 'Äxte'] },
   fish: { g: 'm', word: 'Fisch', plural: 'Fische', short: ['Fisch', 'Fische'] },
   cooked_fish: { g: 'm', word: 'Fisch', adj: 'gebraten', plural: 'gebratene Fische', short: ['Bratfisch', 'Bratfische'] },
+  apple: { g: 'm', word: 'Apfel', plural: 'Äpfel', short: ['Apfel', 'Äpfel'] },
   fishing_rod: { g: 'f', word: 'Angelrute', plural: 'Angelruten', short: ['Angel', 'Angeln'] },
   rope: { g: 'n', word: 'Seil', plural: 'Seile', short: ['Seil', 'Seile'] },
 };
@@ -106,6 +108,15 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   boat_mast: { g: 'n', word: 'Boot' },
   boat_sail: { g: 'n', word: 'Boot' },
   boat_ready: { g: 'n', word: 'Boot' },
+  tree_spruce: { g: 'f', word: 'Fichte', gather: 'Du sammelst heruntergefallene Äste' },
+  tree_spruce_snow: { g: 'f', word: 'Fichte', adj: 'verschneit', gather: 'Du schüttelst den Schnee ab und sammelst Äste' },
+  tree_birch: { g: 'f', word: 'Birke', gather: 'Du sammelst heruntergefallene Äste' },
+  tree_apple: { g: 'm', word: 'Apfelbaum', gather: 'Du pflückst Äpfel' },
+  fern: { g: 'm', word: 'Farn', gather: 'Du pflückst ein paar Farnblätter' },
+  beacon_site: { g: 'm', word: 'Steinkreis', adj: 'alt' },
+  beacon_base: { g: 'n', word: 'Leuchtfeuer' },
+  beacon_pyre: { g: 'n', word: 'Leuchtfeuer' },
+  beacon_ready: { g: 'n', word: 'Leuchtfeuer' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -124,6 +135,12 @@ const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }
     hurt: 'Autsch! Eine Wespe sticht dich.', alert: 'Bzzz! Wespen fliegen dir nach. Lauf weg vom Gras!',
   },
   bear: { g: 'm', word: 'Höhlenbär', shoo: 'Der Höhlenbär brummt und tapst davon.', hurt: 'Der Höhlenbär wacht auf und haut nach dir!' },
+  rabbit: { g: 'm', word: 'Hase', shoo: 'Der Hase zuckt mit der Nase und hoppelt davon.' },
+  squirrel: { g: 'n', word: 'Eichhörnchen', shoo: 'Das Eichhörnchen schimpft und flitzt einen Baum hinauf.' },
+  goat: {
+    g: 'f', word: 'Bergziege', shoo: 'Du fuchtelst mit den Armen. Die Ziege meckert und springt über die Felsen davon.',
+    hurt: 'Bums! Die Bergziege stößt dich mit den Hörnern.', alert: 'Eine Bergziege senkt die Hörner und rennt auf dich zu!',
+  },
 };
 
 const NEEDS = { health: 'Leben', food: 'Essen', water: 'Wasser', energy: 'Energie', warmth: 'Wärme' };
@@ -139,6 +156,11 @@ function itemCount(id: keyof typeof ITEM, count: number): string {
 function itemList(items: [keyof typeof ITEM, number][]): string {
   const parts = items.map(([id, n]) => itemCount(id, n));
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} und ${parts.at(-1)}` : parts.join('');
+}
+
+/** The goal of a stage's island: "das Boot", "dem Leuchtfeuer" (both neuter). */
+function goalName(stage: StageId, c: Case): string {
+  return phrase({ g: 'n', word: stageLevel(stage) === 2 ? 'Leuchtfeuer' : 'Boot' }, c, 'the');
 }
 
 function clock(turn: number): string {
@@ -182,20 +204,34 @@ export const de: Strings = {
     skillPoints: (n) => `${n} ${n === 1 ? 'Talentpunkt' : 'Talentpunkte'}`,
     xpToNext: (have, need) => `EP ${have} / ${need} bis zum nächsten Punkt`,
     skillCost: (n) => `Kostet ${n} ${n === 1 ? 'Punkt' : 'Punkte'}`,
-    goalTitle: 'Inselziel: Repariere das Boot',
-    goalFind: 'Finde das alte Boot. Es liegt an einem Strand auf der anderen Seite der Insel.',
     goalMissing: 'Auf dieser Insel gibt es kein Boot. Starte in deiner Tasche eine neue Insel, um eins zu bekommen.',
     goalStep: (index, count, stage) => `Schritt ${index + 1} von ${count}: ${de.stages[stage]}`,
-    goalHint: 'Lauf gegen das Boot, um ihm zu geben, was du dabeihast.',
-    goalReady: 'Das Boot ist fertig! Lauf dagegen, um loszusegeln.',
-    goalSailed: 'Du bist von dieser Insel weggesegelt.',
-    sailTitle: 'Lossegeln?',
-    sailText: 'Das Boot ist fertig. Willst du von der Insel wegsegeln?',
-    setSail: 'Lossegeln!',
     notYet: 'Noch nicht',
     endTitle: 'Geschafft!',
-    endText: 'Du bist von der Insel weggesegelt. Die nächste Insel kommt bald! Bis dahin kannst du hierbleiben oder eine neue Insel starten.',
+    endText: 'Ein Schiff hat dein Leuchtfeuer gesehen und dich an Bord geholt. Die nächste Insel kommt bald! Bis dahin kannst du hierbleiben oder eine neue Insel starten.',
     stay: 'Auf dieser Insel bleiben',
+  },
+  levels: {
+    1: {
+      goalTitle: 'Inselziel: Repariere das Boot',
+      goalFind: 'Finde das alte Boot. Es liegt an einem Strand auf der anderen Seite der Insel.',
+      goalHint: 'Lauf gegen das Boot, um ihm zu geben, was du dabeihast.',
+      goalReady: 'Das Boot ist fertig! Lauf dagegen, um loszusegeln.',
+      goalSailed: 'Du bist von dieser Insel weggesegelt.',
+      sailTitle: 'Lossegeln?',
+      sailText: 'Das Boot ist fertig. Willst du zu einer neuen Insel segeln? Deine Tasche und deine Talente nimmst du mit.',
+      setSail: 'Lossegeln!',
+    },
+    2: {
+      goalTitle: 'Inselziel: Zünde ein Leuchtfeuer an',
+      goalFind: 'Steig auf den Berg. Finde den alten Steinkreis auf dem verschneiten Gipfel.',
+      goalHint: 'Lauf gegen das Leuchtfeuer, um ihm zu geben, was du dabeihast.',
+      goalReady: 'Das Leuchtfeuer ist fertig! Lauf dagegen, um es anzuzünden.',
+      goalSailed: 'Ein Schiff hat dich von dieser Insel abgeholt.',
+      sailTitle: 'Leuchtfeuer anzünden?',
+      sailText: 'Das Leuchtfeuer ist fertig. Willst du es anzünden, damit ein Schiff dich sieht?',
+      setSail: 'Anzünden!',
+    },
   },
   clock,
   needs: NEEDS,
@@ -203,14 +239,14 @@ export const de: Strings = {
     campfire: { name: 'Lagerfeuer', description: 'Hält dich warm und macht die Nacht hell.' },
     lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf. Hier schläfst du gut und bleibst wärmer.' },
     hut: { name: 'Hütte', description: 'Ein gemütliches Zuhause. Warme Nächte und der beste Schlaf.' },
-    rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Das Boot braucht Seile.' },
+    rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Für das Inselziel brauchst du Seile.' },
     axe: { name: 'Steinaxt', description: 'Schlägt dir einen Weg durch Dornengestrüpp und bringt mehr Holz von Bäumen.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
     fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
-  stages: { hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte' },
+  stages: { hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte', base: 'Steinsockel', pyre: 'Holzstoß', tinder: 'Zunder' },
   skills: {
     small_sips: { name: 'Kleine Schlucke', description: 'Dein Wasser sinkt 20 % langsamer.' },
     small_appetite: { name: 'Kleiner Hunger', description: 'Dein Essen sinkt 20 % langsamer.' },
@@ -302,20 +338,32 @@ export const de: Strings = {
       case 'learn': return `Du hast gelernt: ${de.skills[msg.skill].name}.`;
       case 'catch': return 'Du wirfst die Angel aus … und fängst einen Fisch!';
       case 'noBite': return 'Nichts beißt an. Versuch es noch mal!';
-      case 'goalFound': return 'Du findest ein altes Bootswrack am Strand! Vielleicht kannst du es reparieren und wegsegeln.';
+      case 'goalFound': return msg.obj === 'beacon_site'
+        ? 'Du findest einen alten Steinkreis auf dem Gipfel! Ein Leuchtfeuer hier könnte ein Schiff rufen.'
+        : 'Du findest ein altes Bootswrack am Strand! Vielleicht kannst du es reparieren und wegsegeln.';
       case 'goalNeeds': {
-        const stage = { hull: 'den Rumpf', mast: 'den Mast', sail: 'das Segel', supplies: 'die Vorräte' }[msg.stage];
-        return `Das Boot braucht ${itemList(msg.left)} für ${stage}.`;
+        const stage = {
+          hull: 'den Rumpf', mast: 'den Mast', sail: 'das Segel', supplies: 'die Vorräte',
+          base: 'den Steinsockel', pyre: 'den Holzstoß', tinder: 'den Zunder',
+        }[msg.stage];
+        return `${cap(goalName(msg.stage, 'nom'))} braucht ${itemList(msg.left)} für ${stage}.`;
       }
-      case 'goalGive': return `Du gibst dem Boot ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;
+      case 'goalGive': return `Du gibst ${goalName(msg.stage, 'dat')} ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;
       case 'goalStage': return {
         hull: 'Der Rumpf ist fertig! Jetzt braucht das Boot einen Mast.',
         mast: 'Der Mast steht! Jetzt braucht das Boot ein Segel.',
         sail: 'Das Segel ist dran! Jetzt pack Essen für die Reise ein.',
         supplies: 'Die Vorräte sind an Bord. Das Boot ist bereit zum Lossegeln!',
+        base: 'Der Steinsockel ist fertig! Jetzt staple Holz darauf.',
+        pyre: 'Der Holzstoß steht! Jetzt braucht er trockenen Zunder.',
+        tinder: 'Der Zunder ist drin. Das Leuchtfeuer ist bereit zum Anzünden!',
       }[msg.stage];
-      case 'goalReady': return 'Das Boot ist bereit zum Lossegeln.';
-      case 'sailAway': return 'Du schiebst das Boot in die Wellen und segelst davon!';
+      case 'goalReady': return msg.level === 2 ? 'Das Leuchtfeuer ist bereit zum Anzünden.' : 'Das Boot ist bereit zum Lossegeln.';
+      case 'sailAway': return msg.level === 2
+        ? 'Du zündest das Leuchtfeuer an. Rauch steigt hoch in den Himmel, und bald holt dich ein Schiff an Bord!'
+        : 'Du schiebst das Boot in die Wellen und segelst davon!';
+      case 'landIsland': return 'Nach einer langen Fahrt landet dein Boot auf einer neuen Insel. Hohe Bäume und verschneite Berge! Hier ist es kälter.';
+      case 'snowCold': return 'Brr! Der Schnee ist kalt, auch am Tag. Ein Feuer oder ein Unterschlupf hilft hier oben.';
       case 'legacy': return msg.text;
     }
   },

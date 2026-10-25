@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildSprites, grassTileName, riverBankTileName, shoreTileName } from '../sprites';
+import { buildSprites, grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName } from '../sprites';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
+import { ANIMALS } from './defs/animals';
 import { LEVELS } from './defs/levels';
 import { pointsForXp, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
@@ -9,7 +10,7 @@ import { Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
 import { distanceMap, reachWithBridges } from './pathing';
 import { Rng } from './rng';
-import { generateWorld, NO_REGION } from './worldgen';
+import { generateWorld, NO_REGION, WORLD_HEIGHT, WORLD_WIDTH } from './worldgen';
 
 describe('Rng', () => {
   it('is deterministic for a seed and can resume from saved state', () => {
@@ -127,6 +128,207 @@ describe('generateWorld', () => {
         }
       }
     }
+  });
+});
+
+describe('generateWorld: island 2, forest and mountains', () => {
+  const sprites = buildSprites();
+  const worlds = [1, 2, 3, 4].map((seed) => generateWorld(new Rng(seed), WORLD_WIDTH, WORLD_HEIGHT, 2));
+  const kinds = (objects: Map<number, { kind: string }>) => [...objects.values()].map((o) => o.kind);
+
+  it('has a beach, a northern forest, scree and snow, and no palms', () => {
+    for (const { map, objects } of worlds) {
+      const count = (t: Tile) => map.tiles.filter((x) => x === t).length;
+      expect(count(Tile.Sand)).toBeGreaterThan(200);
+      expect(count(Tile.Grass)).toBeGreaterThan(800);
+      expect(count(Tile.Scree)).toBeGreaterThan(150);
+      expect(count(Tile.Snow)).toBeGreaterThan(20);
+      expect(count(Tile.Rock)).toBeGreaterThan(100);
+      const k = kinds(objects);
+      for (const kind of ['tree_spruce', 'tree_birch', 'tree_apple', 'fern', 'spring', 'chest_closed']) expect(k).toContain(kind);
+      expect(k.some((kind) => kind.startsWith('palm'))).toBe(false);
+    }
+  });
+
+  it('can reach every bit of ground, and keeps the brambles and the river', () => {
+    for (const { map, start, objects } of worlds) {
+      const passable = (x: number, y: number) => {
+        const o = objects.get(map.idx(x, y));
+        return map.isFloor(x, y) && (!o || o.kind === 'bramble');
+      };
+      const reach = reachWithBridges(map, start.x, start.y, passable, (x, y) => map.get(x, y) === Tile.River);
+      for (let i = 0; i < map.tiles.length; i++) {
+        const x = i % map.width;
+        if (passable(x, (i - x) / map.width)) expect(reach[i]).toBe(1);
+      }
+      expect(kinds(objects)).toContain('bramble');
+      expect(map.tiles.includes(Tile.River)).toBe(true);
+    }
+  });
+
+  it('puts the old stone ring on the highest snow you can walk up to', () => {
+    for (const { map, start, objects } of worlds) {
+      const sites = [...objects].filter(([, o]) => o.kind === 'beacon_site');
+      expect(sites).toHaveLength(1);
+      const [i] = sites[0];
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      expect(map.get(x, y)).toBe(Tile.Snow);
+      expect(kinds(objects).some((k) => k.startsWith('boat_'))).toBe(false);
+      // One of its neighbours is ground you can get to.
+      const passable = (cx: number, cy: number) => {
+        const o = objects.get(map.idx(cx, cy));
+        return map.isFloor(cx, cy) && (!o || o.kind === 'bramble');
+      };
+      const reach = reachWithBridges(map, start.x, start.y, passable, (cx, cy) => map.get(cx, cy) === Tile.River);
+      expect([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => reach[map.idx(x + dx, y + dy)])).toBe(true);
+    }
+  });
+
+  it('only makes mountain edges the transition tiles can draw', () => {
+    for (const { map } of worlds) {
+      for (let y = 0; y < map.height; y++) {
+        for (let x = 0; x < map.width; x++) {
+          const t = map.get(x, y);
+          const is = (k: Tile) => (dx: number, dy: number) => map.get(x + dx, y + dy) === k;
+          const near = (k: Tile) => [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => is(k)(dx, dy)));
+          if (map.isLand(x, y)) expect(sprites.has(shoreTileName((dx, dy) => map.isWet(x + dx, y + dy)))).toBe(true);
+          if (t === Tile.Snow) {
+            expect(near(Tile.Grass), `snow ${x},${y} by grass`).toBe(false);
+            const scree = is(Tile.Scree);
+            expect(scree(0, -1) && scree(0, 1)).toBe(false);
+            expect(scree(-1, 0) && scree(1, 0)).toBe(false);
+            expect(sprites.has(snowTileName(scree))).toBe(true);
+          }
+          if (t === Tile.Grass) {
+            const scree = is(Tile.Scree);
+            expect(scree(0, -1) && scree(0, 1)).toBe(false);
+            expect(scree(-1, 0) && scree(1, 0)).toBe(false);
+            expect(sprites.has(grassScreeTileName(scree))).toBe(true);
+            expect(sprites.has(grassTileName(is(Tile.Sand)))).toBe(true);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('Game: sailing to island 2', () => {
+  function sailFrom(seed: number): Game {
+    const game = boatNextTo(sandbox(seed));
+    for (const stage of LEVELS[0].stages) {
+      for (const [item, n] of Object.entries(stage.cost)) game.inventory.add(item as keyof typeof stage.cost, n);
+      game.move(1, 0);
+    }
+    return game;
+  }
+
+  it('lands on the mountain island with your bag, XP, skills and needs', () => {
+    const game = sailFrom(40);
+    game.inventory.add('axe');
+    game.xp = 30;
+    game.learn('small_sips');
+    game.needs.food = 55;
+    const xp = game.xp;
+    game.takeEvents();
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(2);
+    expect(game.sailed).toBe(false);
+    expect(game.map.tiles.includes(Tile.Snow)).toBe(true);
+    expect(game.inventory.count('axe')).toBe(1);
+    expect(game.xp).toBe(xp);
+    expect(game.has('small_sips')).toBe(true);
+    expect(game.needs.food).toBe(55);
+    expect(game.home).toEqual({ x: game.player.x, y: game.player.y });
+    expect(game.map.get(game.player.x, game.player.y)).toBe(Tile.Sand);
+    expect(game.turn % TURNS_PER_DAY).toBe(0);
+    expect(game.goal()).toEqual({ state: 'find' });
+    expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'fade' }));
+    expect(game.log.slice(-2).map((e) => e.msg)).toEqual([{ key: 'sailAway', level: 1 }, { key: 'landIsland', level: 2 }]);
+    // Island 2 animals only.
+    const kinds = new Set(game.animals.map((a) => a.kind));
+    for (const kind of kinds) expect(ANIMALS[kind].islands ?? [1]).toContain(2);
+    expect(kinds.has('rabbit')).toBe(true);
+    expect(kinds.has('monkey')).toBe(false);
+  });
+
+  it('keeps island 2 through a save', () => {
+    const game = sailFrom(41);
+    game.sail();
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.level).toBe(2);
+    expect([...copy.map.tiles]).toEqual([...game.map.tiles]);
+    expect(copy.goal()).toEqual({ state: 'find' });
+  });
+
+  it('builds the beacon in three stages, and lighting it ends the game', () => {
+    const game = sailFrom(42);
+    game.sail();
+    const at = game.map.idx(game.player.x + 1, game.player.y);
+    for (const [i, o] of game.objects) if (o.kind === 'beacon_site') game.objects.delete(i);
+    game.map.set(game.player.x + 1, game.player.y, Tile.Sand);
+    game.objects.set(at, { kind: 'beacon_site' });
+    game.map.explored[at] = 1;
+    const [base, pyre, tinder] = LEVELS[1].stages;
+    expect(game.goal()).toMatchObject({ state: 'build', obj: 'beacon_site', index: 0, count: 3, left: base.cost });
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalNeeds', stage: 'base', left: [['stone', 16]] });
+    for (const stage of [base, pyre, tinder]) {
+      for (const [item, n] of Object.entries(stage.cost)) game.inventory.add(item as keyof typeof stage.cost, n);
+      expect(game.move(1, 0)).toBe(true);
+      expect(game.objects.get(at)?.kind).toBe(stage.becomes);
+    }
+    expect(game.goal()).toEqual({ state: 'ready' });
+    game.move(1, 0);
+    expect(game.takeSailRequest()).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalReady', level: 2 });
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(2);
+    expect(game.sailed).toBe(true);
+    expect(game.goal()).toEqual({ state: 'sailed' });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway', level: 2 });
+  });
+
+  it('gives apples from apple trees, and fern leaves', () => {
+    const game = sandbox(43);
+    place(game, 1, 0, 'tree_apple');
+    game.move(1, 0);
+    expect(game.inventory.count('apple')).toBeGreaterThanOrEqual(1);
+    expect(game.objectSprite(game.objectAt(game.player.x + 1, game.player.y)!)).toBe('tree_apple_bare');
+    const food = game.needs.food = 50;
+    game.needs.water = 50;
+    game.eat('apple');
+    expect(game.needs.food).toBeCloseTo(food + 12 - 0.45, 5);
+    place(game, 0, 1, 'fern');
+    game.move(0, 1);
+    expect(game.inventory.count('leaves')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('is cold on the snow, even in the day, unless you are by a fire or in a hut', () => {
+    const open = { sleeping: false, shelter: 0, nearFire: false, daylight: 1 };
+    expect(warmthTarget(open)).toBe(100);
+    expect(warmthTarget({ ...open, cold: 40 })).toBe(60);
+    expect(warmthTarget({ ...open, cold: 40, daylight: 0 })).toBe(0);
+    expect(warmthTarget({ ...open, cold: 40, shelter: 1, daylight: 0 })).toBe(100);
+    expect(warmthTarget({ ...open, cold: 40, nearFire: true })).toBe(100);
+
+    const game = sandbox(44);
+    game.map.set(game.player.x + 1, game.player.y, Tile.Snow);
+    game.needs.warmth = 100;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'snowCold' });
+    for (let i = 0; i < 20; i++) game.wait();
+    expect(game.needs.warmth).toBeLessThan(90);
+  });
+
+  it('loads version 4 saves that already sailed, so the boat can take them to island 2', () => {
+    const game = sailFrom(45);
+    const v4 = { ...game.toSave(), v: 4, sailed: true };
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(v4)));
+    expect(copy.sailed).toBe(false);
+    expect(copy.goal()).toEqual({ state: 'ready' });
+    expect(copy.sail()).toBe(true);
+    expect(copy.level).toBe(2);
   });
 });
 
@@ -298,7 +500,7 @@ describe('Game: the island goal (the boat)', () => {
     expect(game.goalGiven).toEqual({ wood: 12 });
     expect(game.xp).toBe(xp + 12);
     expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'float', amount: -12, what: { item: 'wood' } }));
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', given: [['wood', 12]], left: [['wood', 8], ['stone', 6]] });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', stage: 'hull', given: [['wood', 12]], left: [['wood', 8], ['stone', 6]] });
 
     game.inventory.add('wood', 30);
     game.inventory.add('stone', 6);
@@ -310,7 +512,7 @@ describe('Game: the island goal (the boat)', () => {
     expect(game.goal()).toMatchObject({ state: 'build', obj: 'boat_hull', index: 1, stage: mast });
   });
 
-  it('is ready after four stages, then asks to sail, and you can sail away', () => {
+  it('is ready after four stages, then asks to sail, and you can sail to the next island', () => {
     const game = boatNextTo(sandbox(33));
     for (const stage of [hull, mast, sail, supplies]) {
       for (const [item, n] of Object.entries(stage.cost)) game.inventory.add(item as keyof typeof stage.cost, n);
@@ -323,9 +525,8 @@ describe('Game: the island goal (the boat)', () => {
     expect(game.takeSailRequest()).toBe(true);
     expect(game.takeSailRequest()).toBe(false);
     expect(game.sail()).toBe(true);
-    expect(game.sailed).toBe(true);
-    expect(game.goal()).toEqual({ state: 'sailed' });
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway' });
+    expect(game.level).toBe(2);
+    expect(game.log.at(-2)?.msg).toEqual({ key: 'sailAway', level: 1 });
   });
 
   it('cannot sail before the boat is ready', () => {

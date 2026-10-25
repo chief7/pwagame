@@ -20,12 +20,15 @@ function everyMessage(): Msg[] {
     { key: 'notSleepy' }, { key: 'fallAsleep' }, { key: 'dozeOff' }, { key: 'notThirsty' }, { key: 'drink' },
     { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'faintWhy', empty: [] }, { key: 'faintWhy', empty: ['food', 'water', 'energy', 'warmth'] }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
     { key: 'needFire' }, { key: 'needPoints' }, { key: 'skillPoint' }, { key: 'catch' }, { key: 'noBite' },
-    { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalReady' }, { key: 'sailAway' },
-    { key: 'goalGive', given: [['wood', 1]], left: [['wood', 19], ['stone', 6]] },
-    { key: 'goalGive', given: [['rope', 2], ['wood', 3]], left: [['rope', 1]] },
+    { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalFound', obj: 'beacon_site' }, { key: 'snowCold' },
   ];
-  for (const stage of ['hull', 'mast', 'sail', 'supplies'] as const) {
+  for (const level of [1, 2] as const) {
+    msgs.push({ key: 'goalReady', level }, { key: 'sailAway', level }, { key: 'landIsland', level });
+  }
+  for (const stage of ['hull', 'mast', 'sail', 'supplies', 'base', 'pyre', 'tinder'] as const) {
     msgs.push({ key: 'goalStage', stage }, { key: 'goalNeeds', stage, left: [['coconut', 4], ['cooked_fish', 1]] });
+    msgs.push({ key: 'goalGive', stage, given: [['wood', 1]], left: [['wood', 19], ['stone', 6]] });
+    msgs.push({ key: 'goalGive', stage, given: [['rope', 2], ['wood', 3]], left: [['rope', 1]] });
   }
   for (const skill of SKILL_IDS) msgs.push({ key: 'needSkill', skill }, { key: 'learn', skill });
   for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
@@ -91,6 +94,12 @@ describe('i18n', () => {
       'Das Dornengestrüpp ist zu dornig für deine Hände. Du brauchst eine Steinaxt.',
     );
     expect(de.message({ key: 'build', obj: 'bridge_ew' })).toBe('Du baust eine Brücke.');
+    expect(de.message({ key: 'goalGive', stage: 'pyre', given: [['wood', 2]], left: [['rope', 4]] })).toBe(
+      'Du gibst dem Leuchtfeuer 2 Stück Holz. Es braucht noch 4 Seile.',
+    );
+    expect(de.message({ key: 'goalNeeds', stage: 'hull', left: [['stone', 6]] })).toBe('Das Boot braucht 6 Steine für den Rumpf.');
+    expect(de.message({ key: 'gather', obj: 'tree_apple', got: [['apple', 2]] })).toBe('Du pflückst Äpfel und bekommst 2 Äpfel.');
+    expect(de.message({ key: 'look', obj: 'beacon_site' })).toBe('Ein alter Steinkreis.');
   });
 
   it('keeps English as it was', () => {

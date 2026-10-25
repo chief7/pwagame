@@ -1,6 +1,6 @@
 import type { AnimalKind } from '../game/defs/animals';
 import type { ItemId } from '../game/defs/items';
-import type { StageId } from '../game/defs/levels';
+import type { LevelId, StageId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
 import type { PathId, SkillId } from '../game/defs/skills';
@@ -55,24 +55,27 @@ export interface Strings {
     xpToNext(have: number, need: number): string;
     /** "Costs 2 points". */
     skillCost(n: number): string;
-    /** The goal card in the Build panel. */
-    goalTitle: string;
-    goalFind: string;
+    /** The goal card in the Build panel (more words for each island in `levels`). */
     goalMissing: string;
     /** "Step 2 of 4: Mast". */
     goalStep(index: number, count: number, stage: StageId): string;
-    goalHint: string;
-    goalReady: string;
-    goalSailed: string;
-    /** The question before leaving, and the screen after. */
-    sailTitle: string;
-    sailText: string;
-    setSail: string;
+    /** The question before leaving, and the screen after the last island. */
     notYet: string;
     endTitle: string;
     endText: string;
     stay: string;
   };
+  /** Each island's goal: the goal card, and the question before leaving. */
+  levels: Record<LevelId, {
+    goalTitle: string;
+    goalFind: string;
+    goalHint: string;
+    goalReady: string;
+    goalSailed: string;
+    sailTitle: string;
+    sailText: string;
+    setSail: string;
+  }>;
   /** "Day 2 · 6:00". */
   clock(turn: number): string;
   needs: Record<NeedId, string>;

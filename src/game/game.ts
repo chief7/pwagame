@@ -1,8 +1,8 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Player } from './actors';
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
-import { ANIMAL_KINDS, ANIMALS, type AnimalKind } from './defs/animals';
+import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
-import { goalProgress, levelDef, type GoalStage } from './defs/levels';
+import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId } from './defs/levels';
 import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPES, type RecipeId } from './defs/recipes';
 import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
@@ -13,7 +13,7 @@ import type { FloatWhat, Msg, WakeReason } from './messages';
 import { freshNeeds, LOW, tickNeeds, type NeedId, type Needs } from './needs';
 import { BRIDGE_SPAN, DIRS, distanceMap, reachWithBridges } from './pathing';
 import { Rng } from './rng';
-import { generateWorld } from './worldgen';
+import { generateWorld, WORLD_HEIGHT, WORLD_WIDTH } from './worldgen';
 
 const LOG_LIMIT = 100;
 /** Caves keep out the wind: they count as this much shelter. */
@@ -46,7 +46,9 @@ const THICK_SKIN = 0.7;
 const GREEN_THUMB = 0.7;
 /** Extra cells the explorer sees at night with Night eyes. */
 const NIGHT_EYES = 2;
-export const SAVE_VERSION = 4;
+/** How much colder it is out in the open on snow, day and night (see warmthTarget). */
+const SNOW_CHILL = 40;
+export const SAVE_VERSION = 5;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -105,7 +107,7 @@ export interface SaveData {
   xp: number;
   skills: SkillId[];
   /** The island's number; each has its own goal (see levels.ts). */
-  level: number;
+  level: LevelId;
   /** What the explorer has handed over for the goal's current stage. */
   goalGiven: Items;
   sailed: boolean;
@@ -128,7 +130,7 @@ export class Game {
   /** Experience from gathering, building and fishing; it earns skill points. */
   xp = 0;
   skills = new Set<SkillId>();
-  level = 1;
+  level: LevelId = 1;
   goalGiven: Items = {};
   /** The explorer left the island on the finished goal. */
   sailed = false;
@@ -175,9 +177,7 @@ export class Game {
       this.player = { id: PLAYER_ID, x: world.start.x, y: world.start.y, facing: 'down' };
       this.home = { ...world.start };
       this.inventory.add('coconut', 2);
-      for (const kind of ANIMAL_KINDS) {
-        for (let n = 0; n < ANIMALS[kind].population; n++) this.spawnAnimal(kind, false);
-      }
+      this.populate();
       this.message({ key: 'arrive' }, 'info');
     }
     this.updateFov();
@@ -388,9 +388,11 @@ export class Game {
       return false;
     }
     this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
+    const onSnow = this.map.get(p.x, p.y) === Tile.Snow;
     p.x = nx;
     p.y = ny;
     if (obj && OBJECTS[obj.kind].shelter) this.message({ key: 'stepInto', obj: obj.kind }, 'info');
+    else if (!onSnow && this.map.get(nx, ny) === Tile.Snow) this.message({ key: 'snowCold' }, 'warn');
     this.endTurn();
     return true;
   }
@@ -480,13 +482,49 @@ export class Game {
     return true;
   }
 
-  /** Leave the island on the finished goal. There is no next island yet, so play can go on here. */
+  /**
+   * Leave the island on the finished goal. The boat of island 1 takes the
+   * explorer to the next island; on the last island play can go on here.
+   */
   sail(): boolean {
     if (!this.sailed && this.goal().state !== 'ready') return false;
-    this.sailed = true;
     this.emit({ type: 'fade' });
-    this.message({ key: 'sailAway' }, 'good');
+    if (this.sailed) return true;
+    this.message({ key: 'sailAway', level: this.level }, 'good');
+    const next = nextLevel(this.level);
+    if (next) this.landOn(next);
+    else this.sailed = true;
     return true;
+  }
+
+  /**
+   * Arrive on a new island with everything you carry, your XP and skills,
+   * and your needs as they are, at 8:00 the next day.
+   */
+  private landOn(level: LevelId): void {
+    const world = generateWorld(this.rng, WORLD_WIDTH, WORLD_HEIGHT, level);
+    this.level = level;
+    this.map = world.map;
+    this.objects = world.objects;
+    this.player.x = world.start.x;
+    this.player.y = world.start.y;
+    this.player.facing = 'down';
+    this.home = { ...world.start };
+    this.goalGiven = {};
+    this.sailAsked = false;
+    this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
+    this.animals = [];
+    this.populate();
+    this.warned.clear();
+    this.updateFov();
+    this.message({ key: 'landIsland', level }, 'good');
+  }
+
+  /** Fill a new island with its animals. */
+  private populate(): void {
+    for (const kind of islandAnimals(this.level)) {
+      for (let n = 0; n < ANIMALS[kind].population; n++) this.spawnAnimal(kind, false);
+    }
   }
 
   /** Spend skill points on a skill. Takes no time. */
@@ -602,7 +640,7 @@ export class Game {
     const done = goalProgress(def, obj.kind);
     if (done >= def.stages.length) {
       this.sailAsked = true;
-      this.message({ key: 'goalReady' }, 'good');
+      this.message({ key: 'goalReady', level: this.level }, 'good');
       return false;
     }
     const stage = def.stages[done];
@@ -622,7 +660,7 @@ export class Game {
     }
     this.gainXp(given.reduce((sum, [, n]) => sum + n, 0), x, y);
     if (left.length) {
-      this.message({ key: 'goalGive', given, left }, 'good');
+      this.message({ key: 'goalGive', stage: stage.id, given, left }, 'good');
       return true;
     }
     obj.kind = stage.becomes;
@@ -749,6 +787,7 @@ export class Game {
       thirst: this.has('small_sips') ? SMALL_SIPS : 1,
       hunger: this.has('small_appetite') ? SMALL_APPETITE : 1,
       chill: this.has('thick_skin') ? THICK_SKIN : 1,
+      cold: this.map.get(p.x, p.y) === Tile.Snow ? SNOW_CHILL : 0,
     });
     if (!this.sleeping) this.warnAboutNeeds();
 
@@ -989,7 +1028,7 @@ export class Game {
 
   /** Animals that wandered off are replaced, out of sight, over time. */
   private topUpAnimals(): void {
-    for (const kind of ANIMAL_KINDS) {
+    for (const kind of islandAnimals(this.level)) {
       if (this.animals.filter((a) => a.kind === kind).length < ANIMALS[kind].population) this.spawnAnimal(kind, true);
     }
   }
@@ -1073,7 +1112,12 @@ export class Game {
     }
     if (data.v === 3) {
       // Version 3 had no island goal. Its island has no boat either (goal() says 'missing').
-      data = { ...data, v: SAVE_VERSION, level: 1, goalGiven: {}, sailed: false };
+      data = { ...data, v: 4, level: 1, goalGiven: {}, sailed: false };
+    }
+    if (data.v === 4) {
+      // Version 4 had only one island: sailing ended the game. Now the finished
+      // boat takes you to island 2, so walking into it asks to set sail again.
+      data = { ...data, v: SAVE_VERSION, sailed: false };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

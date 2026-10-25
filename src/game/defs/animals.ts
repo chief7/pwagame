@@ -11,7 +11,9 @@ import { Tile } from '../map';
 // Wild animals live far from camp. They are the real danger on the island:
 // the Animal friend skill only makes them notice you later.
 
-export type AnimalKind = 'crab' | 'turtle' | 'monkey' | 'piglet' | 'bat' | 'boar' | 'snake' | 'wasps' | 'bear';
+export type AnimalKind =
+  | 'crab' | 'turtle' | 'monkey' | 'piglet' | 'bat' | 'boar' | 'snake' | 'wasps' | 'bear'
+  | 'rabbit' | 'squirrel' | 'goat';
 export type Temper = 'calm' | 'shy' | 'grumpy' | 'cheeky' | 'charger' | 'chaser';
 
 export interface AnimalDef {
@@ -35,17 +37,19 @@ export interface AnimalDef {
   wild?: true;
   /** It only appears at least this many cells from camp. */
   minHomeDistance?: number;
+  /** The islands (levels) it lives on; default only the first. */
+  islands?: number[];
 }
 
 export const ANIMALS: Record<AnimalKind, AnimalDef> = {
-  crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6, damage: 4 },
+  crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6, damage: 4, islands: [1, 2] },
   turtle: { kind: 'turtle', temper: 'calm', habitat: [Tile.Sand], notice: 0, wander: 0.15, population: 2 },
   monkey: { kind: 'monkey', temper: 'cheeky', habitat: [Tile.Grass, Tile.Sand], notice: 5, wander: 0.5, population: 3 },
   piglet: { kind: 'piglet', temper: 'shy', habitat: [Tile.Grass], notice: 3, wander: 0.35, population: 3 },
-  bat: { kind: 'bat', temper: 'shy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.8, population: 4 },
+  bat: { kind: 'bat', temper: 'shy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.8, population: 4, islands: [1, 2] },
   boar: {
     kind: 'boar', temper: 'charger', habitat: [Tile.Grass], notice: 4, wander: 0.3, population: 4,
-    damage: 12, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25,
+    damage: 12, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [1, 2],
   },
   snake: {
     kind: 'snake', temper: 'grumpy', habitat: [Tile.Grass, Tile.Sand], notice: 1, wander: 0.1, population: 5,
@@ -53,12 +57,24 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
   },
   wasps: {
     kind: 'wasps', temper: 'chaser', habitat: [Tile.Grass], notice: 3, wander: 0.6, population: 3,
-    damage: 3, hitChance: 1, fleeAfter: 8, wild: true, minHomeDistance: 25,
+    damage: 3, hitChance: 1, fleeAfter: 8, wild: true, minHomeDistance: 25, islands: [1, 2],
   },
   bear: {
     kind: 'bear', temper: 'grumpy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.05, population: 2,
-    damage: 20, hitChance: 0.5, wild: true, minHomeDistance: 25,
+    damage: 20, hitChance: 0.5, wild: true, minHomeDistance: 25, islands: [1, 2],
+  },
+  // Island 2.
+  rabbit: { kind: 'rabbit', temper: 'shy', habitat: [Tile.Grass], notice: 3, wander: 0.45, population: 4, islands: [2] },
+  squirrel: { kind: 'squirrel', temper: 'cheeky', habitat: [Tile.Grass], notice: 5, wander: 0.5, population: 3, islands: [2] },
+  goat: {
+    kind: 'goat', temper: 'charger', habitat: [Tile.Scree, Tile.Snow], notice: 4, wander: 0.3, population: 3,
+    damage: 10, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [2],
   },
 };
 
 export const ANIMAL_KINDS = Object.keys(ANIMALS) as AnimalKind[];
+
+/** The animals that live on an island. */
+export function islandAnimals(level: number): AnimalKind[] {
+  return ANIMAL_KINDS.filter((kind) => (ANIMALS[kind].islands ?? [1]).includes(level));
+}

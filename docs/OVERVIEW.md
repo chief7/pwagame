@@ -119,7 +119,7 @@ after each action and gives them to the animator.
 | `hit` | An actor lost Health | White flash and a red number |
 | `float` | Show a number at a cell (`+2 wood`, `+35 water`, `+1 XP`): `amount` and `what` (an item, a need or XP) | Text rises and fades. XP has its own colour (lavender). |
 | `sparkle` | Something good happened at a cell (chest, building, skill point, skill learned) | Gold sparkles |
-| `fade` | Time jumped (sleep, faint, new island) | Screen fades in from dark |
+| `fade` | Time jumped (sleep, faint, new island, sailing to island 2) | Screen fades in from dark |
 
 Each event has a `late` flag. `late` is true for events from the animals'
 part of the turn. The animator starts late events 90 ms after the player's
@@ -234,7 +234,10 @@ home is the start point on the beach.
 Warmth moves towards a target value each turn:
 
 - Near a campfire (2 cells or less): target 100.
-- Else: target = 100 − (1 − daylight) × (1 − shelter) × 95.
+- Else: target = 100 − (1 − shelter) × ((1 − daylight) × 95 + cold), at
+  least 0. `cold` is 40 on snow (`SNOW_CHILL`, island 2) and 0 elsewhere. So
+  open snow has a target of 60 by day and 0 at night. A hut or a campfire
+  still gives 100. Stepping onto snow logs `snowCold`.
 
 Shelter values:
 
@@ -346,13 +349,18 @@ Animals have a **temper**. They only react when the player is within their
 | Temper | Behaviour when the player is near | Animals |
 |---|---|---|
 | `calm` | Ignores the player. | turtle |
-| `shy` | Moves away from the player. | piglet, bat |
+| `shy` | Moves away from the player. | piglet, bat, rabbit |
 | `grumpy` | If next to the player: `hitChance` (default 50%) per turn to hurt (−`damage` Health), then runs away for `fleeAfter` turns (default 4). | crab (−4), snake (70%, −8), cave bear (50%, −20) |
-| `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. | monkey |
-| `charger` | Runs at the player, 2 cells per turn (`CHARGE_STEPS`), with the message `alert`. When it starts a turn next to the player, it knocks them over (−12 Health), then trots off for 10 turns. | wild boar |
+| `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. | monkey, squirrel |
+| `charger` | Runs at the player, 2 cells per turn (`CHARGE_STEPS`), with the message `alert`. When it starts a turn next to the player, it knocks them over (−`damage` Health), then trots off for 10 turns. | wild boar (−12), mountain goat (−10) |
 | `chaser` | Follows the player for 6 turns (`CHASE_TURNS`, stored as `chase` on the animal) and stings each turn it is next to them (−3 Health). It gives up at once when the player stands off its habitat (sand, cave, shelter). Then it flies off for 8 turns. | wasps |
 
-**Wild animals** (`wild: true`: boar, snake, wasps, cave bear) only appear
+**Islands.** `islands` lists the islands (levels) where an animal lives
+(default `[1]`). `islandAnimals(level)` gives the list. Island 1: crab,
+turtle, monkey, piglet, bat, boar, snake, wasps, bear. Island 2: crab, bat,
+boar, wasps, bear, rabbit, squirrel, mountain goat.
+
+**Wild animals** (`wild: true`: boar, snake, wasps, cave bear, mountain goat) only appear
 at least `minHomeDistance` (25) cells from home. A new hurt message is
 `hurt`, with a text for each animal in `src/i18n/`. Crabs keep `pinch`.
 
@@ -432,7 +440,9 @@ path. The Skills button shows a star when there are free points.
 
 Each island is a **level** with one big goal: something the player builds
 in stages to leave the island. `src/game/defs/levels.ts` (`LEVELS`) holds
-each level's goal object (`site`) and its stages. Only level 1 exists now.
+each level's `biome` (how world generation shapes it, see §5), its goal
+object (`site`) and its stages. Two levels exist: 1 (`tropical`) and 2
+(`mountain`).
 
 Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
 
@@ -458,14 +468,35 @@ How it works:
 - When a stage is complete, the object becomes the next kind, with
   sparkles. Objects with `goal: true` are goal objects; the stage is
   found from the kind (`goalProgress()`), so it is not stored separately.
-- Walking into the finished boat sets a flag that the UI reads with
-  `game.takeSailRequest()`. The UI asks "Set sail?". `game.sail()` sets
-  `sailed`, sends a `fade` and the log line `sailAway`. The end screen says
-  that the next island comes soon. The player can stay on the island or
-  start a new island.
+- Walking into the finished goal sets a flag that the UI reads with
+  `game.takeSailRequest()`. The UI asks the level's question ("Set sail?",
+  "Light the beacon?"). `game.sail()` logs `sailAway` and sends a `fade`.
+- **On level 1**, `sail()` then lands the player on level 2 (`landOn()`): a
+  new island from `generateWorld(…, 2)`, the player on its start point
+  (also the new home), new animals for that island, `goalGiven` cleared,
+  and the clock at 8:00 the next day. The bag, XP, skills and needs stay.
+  The log says `landIsland`. `sailed` stays false.
+- **On the last level** (2), `sail()` sets `sailed`. The end screen says
+  that a ship took the player on board and the next island comes soon. The
+  player can stay on the island or start a new island.
+  `nextLevel(level)` gives the next level, or null on the last one.
 - `game.goal()` gives the state for the goal card at the top of the Build
   panel: `missing` (an old island without a boat), `find`, `build` (with
-  the stage and what it still needs), `ready` or `sailed`.
+  the stage and what it still needs), `ready` or `sailed`. The words for
+  each level are in `Strings.levels`.
+
+Level 2 (Pine Ridge): an old stone ring (`beacon_site`) stands on the
+highest snow of the mountain. The player builds a signal beacon on it.
+
+| Stage | Cost | The beacon becomes |
+|---|---|---|
+| Stone base | 16 stone | `beacon_base` |
+| Wood pile | 18 wood, 4 rope | `beacon_pyre` |
+| Tinder | 12 leaves, 4 wood | `beacon_ready` |
+
+All stages together need 22 wood, 16 stone and 20 leaves (8 of them for
+rope). There are no coconuts on island 2: apples, berries, mushrooms and
+fish are the food there.
 
 ---
 
@@ -523,9 +554,41 @@ Steps:
    a sand cell next to the sea, in the far side if possible
    (`GOAL_REGIONS`: far side, then forest, then home coast). Its 8
    neighbour cells stay free, so the big sprite is not hidden by trees.
-8. **Animals.** `Game` adds each animal kind up to its population, on its
-   habitat, 8 or more cells from the start. Animals in other regions stay
-   there.
+8. **Animals.** `Game` adds each animal kind of the island
+   (`islandAnimals`) up to its population, on its habitat, 8 or more cells
+   from the start. Animals in other regions stay there.
+
+### Island 2: forest and mountains
+
+`generateWorld(rng, width, height, 2)` uses the same steps, with these
+changes (`biome: 'mountain'`):
+
+- **Biomes** (`addMountains`). The beach is narrower (`MOUNTAIN_BEACH_WIDTH`,
+  2 cells, plus noise). The height of a cell is 0.6 × its distance from the
+  sea (scaled to 0..1) + 0.4 × a ridge noise (`1 − |2n − 1|`, which makes
+  long ridges). Of the inland cells (5 or more from the sea), the lowest
+  60% stay forest (`FOREST_LINE`). Above that is mountain: "cliff" noise
+  makes `Rock` (sometimes with `CaveFloor` inside), else walkable `Scree`.
+  The top 7% are `Snow` (`SNOW_LINE`), with some rock.
+- **Cleaning** (`cleanGrass`). Cave floor needs rock around it, else it
+  becomes scree. Snow never touches grass (it becomes scree). Thin strips
+  of grass become sand near the beach and scree in the hills. Thin strips
+  of snow become scree.
+- **Tunnels** from the connect step are `Scree` (mountain passes), not cave
+  floor.
+- **Regions, brambles and the river** are the same as on island 1. The
+  river often runs down through the mountain.
+- **The goal** (`beacon_site`) goes on the highest snow cell that has at
+  least 5 floor neighbours (`GOAL_OPEN_SIDES`), so the player can walk up
+  to it. If no such cell exists, the island is made again.
+- **Scatter** uses the `mountain` table of `SCATTER`: driftwood and pebbles
+  on the beach; spruce, birch, apple tree, broadleaf tree, fern, bushes and
+  mushrooms in the forest; pebbles, boulders and some spruces on scree;
+  snowy spruces and boulders on snow. There are no palms. Springs can also
+  be on scree.
+
+A typical island 2 has about 1,700 forest, 450 scree, 250 rock and 100 snow
+cells. Generation takes 0.1 to 0.3 seconds.
 
 A typical island has about 3,100 floor cells (about 1,150 home, 1,000 forest,
 850 far side), 50 to 200 river cells and 50 to 80 brambles. Generation
@@ -614,12 +677,12 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish (food); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready) |
+| Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready) |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
 | Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend, wild sense |
-| Levels | 1: repair the boat (hull, mast, sail, supplies) |
-| Animals | crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves) |
+| Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
+| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow) |
 
 ---
 
@@ -636,12 +699,16 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 - `outline()` adds a 1 px dark outline. `shadow()` adds a soft ground shadow.
   Call `outline()` first.
 - Sizes: terrain tiles are 16 × 16. Most objects are 16 × 16. Palms and trees
-  are 24 × 32, the boat 24 × 30, the hut 24 × 28 and the lean-to 20 × 20. All are drawn
+  are 24 × 32, the boat 24 × 30, the hut and the beacon 24 × 28 and the lean-to 20 × 20. All are drawn
   bottom-centre on their cell, so tall sprites overlap the cell above.
 - **Transition tiles** (shore, grass edges and river banks) are 12 tiles per
   set: 4 edges, 4 outer corners and 4 inner corners. `transitionTileName()`
   picks one from the neighbour cells. Sand next to the river uses the shore
-  set. Grass next to the river uses the `bank_*` set.
+  set. Grass next to the river uses the `bank_*` set. On island 2, grass
+  next to scree uses the `grass_scree_*` set, and snow next to scree uses
+  the `snow_*` set. A grass cell shows one kind of edge: river bank first,
+  then sand, then scree. Scree and snow have hard edges against rock, cave
+  floor and the river.
 - The river has 2 frames (`river`, `river_2`), 220 ms each.
 - Characters have 4 facings × 3 frames (stand, step 1, step 2). The left
   facing is the right facing, mirrored.
@@ -715,8 +782,12 @@ Auto-walk (travel and hold) stops when:
   warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 4. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 3 saves load
+- `SAVE_VERSION` is 5. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 4 saves load
+  with `sailed: false`: they had only one island, so a player who already
+  sailed walks into the finished boat again and can sail to island 2. The
+  tiles of island 2 (`Scree` 6, `Snow` 7) need no change to the save
+  shape. Version 3 saves load
   at level 1, but their island has no boat: the goal card tells the player
   to start a new island. Version 2 saves load with 0 XP and no skills. Version 1 saves also load: their log lines were
   English text and become `legacy` messages.
@@ -754,7 +825,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach), the island goal (stages, many trips, sailing), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
@@ -791,6 +862,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Island goal stages | `levels.ts` → `LEVELS` | see 4.12 |
 | Where the goal goes | `worldgen.ts` → `GOAL_REGIONS` | far side, forest, home |
 | River drink | `game.ts` → `RIVER_DRINK` | 35 |
+| Snow cold | `game.ts` → `SNOW_CHILL` | 40 |
+| Island 2 beach, forest line, snow line | `worldgen.ts` → `MOUNTAIN_BEACH_WIDTH`, `FOREST_LINE`, `SNOW_LINE` | 2, 0.6, 0.93 |
+| Island 2 goal room | `worldgen.ts` → `GOAL_OPEN_SIDES` | 5 |
 | XP per gather, per fish | `game.ts` → `GATHER_XP`, `CATCH_XP` | 1, 2 |
 | Skill point thresholds | `skills.ts` → `FIRST_POINT_XP`, `POINT_XP_STEP` | 10, 5 |
 | Bite chance | `game.ts` → `BITE_CHANCE`, `PATIENT_BITE_CHANCE` | 0.4, 0.7 |
@@ -811,12 +885,17 @@ Also run `npm run build` (typecheck and build) before you commit.
   wander closer to camp later.
 - Animals have no walk frames. They hop when they move. They always face down.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
-- Only level 1 exists. After the player sails away, there is no next island
-  yet: the player stays on the island or starts a new one. Level 2 needs a
-  new island generator (another biome), and `sail()` must then load it.
+- Only two levels exist. After the beacon on island 2, there is no next
+  island yet: the player stays on the island or starts a new one.
+- Island 1 cannot be visited again after sailing. "New island" always
+  starts again on island 1.
+- On island 2, a grass cell next to both scree and sand (or the river) shows
+  only one edge, so the scree side has a hard edge. Scree and snow next to
+  the river also have hard edges.
+- The low-water warning still says "a spring or a coconut", also on island 2.
 - Islands from saves before version 4 have no boat, so they have no goal.
-- The boat does not move when the player sails. The UI shows a fade and the
-  end screen.
+- The boat does not move when the player sails. The UI shows a fade (and
+  the end screen after the beacon). The beacon does not show a fire.
 - Cheeky monkeys can take the coconuts and cooked fish that the player
   carries for the supplies.
 - The raft sprite is not used.

@@ -1,6 +1,6 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
-import type { StageId } from './defs/levels';
+import type { LevelId, StageId } from './defs/levels';
 import type { ObjectKind } from './defs/objects';
 import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
@@ -60,12 +60,17 @@ export type Msg =
   | { key: 'goalFound'; obj: ObjectKind }
   /** Walked into the goal with nothing it needs. */
   | { key: 'goalNeeds'; stage: StageId; left: [ItemId, number][] }
-  | { key: 'goalGive'; given: [ItemId, number][]; left: [ItemId, number][] }
+  | { key: 'goalGive'; stage: StageId; given: [ItemId, number][]; left: [ItemId, number][] }
   /** A stage of the goal is finished. */
   | { key: 'goalStage'; stage: StageId }
   /** Walked into the finished goal. */
-  | { key: 'goalReady' }
-  | { key: 'sailAway' }
+  | { key: 'goalReady'; level: LevelId }
+  /** Leaving the island on the finished goal: the boat sails, or the beacon calls a ship. */
+  | { key: 'sailAway'; level: LevelId }
+  /** The boat lands on the next island. */
+  | { key: 'landIsland'; level: LevelId }
+  /** Stepped onto snow: it is cold up here. */
+  | { key: 'snowCold' }
   /** A line from a save made before messages were data; shown as it is. */
   | { key: 'legacy'; text: string };
 

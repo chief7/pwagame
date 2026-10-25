@@ -3,7 +3,7 @@
 // or used in recipes.
 
 export type ItemId =
-  | 'coconut' | 'berries' | 'mushroom' | 'cooked_fish'
+  | 'coconut' | 'berries' | 'mushroom' | 'cooked_fish' | 'apple'
   | 'wood' | 'leaves' | 'stone' | 'fish' | 'rope'
   | 'axe' | 'fishing_rod';
 
@@ -28,6 +28,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   berries: { id: 'berries', eat: { food: 7, water: 4 } },
   mushroom: { id: 'mushroom', eat: { food: 9, energy: 5 } },
   cooked_fish: { id: 'cooked_fish', eat: { food: 40, energy: 10 } },
+  apple: { id: 'apple', eat: { food: 12, water: 8 } },
   wood: { id: 'wood' },
   leaves: { id: 'leaves' },
   stone: { id: 'stone' },

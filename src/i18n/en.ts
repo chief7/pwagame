@@ -1,4 +1,5 @@
 import { dayNumber, minuteOfDay } from '../game/clock';
+import { stageLevel, type StageId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
 import type { AnimalWords, ItemWords, ObjectWords, Strings } from './types';
 
@@ -12,6 +13,7 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   axe: { one: 'stone axe', many: 'stone axes', short: ['axe', 'axes'] },
   fish: { one: 'fish', many: 'fish', short: ['fish', 'fish'] },
   cooked_fish: { one: 'cooked fish', many: 'cooked fish', short: ['cooked fish', 'cooked fish'] },
+  apple: { one: 'apple', many: 'apples', short: ['apple', 'apples'] },
   fishing_rod: { one: 'fishing rod', many: 'fishing rods', short: ['rod', 'rods'] },
   rope: { one: 'rope', many: 'ropes', short: ['rope', 'ropes'] },
 };
@@ -47,6 +49,15 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   boat_mast: { name: 'boat' },
   boat_sail: { name: 'boat' },
   boat_ready: { name: 'boat' },
+  tree_spruce: { name: 'spruce', gather: 'You collect fallen branches' },
+  tree_spruce_snow: { name: 'snowy spruce', gather: 'You shake off the snow and collect branches' },
+  tree_birch: { name: 'birch', gather: 'You collect fallen branches' },
+  tree_apple: { name: 'apple tree', gather: 'You pick apples' },
+  fern: { name: 'fern', gather: 'You pick some fern leaves' },
+  beacon_site: { name: 'old stone ring' },
+  beacon_base: { name: 'beacon' },
+  beacon_pyre: { name: 'beacon' },
+  beacon_ready: { name: 'beacon' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -65,6 +76,12 @@ const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: s
     hurt: 'Ouch! A wasp stings you.', alert: 'Bzzz! Wasps come after you. Run off the grass!',
   },
   bear: { name: 'cave bear', shoo: 'The cave bear grumbles and shuffles away.', hurt: 'The cave bear wakes up and swipes at you!' },
+  rabbit: { name: 'rabbit', shoo: 'The rabbit twitches its nose and hops away.' },
+  squirrel: { name: 'squirrel', shoo: 'The squirrel chatters at you and runs up a tree.' },
+  goat: {
+    name: 'mountain goat', shoo: 'You wave your arms. The goat bleats and jumps away over the rocks.',
+    hurt: 'Bonk! The mountain goat butts you with its horns.', alert: 'A mountain goat lowers its horns and runs at you!',
+  },
 };
 
 const NEEDS = { health: 'Health', food: 'Food', water: 'Water', energy: 'Energy', warmth: 'Warmth' };
@@ -81,6 +98,9 @@ function itemList(items: [keyof typeof ITEM, number][]): string {
   const parts = items.map(([id, n]) => itemCount(id, n));
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts.join('');
 }
+
+/** What the goal of a stage's island is called: "boat", "beacon". */
+const goalName = (stage: StageId) => (stageLevel(stage) === 2 ? 'beacon' : 'boat');
 
 function clock(turn: number): string {
   const m = Math.floor(minuteOfDay(turn));
@@ -123,20 +143,34 @@ export const en: Strings = {
     skillPoints: (n) => `${n} skill ${n === 1 ? 'point' : 'points'}`,
     xpToNext: (have, need) => `XP ${have} / ${need} to the next point`,
     skillCost: (n) => `Costs ${n} ${n === 1 ? 'point' : 'points'}`,
-    goalTitle: 'Island goal: repair the boat',
-    goalFind: 'Find the old boat. It lies on a beach on the far side of the island.',
     goalMissing: 'This island has no boat. Start a new island in your bag to get one.',
     goalStep: (index, count, stage) => `Step ${index + 1} of ${count}: ${en.stages[stage]}`,
-    goalHint: 'Walk into the boat to give it what you carry.',
-    goalReady: 'The boat is ready! Walk into it to set sail.',
-    goalSailed: 'You sailed away from this island.',
-    sailTitle: 'Set sail?',
-    sailText: 'The boat is ready. Do you want to sail away from the island?',
-    setSail: 'Set sail!',
     notYet: 'Not yet',
     endTitle: 'You did it!',
-    endText: 'You sailed away from the island. The next island is coming soon! Until then, you can stay here or start a new island.',
+    endText: 'A ship saw your beacon and took you on board. The next island is coming soon! Until then, you can stay here or start a new island.',
     stay: 'Stay on this island',
+  },
+  levels: {
+    1: {
+      goalTitle: 'Island goal: repair the boat',
+      goalFind: 'Find the old boat. It lies on a beach on the far side of the island.',
+      goalHint: 'Walk into the boat to give it what you carry.',
+      goalReady: 'The boat is ready! Walk into it to set sail.',
+      goalSailed: 'You sailed away from this island.',
+      sailTitle: 'Set sail?',
+      sailText: 'The boat is ready. Do you want to sail to a new island? You take your bag and your skills with you.',
+      setSail: 'Set sail!',
+    },
+    2: {
+      goalTitle: 'Island goal: light a beacon',
+      goalFind: 'Climb the mountain. Find the old stone ring on the snowy peak.',
+      goalHint: 'Walk into the beacon to give it what you carry.',
+      goalReady: 'The beacon is ready! Walk into it to light it.',
+      goalSailed: 'A ship took you away from this island.',
+      sailTitle: 'Light the beacon?',
+      sailText: 'The beacon is ready. Do you want to light it, so a passing ship sees you?',
+      setSail: 'Light it!',
+    },
   },
   clock,
   needs: NEEDS,
@@ -145,13 +179,13 @@ export const en: Strings = {
     lean_to: { name: 'Lean-to', description: 'A simple shelter. Sleep here to rest well and stay warmer.' },
     hut: { name: 'Hut', description: 'A cosy home. Toasty nights and the best sleep.' },
     axe: { name: 'Stone axe', description: 'Chops through brambles, and gets you more wood from trees.' },
-    rope: { name: 'Rope', description: 'Twisted from big leaves. The boat needs rope.' },
+    rope: { name: 'Rope', description: 'Twisted from big leaves. You need rope for the island goal.' },
     bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
     fishing_rod: { name: 'Fishing rod', description: 'Walk into the sea with it to catch fish.' },
     cooked_fish: { name: 'Cook a fish', description: 'Stand next to a campfire. Cooked fish is tasty food.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
-  stages: { hull: 'Hull', mast: 'Mast', sail: 'Sail', supplies: 'Supplies' },
+  stages: { hull: 'Hull', mast: 'Mast', sail: 'Sail', supplies: 'Supplies', base: 'Stone base', pyre: 'Wood pile', tinder: 'Tinder' },
   skills: {
     small_sips: { name: 'Small sips', description: 'Your water goes down 20% slower.' },
     small_appetite: { name: 'Small appetite', description: 'Your food goes down 20% slower.' },
@@ -243,17 +277,26 @@ export const en: Strings = {
       case 'learn': return `You learned: ${en.skills[msg.skill].name}.`;
       case 'catch': return 'You cast your line… and catch a fish!';
       case 'noBite': return 'Nothing bites. Try again!';
-      case 'goalFound': return 'You find an old boat wreck on the beach! Maybe you can fix it and sail away.';
-      case 'goalNeeds': return `The boat needs ${itemList(msg.left)} for the ${en.stages[msg.stage].toLowerCase()}.`;
-      case 'goalGive': return `You give the boat ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;
+      case 'goalFound': return msg.obj === 'beacon_site'
+        ? 'You find an old ring of stones on the peak! A beacon here could call a ship.'
+        : 'You find an old boat wreck on the beach! Maybe you can fix it and sail away.';
+      case 'goalNeeds': return `The ${goalName(msg.stage)} needs ${itemList(msg.left)} for the ${en.stages[msg.stage].toLowerCase()}.`;
+      case 'goalGive': return `You give the ${goalName(msg.stage)} ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;
       case 'goalStage': return {
         hull: 'The hull is finished! Now the boat needs a mast.',
         mast: 'The mast stands tall! Now the boat needs a sail.',
         sail: 'The sail is up! Now pack food for the trip.',
         supplies: 'The supplies are on board. The boat is ready to sail!',
+        base: 'The stone base is finished! Now pile up wood on it.',
+        pyre: 'The wood pile stands tall! Now it needs dry tinder.',
+        tinder: 'The tinder is in. The beacon is ready to light!',
       }[msg.stage];
-      case 'goalReady': return 'The boat is ready to sail.';
-      case 'sailAway': return 'You push the boat into the waves and sail away!';
+      case 'goalReady': return msg.level === 2 ? 'The beacon is ready to light.' : 'The boat is ready to sail.';
+      case 'sailAway': return msg.level === 2
+        ? 'You light the beacon. Smoke rises high into the sky, and soon a ship comes to take you on board!'
+        : 'You push the boat into the waves and sail away!';
+      case 'landIsland': return 'After a long trip, your boat lands on a new island. Tall trees and snowy mountains! It is colder here.';
+      case 'snowCold': return 'Brr! The snow is cold, even in the day. A fire or a shelter helps up here.';
       case 'legacy': return msg.text;
     }
   },

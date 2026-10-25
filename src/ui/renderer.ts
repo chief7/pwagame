@@ -2,7 +2,9 @@ import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
 import { hash2 } from '../sprites/pixel';
-import { bake, buildSprites, grassTileName, riverBankTileName, shoreTileName, type Sprite } from '../sprites';
+import {
+  bake, buildSprites, grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName, type Sprite,
+} from '../sprites';
 import { characterName } from '../sprites/characters';
 import type { Animator } from './animator';
 
@@ -382,10 +384,19 @@ export class Renderer {
         if (bank !== 'grass') return bank;
         const edge = grassTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Sand);
         if (edge !== 'grass') return edge;
+        const scree = grassScreeTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Scree);
+        if (scree !== 'grass') return scree;
         return roll < 0.88 ? 'grass' : 'grass_flowers';
       }
       case Tile.Rock:
         return map.get(x, y + 1) === Tile.Rock ? 'rock_top' : 'rock_face';
+      case Tile.Scree:
+        return roll < 0.8 ? 'scree' : 'scree_2';
+      case Tile.Snow: {
+        const edge = snowTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Scree);
+        if (edge !== 'snow') return edge;
+        return roll < 0.9 ? 'snow' : 'snow_2';
+      }
       default:
         return roll < 0.8 ? 'cave_floor' : 'cave_floor_2';
     }

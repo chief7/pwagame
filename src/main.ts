@@ -1,5 +1,6 @@
 import './style.css';
 import { ITEMS, type ItemId } from './game/defs/items';
+import { levelDef } from './game/defs/levels';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
@@ -359,7 +360,7 @@ function row(image: string, title: string, note: Node | string, action?: HTMLBut
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, sail: words.ui.sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
   if (sheetKind === 'sail' || sheetKind === 'end') {
@@ -467,44 +468,52 @@ function costList(cost: Partial<Record<ItemId, number>>): HTMLElement {
 /** The island goal at the top of the Build panel: what to do next for the boat. */
 function goalCard(): HTMLElement {
   const words = t();
+  const level = words.levels[game.level];
   const goal = game.goal();
   const note = el('div', {});
   const say = (text: string) => note.append(el('span', { className: 'row-note', textContent: text }));
-  let sprite = 'boat_wreck';
+  let sprite: string = levelDef(game.level).site;
   switch (goal.state) {
     case 'missing': say(words.ui.goalMissing); break;
-    case 'find': say(words.ui.goalFind); break;
+    case 'find': say(level.goalFind); break;
     case 'build':
       sprite = goal.obj;
       note.append(el('span', { className: 'row-note goal-step', textContent: words.ui.goalStep(goal.index, goal.count, goal.stage.id) }));
       note.append(costList(goal.left));
-      say(words.ui.goalHint);
+      say(level.goalHint);
       break;
-    case 'ready': sprite = 'boat_ready'; say(words.ui.goalReady); break;
-    case 'sailed': sprite = 'boat_ready'; say(words.ui.goalSailed); break;
+    case 'ready': sprite = goalDone(); say(level.goalReady); break;
+    case 'sailed': sprite = goalDone(); say(level.goalSailed); break;
   }
-  const card = row(icon(sprite), words.ui.goalTitle, note);
+  const card = row(icon(sprite), level.goalTitle, note);
   card.classList.add('goal');
   return card;
 }
 
-/** "Set sail?" before leaving, and the end screen after. */
+/** The finished goal of this island: the ready boat, the ready beacon. */
+function goalDone(): string {
+  return levelDef(game.level).stages.at(-1)!.becomes;
+}
+
+/** "Set sail?" before leaving, and the end screen after the last island. */
 function renderVoyage(rows: HTMLElement): void {
   const words = t();
   const leaving = sheetKind === 'sail';
   rows.append(
     el('div', { className: 'voyage' }, [
-      el('img', { src: icon('boat_ready'), alt: '' }),
-      el('p', { textContent: leaving ? words.ui.sailText : words.ui.endText }),
+      el('img', { src: icon(goalDone()), alt: '' }),
+      el('p', { textContent: leaving ? words.levels[game.level].sailText : words.ui.endText }),
     ]),
   );
   const foot = el('div', { className: 'sheet-foot' });
   if (leaving) {
-    const go = el('button', { type: 'button', className: 'primary', textContent: words.ui.setSail });
+    const go = el('button', { type: 'button', className: 'primary', textContent: words.levels[game.level].setSail });
     go.addEventListener('click', () => {
       if (!game.sail()) return closeSheet();
       afterTurn();
-      openSheet('end');
+      // The boat of island 1 lands on the next island; the last goal ends the game.
+      if (game.sailed) openSheet('end');
+      else closeSheet();
     });
     const wait = el('button', { type: 'button', textContent: words.ui.notYet });
     wait.addEventListener('click', closeSheet);

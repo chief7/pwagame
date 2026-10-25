@@ -7,6 +7,10 @@ export const Tile = {
   CaveFloor: 4,
   /** Fresh water: blocks movement like the sea, but you can drink it and bridge it. */
   River: 5,
+  /** Island 2: loose gravel on the mountains, walkable. */
+  Scree: 6,
+  /** Island 2: snow on the high peaks. Walkable, but cold. */
+  Snow: 7,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -56,7 +60,7 @@ export class GameMap {
   /** Ground you can stand on, ignoring objects. */
   isFloor(x: number, y: number): boolean {
     const t = this.get(x, y);
-    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor;
+    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow;
   }
 
   isOpaque(x: number, y: number): boolean {
