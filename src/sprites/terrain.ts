@@ -90,24 +90,31 @@ function transitionSet(prefix: string, paint: (f: number, x: number, y: number) 
   );
 }
 
+/** How a tile's own ground meets other ground: `f` is the signed distance from the boundary (negative is across it). */
+type Band = (f: number, x: number, y: number) => Color;
+
+const shoreBand: Band = (f, x, y) => {
+  if (f < -3) return waterPixel(x, y);
+  if (f < -1) return hash2(x, y, 9) < 0.15 ? P.water : P.waterShallow;
+  if (f < 0) return hash2(x, y, 10) < 0.2 ? P.waterShallow : P.foam;
+  if (f < 2) return hash2(x, y, 11) < 0.25 ? P.sandMid : P.sandWet;
+  return sandPixel(x, y, 1);
+};
+
+const grassSandBand: Band = (f, x, y) => {
+  if (f < 0) return sandPixel(x, y, 1);
+  if (f < 1) return hash2(x, y, 12) < 0.5 ? P.grassEdge : P.grassDark;
+  return grassPixel(x, y, 4);
+};
+
 /** Sand with the sea along its edges. */
 export function shoreSet(): Sprite[] {
-  return transitionSet('shore', (f, x, y) => {
-    if (f < -3) return waterPixel(x, y);
-    if (f < -1) return hash2(x, y, 9) < 0.15 ? P.water : P.waterShallow;
-    if (f < 0) return hash2(x, y, 10) < 0.2 ? P.waterShallow : P.foam;
-    if (f < 2) return hash2(x, y, 11) < 0.25 ? P.sandMid : P.sandWet;
-    return sandPixel(x, y, 1);
-  });
+  return transitionSet('shore', shoreBand);
 }
 
 /** Grass with beach sand along its edges. */
 export function grassEdgeSet(): Sprite[] {
-  return transitionSet('grass', (f, x, y) => {
-    if (f < 0) return sandPixel(x, y, 1);
-    if (f < 1) return hash2(x, y, 12) < 0.5 ? P.grassEdge : P.grassDark;
-    return grassPixel(x, y, 4);
-  });
+  return transitionSet('grass', grassSandBand);
 }
 
 function riverPixel(x: number, y: number, phase: number): Color {
@@ -123,15 +130,31 @@ export function river(): Sprite[] {
   return [0, 1].map((phase) => new Sprite(phase ? 'river_2' : 'river').paint((x, y) => riverPixel(x, y, phase)));
 }
 
+const riverBankBand: Band = (f, x, y) => {
+  if (f < -2) return riverPixel(x, y, 0);
+  if (f < -1) return hash2(x, y, 52) < 0.3 ? P.river : P.waterShallow;
+  if (f < 0) return hash2(x, y, 53) < 0.3 ? P.mudDark : P.mud;
+  if (f < 1) return hash2(x, y, 54) < 0.5 ? P.grassEdge : P.grassDark;
+  return grassPixel(x, y, 4);
+};
+
 /** Grass with a river along its edges: a strip of muddy bank between. */
 export function riverBankSet(): Sprite[] {
-  return transitionSet('bank', (f, x, y) => {
-    if (f < -2) return riverPixel(x, y, 0);
-    if (f < -1) return hash2(x, y, 52) < 0.3 ? P.river : P.waterShallow;
-    if (f < 0) return hash2(x, y, 53) < 0.3 ? P.mudDark : P.mud;
-    if (f < 1) return hash2(x, y, 54) < 0.5 ? P.grassEdge : P.grassDark;
-    return grassPixel(x, y, 4);
-  });
+  return transitionSet('bank', riverBankBand);
+}
+
+/** The river running into the sea: river water that turns to sea water through a dithered band. */
+function mouthBand(phase: number): Band {
+  return (f, x, y) => {
+    if (f < -2) return waterPixel(x, y);
+    if (f < 1) return hash2(x, y, 55) < (f + 3) / 4 ? riverPixel(x, y, phase) : P.water;
+    return riverPixel(x, y, phase);
+  };
+}
+
+/** River cells next to the sea, 2 frames like the river ('mouth_…' and 'mouth2_…'). */
+export function riverMouthSet(): Sprite[] {
+  return [...transitionSet('mouth', mouthBand(0)), ...transitionSet('mouth2', mouthBand(1))];
 }
 
 /**
@@ -299,23 +322,64 @@ export function snowTracks(): Sprite {
   return s;
 }
 
+const snowScreeBand: Band = (f, x, y) => {
+  if (f < -1) return screePixel(x, y, 80);
+  if (f < 0) return hash2(x, y, 84) < 0.5 ? P.screeDark : P.screeDeep;
+  if (f < 1) return hash2(x, y, 85) < 0.5 ? P.snowDeep : P.snowShade;
+  return snowPixel(x, y, 82);
+};
+
+const grassScreeBand: Band = (f, x, y) => {
+  if (f < 0) return screePixel(x, y, 80);
+  if (f < 1) return hash2(x, y, 86) < 0.5 ? P.grassEdge : P.grassDark;
+  return grassPixel(x, y, 4);
+};
+
+/** Water side of a bank: river, then a dithered shallow strip. */
+function riverSide(f: number, x: number, y: number, seed: number): Color {
+  if (f < -2) return riverPixel(x, y, 0);
+  return hash2(x, y, seed) < 0.3 ? P.river : P.waterShallow;
+}
+
+/** Scree down to the river: wet, dark gravel at the waterline. */
+const screeBankBand: Band = (f, x, y) => {
+  if (f < -1) return riverSide(f, x, y, 87);
+  if (f < 1) return hash2(x, y, 88) < 0.4 ? P.screeDeep : P.screeDark;
+  return screePixel(x, y, 80);
+};
+
+/** Snow down to the river: the snow melts into a line of wet gravel. */
+const snowBankBand: Band = (f, x, y) => {
+  if (f < -1) return riverSide(f, x, y, 89);
+  if (f < 0) return hash2(x, y, 90) < 0.5 ? P.screeDark : P.screeDeep;
+  if (f < 1) return hash2(x, y, 91) < 0.5 ? P.snowDeep : P.snowShade;
+  return snowPixel(x, y, 82);
+};
+
+/** Cave floor down to an underground stream: dark wet stone at the edge. */
+const caveBankBand: Band = (f, x, y) => {
+  if (f < -1) return riverSide(f, x, y, 92);
+  if (f < 1) return hash2(x, y, 93) < 0.4 ? P.stoneDeep : P.caveFloorDark;
+  return caveFloorPixel(x, y, 40);
+};
+
 /** Snow with scree along its edges: a thin melt line of wet gravel between. */
 export function snowEdgeSet(): Sprite[] {
-  return transitionSet('snow', (f, x, y) => {
-    if (f < -1) return screePixel(x, y, 80);
-    if (f < 0) return hash2(x, y, 84) < 0.5 ? P.screeDark : P.screeDeep;
-    if (f < 1) return hash2(x, y, 85) < 0.5 ? P.snowDeep : P.snowShade;
-    return snowPixel(x, y, 82);
-  });
+  return transitionSet('snow', snowScreeBand);
 }
 
 /** Grass with mountain scree along its edges. */
 export function grassScreeSet(): Sprite[] {
-  return transitionSet('grass_scree', (f, x, y) => {
-    if (f < 0) return screePixel(x, y, 80);
-    if (f < 1) return hash2(x, y, 86) < 0.5 ? P.grassEdge : P.grassDark;
-    return grassPixel(x, y, 4);
-  });
+  return transitionSet('grass_scree', grassScreeBand);
+}
+
+/** Scree, snow and cave floor with the river along their edges. */
+export function bankSets(): Sprite[] {
+  return [
+    ...transitionSet('scree_bank', screeBankBand),
+    ...transitionSet('snow_bank', snowBankBand),
+    ...transitionSet('cave_bank', caveBankBand),
+  ];
 }
 
 /** Snow tile for a snow cell given which neighbours are scree ('snow' when none). */
@@ -326,4 +390,69 @@ export function snowTileName(isScree: (dx: number, dy: number) => boolean): stri
 /** Grass tile for a grass cell next to mountain scree ('grass' when none). */
 export function grassScreeTileName(isScree: (dx: number, dy: number) => boolean): string {
   return transitionTileName('grass_scree', 'grass', isScree);
+}
+
+// ---- Edges against several kinds of ground ------------------------------------------
+
+/** Ground that draws edges, and for each kind of neighbour (one letter) its tile set and band. */
+const EDGES = {
+  grass: { a: ['grass', grassSandBand], r: ['bank', riverBankBand], c: ['grass_scree', grassScreeBand] },
+  snow: { c: ['snow', snowScreeBand], r: ['snow_bank', snowBankBand] },
+  scree: { r: ['scree_bank', screeBankBand] },
+  cave: { r: ['cave_bank', caveBankBand] },
+  river: { w: ['mouth', mouthBand(0)] },
+} as const satisfies Record<string, Record<string, readonly [string, Band]>>;
+
+export type EdgeGround = keyof typeof EDGES;
+
+/** Neighbour order in a mixed tile's name: four sides, then four corners. */
+const AROUND = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const;
+const SIDES: Side[] = ['n', 's', 'w', 'e'];
+const CORNERS: [Side, Side][] = [['n', 'w'], ['n', 'e'], ['s', 'w'], ['s', 'e']];
+
+/**
+ * Tile for a cell of `own` ground. `kindAt` gives the letter of a
+ * neighbour's ground from EDGES[own], or '.' when it draws no edge. With
+ * one kind around, this is that kind's transition tile; with more, a mixed
+ * tile 'mix_<own>_<8 letters>' that mixedTile() paints on demand.
+ */
+export function edgeTileName(own: EdgeGround, plain: string, kindAt: (dx: number, dy: number) => string): string {
+  const kinds = AROUND.map(([dx, dy]) => kindAt(dx, dy));
+  const found = [...new Set(kinds.filter((k) => k !== '.'))];
+  if (!found.length) return plain;
+  if (found.length === 1) {
+    const [prefix] = (EDGES[own] as Record<string, readonly [string, Band]>)[found[0]];
+    return transitionTileName(prefix, plain, (dx, dy) => kindAt(dx, dy) === found[0]);
+  }
+  return `mix_${own}_${kinds.join('')}`;
+}
+
+/**
+ * Paint a mixed tile: every pixel takes the band of the nearest boundary.
+ * Sides work as in the transition sets; a corner counts only when neither
+ * of its sides has an edge.
+ */
+export function mixedTile(name: string): Sprite | null {
+  const m = /^mix_([a-z]+)_([a-z.]{8})$/.exec(name);
+  if (!m || !(m[1] in EDGES)) return null;
+  const bands = EDGES[m[1] as EdgeGround] as Record<string, readonly [string, Band]>;
+  const kinds = [...m[2]];
+  if (kinds.some((k) => k !== '.' && !bands[k])) return null;
+  const sides = SIDES.map((side, i) => [side, kinds[i]] as const).filter(([, k]) => k !== '.');
+  const edged = new Set(sides.map(([side]) => side));
+  const corners = CORNERS.map((pair, i) => [pair, kinds[4 + i]] as const)
+    .filter(([pair, k]) => k !== '.' && !edged.has(pair[0]) && !edged.has(pair[1]));
+  return new Sprite(name).paint((x, y) => {
+    let best = Infinity;
+    let kind = '';
+    for (const [side, k] of sides) {
+      const f = inland(side, x, y);
+      if (f < best) [best, kind] = [f, k];
+    }
+    for (const [[a, b], k] of corners) {
+      const f = Math.max(inland(a, x, y), inland(b, x, y));
+      if (f < best) [best, kind] = [f, k];
+    }
+    return bands[kind][1](best, x, y);
+  });
 }

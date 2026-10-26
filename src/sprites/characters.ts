@@ -1,5 +1,5 @@
 import { PALETTE as P } from './palette';
-import { fromRows, type Color, type Sprite } from './pixel';
+import { fromRows, Sprite, type Color } from './pixel';
 
 // Castaway explorer, 16×16, drawn as templates so hair, skin and clothes are
 // swappable. Keys: k outline, s/S skin, e eye, h/H hair, c/C shirt,
@@ -169,7 +169,57 @@ export function character(body: Body, facing: Facing, frame: Frame = 0, look: Lo
 }
 
 export function characterSet(body: Body): Sprite[] {
-  return (['down', 'up', 'right', 'left'] as const).flatMap((f) => ([0, 1, 2] as const).map((fr) => character(body, f, fr)));
+  const facings = ['down', 'up', 'right', 'left'] as const;
+  return [
+    ...facings.flatMap((f) => ([0, 1, 2] as const).map((fr) => character(body, f, fr))),
+    ...facings.map((f) => fishingPose(body, f)),
+  ];
+}
+
+export function fishingName(body: Body, facing: Facing): string {
+  return `${body}_${facing}_fish`;
+}
+
+/** A straight 1px line from (x0, y0) to (x1, y1); `color` gets the step index. */
+function line(s: Sprite, x0: number, y0: number, x1: number, y1: number, color: (i: number) => string): void {
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let i = 0; i <= n; i++) s.set(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n, color(i));
+}
+
+/**
+ * The explorer casting the fishing rod, 32 × 24: the standing pose in the
+ * middle, the rod reaching out over the water it faces, the line and a
+ * bobber. Wider and taller than the cell, so the rod reaches the next one.
+ */
+export function fishingPose(body: Body, facing: Facing): Sprite {
+  const name = fishingName(body, facing);
+  if (facing === 'left') return fishingPose(body, 'right').mirrored(name);
+  const s = new Sprite(name, 32, 24);
+  const stand = character(body, facing);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) s.set(x + 8, y + 8, stand.get(x, y));
+  const rod = (i: number) => (i < 3 ? P.outline : i < 7 ? P.woodDeep : P.woodDark);
+  const cord = () => P.fishingLine;
+  const bobber = (x: number, y: number) => {
+    s.set(x, y, P.flowerWhite);
+    s.set(x, y + 1, P.bobber);
+  };
+  if (facing === 'right') {
+    // Held out at the front, tip over the next cell, line down into the water.
+    line(s, 19, 18, 29, 8, rod);
+    line(s, 30, 8, 30, 18, cord);
+    bobber(30, 19);
+  } else if (facing === 'up') {
+    // Over the shoulder, tip in the cell above.
+    line(s, 20, 17, 25, 2, rod);
+    line(s, 26, 2, 26, 4, cord);
+    bobber(26, 5);
+  } else {
+    // Facing you: the rod points out to the side, the line drops in front.
+    line(s, 21, 17, 29, 11, rod);
+    line(s, 30, 11, 30, 21, cord);
+    bobber(30, 22);
+  }
+  return s;
 }
 
 function setRow(rows: string[], y: number, x: number, text: string): void {

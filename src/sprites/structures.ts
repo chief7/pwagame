@@ -1,4 +1,5 @@
 import { PALETTE as P } from './palette';
+import { LOOKS } from './characters';
 import { hash2, Sprite } from './pixel';
 
 // Things the explorer builds.
@@ -237,6 +238,57 @@ function boatSprite(name: string, stage: BoatStage, frame: 0 | 1 = 0): Sprite {
   return s.shadow(12, KEEL + 1.5, 11, 1.5);
 }
 
+/** The explorer standing on deck in front of the mast, seen from the side. */
+function drawSailor(s: Sprite, body: 'male' | 'female'): void {
+  const look = LOOKS[body];
+  const rows = [
+    '.hhh.',
+    'hhhhh',
+    'hssse',
+    'hSsss',
+    'ccccC',
+    'ccccC',
+  ];
+  const key: Record<string, string> = { h: look.hair, s: look.skin, S: look.skinShade, e: P.outline, c: look.shirt, C: look.shirtShade };
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch !== '.') s.set(6 + x, DECK - 6 + y, key[ch]);
+  }));
+  if (body === 'female') s.set(7, DECK - 6, P.flower);
+}
+
+/** Foam at the waterline and a bow wave; it moves between frames. */
+function drawWake(s: Sprite, frame: 0 | 1): void {
+  const [k0, k1] = hullSpan(KEEL);
+  for (let x = k0 - 3; x <= k1 + 4; x++) {
+    if ((x + frame) % 3 !== 0) s.set(x, KEEL + 1, P.foam);
+    if ((x + frame) % 4 === 1 && x > k0) s.set(x - 2, KEEL + 2, P.waterShallow);
+  }
+  // The bow cuts a wave as the boat sails right.
+  const bow = hullSpan(DECK + 3)[1] + 1;
+  for (let i = 0; i < 3; i++) s.set(bow + i, KEEL - 1 - i + frame, P.foam);
+}
+
+/**
+ * The ready boat under sail with the explorer on board, for the trip to the
+ * next island: no ground shadow, foam along the waterline. 2 frames.
+ */
+function boatAwaySprite(body: 'male' | 'female', frame: 0 | 1): Sprite {
+  const s = new Sprite(`boat_away_${body}${frame ? '_2' : ''}`, BOAT_W, BOAT_H);
+  drawHull(s);
+  drawMast(s);
+  drawSail(s);
+  drawSupplies(s, frame);
+  drawSailor(s, body);
+  s.outline();
+  drawRigging(s);
+  drawWake(s, frame);
+  return s;
+}
+
+export function boatAway(): Sprite[] {
+  return (['male', 'female'] as const).flatMap((body) => [boatAwaySprite(body, 0), boatAwaySprite(body, 1)]);
+}
+
 /** The boat in each stage; the ready boat has two frames for its pennant. */
 export function boat(): Sprite[] {
   return [
@@ -338,6 +390,35 @@ function beaconSprite(name: string, stage: BeaconStage, frame: 0 | 1 = 0): Sprit
   return s.outline().shadow(12, BASE_FOOT + 1.5, 11, 1.5);
 }
 
+/** A tall signal fire on top of the pyre that leans one way, then the other. */
+function drawBeaconFire(s: Sprite, frame: 0 | 1): void {
+  const lean = frame === 0 ? -0.5 : 0.5;
+  for (let y = 0; y <= 14; y++) {
+    const t = y / 14;
+    const half = 0.8 + t * 5.2;
+    const cx = 12 + lean * (1 - t) * 3;
+    for (let x = Math.floor(cx - half); x <= Math.ceil(cx + half); x++) {
+      const d = Math.abs(x + 0.5 - cx) / (half + 0.3);
+      if (d > 1 || hash2(x, y, 105 + frame) < 0.15 * (1 - t)) continue;
+      const heat = (1 - d) * (0.35 + t * 0.65);
+      s.set(x, y, heat > 0.55 ? P.flameCore : heat > 0.35 ? P.flame : heat > 0.15 ? P.flameOrange : P.flameRed);
+    }
+  }
+}
+
+/** The lit beacon after the last goal: a big fire on the pyre, 2 frames. */
+function beaconLit(name: string, frame: 0 | 1): Sprite {
+  const s = new Sprite(name, BEACON_W, BEACON_H);
+  drawBeaconBase(s);
+  drawPyre(s);
+  drawTinder(s, frame);
+  drawBeaconFire(s, frame);
+  s.outline();
+  // Sparks rising above the outline.
+  for (const [x, y] of frame === 0 ? [[6, 2], [17, 5]] : [[8, 4], [18, 1]]) s.set(x, y, P.flame);
+  return s.shadow(12, BASE_FOOT + 1.5, 11, 1.5);
+}
+
 /** The signal beacon in each stage; the ready beacon has two frames for its pennant. */
 export function beacon(): Sprite[] {
   return [
@@ -346,5 +427,7 @@ export function beacon(): Sprite[] {
     beaconSprite('beacon_pyre', 'pyre'),
     beaconSprite('beacon_ready', 'ready', 0),
     beaconSprite('beacon_ready_2', 'ready', 1),
+    beaconLit('beacon_lit', 0),
+    beaconLit('beacon_lit_2', 1),
   ];
 }

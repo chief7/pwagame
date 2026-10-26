@@ -8,8 +8,66 @@ function creature(name: string, rows: readonly string[], key: Record<string, Col
   return fromRows(name, rows, { '.': null, ...key }).outline().shadow(8, 14.6, shadowRx, 1.2);
 }
 
-export function crab(): Sprite {
-  return creature('animal_crab', [
+/**
+ * How an animal moves between cells: 'walk' lifts every other leg in turn,
+ * 'flap' raises and lowers the wings (the `wing` key), 'slither' sways the
+ * tail end left and right.
+ */
+type Gait = { walk: true } | { flap: string } | { slither: true };
+
+/** The lowest row with anything drawn on it. */
+function lowestRow(rows: readonly string[]): number {
+  let y = rows.length - 1;
+  while (y > 0 && !/[^.]/.test(rows[y])) y--;
+  return y;
+}
+
+/** Lift the legs (the lowest row) one cluster up, every other cluster from `first`. */
+function liftLegs(rows: readonly string[], first: number): string[] {
+  const out = rows.map((r) => [...r]);
+  const y = lowestRow(rows);
+  let cluster = -1;
+  for (let x = 0; x < out[y].length; x++) {
+    if (out[y][x] === '.') continue;
+    if (x === 0 || out[y][x - 1] === '.') cluster++;
+    if (cluster % 2 !== first) continue;
+    out[y - 1][x] = out[y][x];
+    out[y][x] = '.';
+  }
+  return out.map((r) => r.join(''));
+}
+
+/** Move every `wing` pixel one row up (dy -1) or down (dy 1). */
+function flapWings(rows: readonly string[], wing: string, dy: number): string[] {
+  const out = rows.map((r) => [...r].map((c) => (c === wing ? '.' : c)));
+  rows.forEach((r, y) => [...r].forEach((c, x) => {
+    if (c === wing && out[y + dy]?.[x] === '.') out[y + dy][x] = wing;
+  }));
+  return out.map((r) => r.join(''));
+}
+
+/** Shift the lowest two rows one pixel left (dx -1) or right (dx 1). */
+function sway(rows: readonly string[], dx: number): string[] {
+  const y = lowestRow(rows);
+  return rows.map((r, i) => (i < y - 1 ? r : dx < 0 ? `${r.slice(1)}.` : `.${r.slice(0, -1)}`));
+}
+
+/**
+ * An animal's sprites: standing ('name'), two step frames ('name_step1',
+ * 'name_step2'), and all three mirrored to face the other way ('name_left…').
+ * The rows are drawn facing right (or straight at you).
+ */
+function animal(name: string, rows: readonly string[], key: Record<string, Color>, shadowRx: number, gait: Gait = { walk: true }): Sprite[] {
+  const steps = 'walk' in gait ? [liftLegs(rows, 0), liftLegs(rows, 1)]
+    : 'flap' in gait ? [flapWings(rows, gait.flap, -1), flapWings(rows, gait.flap, 1)]
+    : [sway(rows, -1), sway(rows, 1)];
+  const right = [creature(name, rows, key, shadowRx), ...steps.map((r, i) => creature(`${name}_step${i + 1}`, r, key, shadowRx))];
+  const left = right.map((sp) => sp.mirrored(sp.name.replace(name, `${name}_left`)));
+  return [...right, ...left];
+}
+
+export function crab(): Sprite[] {
+  return animal('animal_crab', [
     '................',
     '................',
     '................',
@@ -29,8 +87,8 @@ export function crab(): Sprite {
   ], { c: '#e0583a', C: '#a83c26', W: '#f29a7a', e: '#20180f' }, 6);
 }
 
-export function turtle(): Sprite {
-  return creature('animal_turtle', [
+export function turtle(): Sprite[] {
+  return animal('animal_turtle', [
     '................',
     '................',
     '................',
@@ -50,8 +108,8 @@ export function turtle(): Sprite {
   ], { S: '#4f7a3a', s: '#7aa64f', f: '#9cc97a', h: '#9cc97a', e: '#20180f' }, 6);
 }
 
-export function monkey(): Sprite {
-  return creature('animal_monkey', [
+export function monkey(): Sprite[] {
+  return animal('animal_monkey', [
     '................',
     '................',
     '................',
@@ -71,8 +129,8 @@ export function monkey(): Sprite {
   ], { b: '#7a4f2e', f: '#e2b98a', n: '#b8875a', e: '#20180f', t: '#5e3b22' }, 5);
 }
 
-export function piglet(): Sprite {
-  return creature('animal_piglet', [
+export function piglet(): Sprite[] {
+  return animal('animal_piglet', [
     '................',
     '................',
     '................',
@@ -92,8 +150,8 @@ export function piglet(): Sprite {
   ], { p: '#f2a7b0', P: '#d67f8c', n: '#c2606e', e: '#20180f', t: '#d67f8c' }, 6);
 }
 
-export function bat(): Sprite {
-  return creature('animal_bat', [
+export function bat(): Sprite[] {
+  return animal('animal_bat', [
     '................',
     '................',
     '................',
@@ -110,11 +168,11 @@ export function bat(): Sprite {
     '................',
     '................',
     '................',
-  ], { b: '#7a5a9e', w: '#523a70', e: '#ffd166' }, 4);
+  ], { b: '#7a5a9e', w: '#523a70', e: '#ffd166' }, 4, { flap: 'w' });
 }
 
-export function boar(): Sprite {
-  return creature('animal_boar', [
+export function boar(): Sprite[] {
+  return animal('animal_boar', [
     '................',
     '................',
     '................',
@@ -134,8 +192,8 @@ export function boar(): Sprite {
   ], { b: P.boar, L: P.boarLight, D: P.boarDark, h: P.boarDark, s: P.boarSnout, n: P.boarDark, T: P.tusk, e: P.outline, t: P.boarDark }, 6);
 }
 
-export function snake(): Sprite {
-  return creature('animal_snake', [
+export function snake(): Sprite[] {
+  return animal('animal_snake', [
     '................',
     '................',
     '................',
@@ -152,12 +210,12 @@ export function snake(): Sprite {
     '..d...ddddd.....',
     '................',
     '................',
-  ], { g: P.snake, L: P.snakeLight, d: P.snakeDark, e: P.outline, r: P.snakeTongue }, 5);
+  ], { g: P.snake, L: P.snakeLight, d: P.snakeDark, e: P.outline, r: P.snakeTongue }, 5, { slither: true });
 }
 
-export function wasps(): Sprite {
+export function wasps(): Sprite[] {
   // A small buzzing swarm: three wasps with pale wings.
-  return creature('animal_wasps', [
+  return animal('animal_wasps', [
     '................',
     '................',
     '......ww........',
@@ -174,11 +232,11 @@ export function wasps(): Sprite {
     '.....yKyK.......',
     '......yy........',
     '................',
-  ], { y: P.wasp, K: P.waspStripe, w: P.waspWing }, 3);
+  ], { y: P.wasp, K: P.waspStripe, w: P.waspWing }, 3, { flap: 'w' });
 }
 
-export function bear(): Sprite {
-  return creature('animal_bear', [
+export function bear(): Sprite[] {
+  return animal('animal_bear', [
     '................',
     '................',
     '...bb......bb...',
@@ -198,8 +256,8 @@ export function bear(): Sprite {
   ], { b: P.bear, L: P.bearLight, d: P.bearDark, m: P.bearMuzzle, n: P.outline, e: P.outline }, 7);
 }
 
-export function rabbit(): Sprite {
-  return creature('animal_rabbit', [
+export function rabbit(): Sprite[] {
+  return animal('animal_rabbit', [
     '................',
     '................',
     '................',
@@ -219,9 +277,9 @@ export function rabbit(): Sprite {
   ], { r: P.rabbit, L: P.rabbitLight, D: P.rabbitDark, p: P.rabbitEar, w: P.flowerWhite, e: P.outline, n: P.rabbitEar }, 5);
 }
 
-export function squirrel(): Sprite {
+export function squirrel(): Sprite[] {
   // Sitting up with its big bushy tail curled behind it.
-  return creature('animal_squirrel', [
+  return animal('animal_squirrel', [
     '................',
     '................',
     '..TTT...........',
@@ -241,9 +299,9 @@ export function squirrel(): Sprite {
   ], { s: P.squirrel, L: P.squirrelLight, T: P.squirrelDark, D: P.squirrelDark, b: P.squirrelBelly, e: P.outline, n: P.outline }, 5);
 }
 
-export function goat(): Sprite {
+export function goat(): Sprite[] {
   // A shaggy mountain goat with curved horns and a little beard.
-  return creature('animal_goat', [
+  return animal('animal_goat', [
     '................',
     '................',
     '................',
@@ -268,8 +326,8 @@ export function goat(): Sprite {
 const DOG_KEY = { d: P.dog, L: P.dogLight, D: P.dogDark, n: P.dogNose, e: P.outline, c: P.collar, t: P.collarTag };
 
 /** A stray dog, standing, with floppy ears and a raised tail. */
-export function strayDog(): Sprite {
-  return creature('animal_dog', DOG_ROWS, DOG_KEY, 6);
+export function strayDog(): Sprite[] {
+  return animal('animal_dog', DOG_ROWS, DOG_KEY, 6);
 }
 
 const DOG_ROWS = [
@@ -292,11 +350,11 @@ const DOG_ROWS = [
 ];
 
 /** The adopted dog: the same dog with a red collar and a gold tag. */
-export function companionDog(): Sprite {
+export function companionDog(): Sprite[] {
   const rows = [...DOG_ROWS];
   rows[9] = '..dd...ddDccdd..';
   rows[10] = '...ddddddddtd...';
-  return creature('dog', rows, DOG_KEY, 6);
+  return animal('dog', rows, DOG_KEY, 6);
 }
 
 /** The adopted dog lying down with its head on its paws, resting (asleep, or tired and waiting at camp). */
@@ -323,12 +381,12 @@ export function dogRest(): Sprite {
 
 /** The adopted dog's sprites, facing right and (mirrored) left. */
 export function dogFacings(): Sprite[] {
-  const [dog, rest] = [companionDog(), dogRest()];
-  return [dog, dog.mirrored('dog_left'), rest, rest.mirrored('dog_rest_left')];
+  const rest = dogRest();
+  return [...companionDog(), rest, rest.mirrored('dog_rest_left')];
 }
 
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), ...dogFacings()];
+  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), dogFacings()].flat();
 }
 
 // ---- Item icons -------------------------------------------------------------------

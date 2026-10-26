@@ -1211,7 +1211,8 @@ export class Game {
 
   private tryStep(a: Animal, x: number, y: number): boolean {
     if (!this.canStand(a, x, y)) return false;
-    a.facing = facingFor(x - a.x, y - a.y, a.facing);
+    // Animal sprites only look left or right: they keep their side when they move straight up or down.
+    if (x !== a.x) a.facing = x < a.x ? 'left' : 'right';
     this.emit({ type: 'move', id: a.id, fromX: a.x, fromY: a.y, toX: x, toY: y });
     a.x = x;
     a.y = y;

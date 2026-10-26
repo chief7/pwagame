@@ -2,9 +2,7 @@ import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
 import { hash2 } from '../sprites/pixel';
-import {
-  bake, buildSprites, grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName, type Sprite,
-} from '../sprites';
+import { bake, buildSprites, edgeTileName, mixedTile, shoreTileName, type Sprite } from '../sprites';
 import { characterName } from '../sprites/characters';
 import type { Animator } from './animator';
 
@@ -25,6 +23,8 @@ const WATER_FRAME_MS = 750;
 const WATER_TILES = ['water', 'water_2', 'water_3'];
 const RIVER_TILES = ['river', 'river_2'];
 const FIRE_FRAME_MS = 220;
+/** Animals that flutter along with a little hop; the others walk with step frames. */
+const FLYERS = new Set(['bat', 'wasps']);
 /** Night tint; its alpha comes from how dark a cell is. */
 const NIGHT_RGB = '10, 16, 42';
 const NIGHT_MAX = 0.62;
@@ -145,6 +145,7 @@ export class Renderer {
         let name = terrain[map.idx(x, y)];
         if (name === '~') name = WATER_TILES[(Math.floor(hash2(x, y, 51) * 3) + waterTick) % 3];
         else if (name === '≈') name = RIVER_TILES[riverTick % 2];
+        else if (riverTick % 2 && name.startsWith('mouth_')) name = `mouth2_${name.slice(6)}`;
         this.drawTile(name, o.x + x * cell, o.y + y * cell);
       }
     }
@@ -177,14 +178,18 @@ export class Renderer {
     for (const a of game.animals) {
       if (!map.isVisible(a.x, a.y)) continue;
       const pose = anim.pose(a.id, a.x, a.y, now);
-      actors.push({ id: a.id, name: `animal_${a.kind}`, pose, bob: pose.hop ? 0 : anim.idleBob(a.id, now) });
+      if (!FLYERS.has(a.kind)) pose.hop = 0;
+      const name = `animal_${a.kind}${a.facing === 'left' ? '_left' : ''}${pose.frame ? `_step${pose.frame}` : ''}`;
+      actors.push({ id: a.id, name, pose, bob: pose.frame ? 0 : anim.idleBob(a.id, now) });
     }
     const dog = game.dog;
     if (dog && map.isVisible(dog.x, dog.y)) {
       const pose = anim.pose(dog.id, dog.x, dog.y, now);
+      pose.hop = 0;
       const resting = dog.tired || dog.napping;
-      const name = `${resting ? 'dog_rest' : 'dog'}${dog.facing === 'left' ? '_left' : ''}`;
-      actors.push({ id: dog.id, name, pose, bob: pose.hop || resting ? 0 : anim.idleBob(dog.id, now) });
+      const step = !resting && pose.frame ? `_step${pose.frame}` : '';
+      const name = `${resting ? 'dog_rest' : 'dog'}${dog.facing === 'left' ? '_left' : ''}${step}`;
+      actors.push({ id: dog.id, name, pose, bob: pose.frame || resting ? 0 : anim.idleBob(dog.id, now) });
     }
     actors.push({
       id: player.id,
@@ -328,7 +333,12 @@ export class Renderer {
   }
 
   private drawTile(name: string, sx: number, sy: number): void {
-    const baked = this.sprites.get(name);
+    let baked = this.sprites.get(name);
+    if (!baked) {
+      // Cells with edges against several kinds of ground get their tile painted on first use.
+      const sprite = mixedTile(name);
+      if (sprite) this.sprites.set(name, (baked = { sprite, canvas: bake(sprite) }));
+    }
     if (baked) this.ctx.drawImage(baked.canvas, sx, sy, this.cell, this.cell);
   }
 
@@ -380,32 +390,28 @@ export class Renderer {
       case Tile.Water:
         return '~';
       case Tile.River:
-        return '≈';
+        return edgeTileName('river', '≈', (dx, dy) => (map.get(x + dx, y + dy) === Tile.Water ? 'w' : '.'));
       case Tile.Sand: {
         const shore = shoreTileName((dx, dy) => map.isWet(x + dx, y + dy));
         if (shore !== 'sand') return shore;
         return roll < 0.72 ? 'sand' : roll < 0.94 ? 'sand_ripples' : 'sand_shell';
       }
-      case Tile.Grass: {
-        const bank = riverBankTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.River);
-        if (bank !== 'grass') return bank;
-        const edge = grassTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Sand);
-        if (edge !== 'grass') return edge;
-        const scree = grassScreeTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Scree);
-        if (scree !== 'grass') return scree;
-        return roll < 0.88 ? 'grass' : 'grass_flowers';
-      }
+      case Tile.Grass:
+        return edgeTileName('grass', roll < 0.88 ? 'grass' : 'grass_flowers', (dx, dy) => {
+          const t = map.get(x + dx, y + dy);
+          return t === Tile.River ? 'r' : t === Tile.Sand ? 'a' : t === Tile.Scree ? 'c' : '.';
+        });
       case Tile.Rock:
         return map.get(x, y + 1) === Tile.Rock ? 'rock_top' : 'rock_face';
       case Tile.Scree:
-        return roll < 0.8 ? 'scree' : 'scree_2';
-      case Tile.Snow: {
-        const edge = snowTileName((dx, dy) => map.get(x + dx, y + dy) === Tile.Scree);
-        if (edge !== 'snow') return edge;
-        return roll < 0.9 ? 'snow' : 'snow_2';
-      }
+        return edgeTileName('scree', roll < 0.8 ? 'scree' : 'scree_2', (dx, dy) => (map.get(x + dx, y + dy) === Tile.River ? 'r' : '.'));
+      case Tile.Snow:
+        return edgeTileName('snow', roll < 0.9 ? 'snow' : 'snow_2', (dx, dy) => {
+          const t = map.get(x + dx, y + dy);
+          return t === Tile.River ? 'r' : t === Tile.Scree ? 'c' : '.';
+        });
       default:
-        return roll < 0.8 ? 'cave_floor' : 'cave_floor_2';
+        return edgeTileName('cave', roll < 0.8 ? 'cave_floor' : 'cave_floor_2', (dx, dy) => (map.get(x + dx, y + dy) === Tile.River ? 'r' : '.'));
     }
   }
 }

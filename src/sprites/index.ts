@@ -4,19 +4,19 @@ import {
   berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
   treeSpruce, treeSpruceSnow,
 } from './forest';
-import { beacon, boat, bridge, campfire, hut, leanTo } from './structures';
+import { beacon, boat, boatAway, bridge, campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
 import { appIcon, globe, grillButton, skillIcons } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
-  caveFloor, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, rockFace, rockTop,
+  bankSets, caveFloor, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, riverMouthSet, rockFace, rockTop,
   sand, sandRipples, sandShell, scree, screeStones, shoreSet, snow, snowEdgeSet, snowTracks, water, waterVariants,
 } from './terrain';
 
 export { Sprite } from './pixel';
 export {
-  grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName, transitionTileName,
+  edgeTileName, grassScreeTileName, grassTileName, mixedTile, riverBankTileName, shoreTileName, snowTileName, transitionTileName,
 } from './terrain';
 
 export interface SpriteGroup {
@@ -36,13 +36,13 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
-    { title: 'River', sprites: [...river(), ...riverBankSet(), bridge('ns'), bridge('ew')] },
+    { title: 'River', sprites: [...river(), ...riverBankSet(), ...bankSets(), ...riverMouthSet(), bridge('ns'), bridge('ew')] },
     { title: 'Stones', sprites: [boulder(), pebbles(), mossyStone()] },
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
     { title: 'Animals', sprites: animalSet() },
     { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
-    { title: 'Boat', sprites: boat() },
+    { title: 'Boat', sprites: [...boat(), ...boatAway()] },
     { title: 'Beacon', sprites: beacon() },
     { title: 'Interface', sprites: [globe(), ...skillIcons(), ...grillButton(), appIcon()] },
   ];
