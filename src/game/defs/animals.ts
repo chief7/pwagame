@@ -40,6 +40,8 @@ export interface AnimalDef {
   minHomeDistance?: number;
   /** The islands (levels) it lives on; default only the first. */
   islands?: number[];
+  /** It walks over steep steps (on its habitat) without a ladder. */
+  climber?: true;
   /** Your dog's bark makes it run away. */
   scaredByDog?: true;
 }
@@ -71,7 +73,7 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
   squirrel: { kind: 'squirrel', temper: 'cheeky', habitat: [Tile.Grass], notice: 5, wander: 0.5, population: 3, islands: [2], scaredByDog: true },
   goat: {
     kind: 'goat', temper: 'charger', habitat: [Tile.Scree, Tile.Snow], notice: 4, wander: 0.3, population: 3,
-    damage: 10, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [2],
+    damage: 10, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [2], climber: true,
   },
   // A lost dog, one on each island, far from camp, until you adopt one.
   dog: { kind: 'dog', temper: 'stray', habitat: [Tile.Grass], notice: 0, wander: 0.1, population: 1, minHomeDistance: 25, islands: [1, 2] },

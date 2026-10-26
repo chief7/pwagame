@@ -3,8 +3,8 @@ import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './cl
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
 import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId } from './defs/levels';
-import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
-import { RECIPES, type RecipeId } from './defs/recipes';
+import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
+import { RECIPE_IDS, RECIPES, type RecipeId } from './defs/recipes';
 import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
 import { computeFov } from './fov';
 import { Inventory } from './inventory';
@@ -48,6 +48,8 @@ const GREEN_THUMB = 0.7;
 const NIGHT_EYES = 2;
 /** How much colder it is out in the open on snow, day and night (see warmthTarget). */
 const SNOW_CHILL = 40;
+/** Energy it costs to climb onto a ladder or a climbing rope. */
+const CLIMB_ENERGY = 2;
 /** Turns a shooed (or barked at) animal runs away. */
 const SHOO_TURNS = 8;
 /** How much the dog's Food and Water drop each turn (half while you sleep). */
@@ -169,6 +171,8 @@ export class Game {
   private animalsActing = false;
   /** The explorer walked into the finished goal: the UI asks whether to set sail. */
   private sailAsked = false;
+  /** climberDist() of this turn. */
+  private climbDist: { turn: number; dist: Int32Array } | null = null;
 
   constructor(seed = (Math.random() * 2 ** 32) >>> 0, save?: SaveData) {
     this.seed = seed;
@@ -347,7 +351,8 @@ export class Game {
     }
     if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
-    if ('builds' in recipe && !this.buildSpot(recipe.builds)) {
+    if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
+      if (recipe.onto) return { key: 'noStep', obj: recipe.onto };
       return OBJECTS[recipe.builds].bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
     return null;
@@ -460,9 +465,17 @@ export class Game {
     p.x = nx;
     p.y = ny;
     if (obj && OBJECTS[obj.kind].shelter) this.message({ key: 'stepInto', obj: obj.kind }, 'info');
+    else if (obj && OBJECTS[obj.kind].climb) this.climb(nx, ny, obj.kind);
     else if (!onSnow && this.map.get(nx, ny) === Tile.Snow) this.message({ key: 'snowCold' }, 'warn');
     this.endTurn();
     return true;
+  }
+
+  /** Climbing onto a ladder or a climbing rope is hard work. */
+  private climb(x: number, y: number, kind: ObjectKind): void {
+    this.needs.energy = Math.max(0, this.needs.energy - CLIMB_ENERGY);
+    this.emit({ type: 'float', x, y, amount: -CLIMB_ENERGY, what: { need: 'energy' }, tone: 'info' });
+    this.message({ key: 'climb', obj: kind }, 'info');
   }
 
   /** One step along the shortest known path to (tx, ty), through explored ground only. */
@@ -561,7 +574,7 @@ export class Game {
       this.endTurn();
       return true;
     }
-    const spot = this.buildSpot(recipe.builds)!;
+    const spot = this.buildSpot(recipe.builds, recipe.onto)!;
     for (const cell of spot.cells) {
       this.objects.set(this.map.idx(cell.x, cell.y), { kind: spot.kind });
       this.emit({ type: 'sparkle', x: cell.x, y: cell.y });
@@ -689,6 +702,12 @@ export class Game {
 
     if (def.drink) return this.drink(def.drink, { key: 'drink' });
     if (def.goal) return this.workOnGoal(x, y, obj);
+    if (def.steep) {
+      const recipe = RECIPE_IDS.map((id) => RECIPES[id]).find((r) => r.onto === obj.kind);
+      const way = recipe && 'builds' in recipe ? recipe.builds : obj.kind;
+      this.message({ key: 'tooSteep', obj: obj.kind, way }, 'info');
+      return false;
+    }
 
     const gather = def.gather;
     if (!gather) {
@@ -861,9 +880,10 @@ export class Game {
   /**
    * Where a new building goes: in front of the explorer if free, else the
    * nearest free neighbour. A bridge goes straight ahead across the river
-   * instead, facing the way the explorer does.
+   * instead, facing the way the explorer does. A way up a step (`onto`)
+   * goes on such a step in front, else on the nearest one next to the explorer.
    */
-  private buildSpot(kind: ObjectKind): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
+  private buildSpot(kind: ObjectKind, onto?: ObjectKind): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
     const p = this.player;
     const [fx, fy] = facingDelta(p.facing);
     if (OBJECTS[kind].bridge) {
@@ -871,6 +891,10 @@ export class Game {
       return cells ? { kind: fx ? 'bridge_ew' : 'bridge_ns', cells } : null;
     }
     const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
+    if (onto) {
+      const at = order.find(([dx, dy]) => this.objectAt(p.x + dx, p.y + dy)?.kind === onto && !this.animalAt(p.x + dx, p.y + dy));
+      return at ? { kind, cells: [{ x: p.x + at[0], y: p.y + at[1] }] } : null;
+    }
     for (const [dx, dy] of order) {
       const x = p.x + dx;
       const y = p.y + dy;
@@ -903,10 +927,13 @@ export class Game {
 
   /**
    * Whether everything the explorer could get to now (counting brambles to
-   * clear and rivers to bridge) is still reachable.
+   * clear, steps to climb and rivers to bridge) is still reachable.
    */
   private allReachableFrom(sx: number, sy: number): boolean {
-    const open = (x: number, y: number) => this.isPassable(x, y) || this.objectAt(x, y)?.kind === 'bramble';
+    const open = (x: number, y: number) => {
+      const obj = this.objectAt(x, y);
+      return this.isPassable(x, y) || (!!obj && canBeOpened(obj.kind));
+    };
     const isRiver = (x: number, y: number) => this.map.get(x, y) === Tile.River && !this.objectAt(x, y);
     const reach = reachWithBridges(this.map, sx, sy, open, isRiver);
     for (let i = 0; i < this.map.tiles.length; i++) {
@@ -1202,9 +1229,11 @@ export class Game {
   }
 
   private canStand(a: Animal, x: number, y: number): boolean {
+    const obj = this.objectAt(x, y);
+    // Climbers (the mountain goat) jump up and down steep steps, with or without a ladder.
+    const climbs = !!obj && !!ANIMALS[a.kind].climber && !!(OBJECTS[obj.kind].steep || OBJECTS[obj.kind].climb);
     return (
-      this.isPassable(x, y) &&
-      !this.objectAt(x, y) &&
+      (climbs || (this.isPassable(x, y) && !obj)) &&
       ANIMALS[a.kind].habitat.includes(this.map.get(x, y)) &&
       !this.animalAt(x, y) &&
       !this.dogAt(x, y) &&
@@ -1238,6 +1267,7 @@ export class Game {
   }
 
   private stepToward(a: Animal, playerDist: Int32Array): void {
+    if (ANIMALS[a.kind].climber) playerDist = this.climberDist();
     let best: [number, number] | null = null;
     let bestDist = playerDist[this.map.idx(a.x, a.y)];
     for (const [dx, dy] of DIRS) {
@@ -1251,6 +1281,19 @@ export class Game {
       }
     }
     if (best) this.tryStep(a, best[0], best[1]);
+  }
+
+  /** Distances to the explorer for climbers: over steep steps too. Made once a turn, when needed. */
+  private climberDist(): Int32Array {
+    if (this.climbDist?.turn !== this.turn) {
+      const p = this.player;
+      const over = (x: number, y: number) => {
+        const obj = this.objectAt(x, y);
+        return this.isPassable(x, y) || (!!obj && !!OBJECTS[obj.kind].steep);
+      };
+      this.climbDist = { turn: this.turn, dist: distanceMap(this.map, p.x, p.y, over) };
+    }
+    return this.climbDist.dist;
   }
 
   private spawnAnimal(kind: AnimalKind, outOfSight: boolean): void {

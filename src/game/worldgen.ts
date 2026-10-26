@@ -1,5 +1,5 @@
 import { levelDef, type Biome } from './defs/levels';
-import { OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
+import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { GameMap, Tile } from './map';
 import { DIRS, distanceMap, reachWithBridges } from './pathing';
 import type { Rng } from './rng';
@@ -41,6 +41,13 @@ const FOREST_LINE = 0.6;
 const SNOW_LINE = 0.93;
 /** Island 2: the goal stands on a cell with at least this many floor neighbours, so you can walk up to it. */
 const GOAL_OPEN_SIDES = 5;
+/**
+ * Island 2: the rings of steep steps round the goal, as walking distances
+ * from it to try (the ring on the most of its ground wins): rocky ledges
+ * in the scree, and ice walls on the snow nearer the top.
+ */
+const LEDGE_RING = { from: 6, to: 10, ground: Tile.Scree, kind: 'ledge' } as const;
+const ICE_RING = { from: 3, to: 4, ground: Tile.Snow, kind: 'ice_wall' } as const;
 
 type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow';
 
@@ -524,10 +531,10 @@ function scatterObjects(
   const objects = new Map<number, WorldObject>(borders.brambles.map((i) => [i, { kind: 'bramble' }]));
   const { region } = borders;
   const forest = valueNoise(map.width, map.height, 6, rng);
-  // Brambles can be cleared, so they don't count as blocking here.
+  // Brambles can be cleared and steps climbed, so they don't count as blocking here.
   const blocked = (x: number, y: number) => {
     const o = objects.get(map.idx(x, y));
-    return o !== undefined && !OBJECTS[o.kind].walkable && o.kind !== 'bramble';
+    return o !== undefined && !OBJECTS[o.kind].walkable && !canBeOpened(o.kind);
   };
   const open = (x: number, y: number) => map.isFloor(x, y) && !blocked(x, y);
   const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
@@ -579,6 +586,7 @@ function scatterObjects(
     const peaks = cells.filter((i) => map.tiles[i] === Tile.Snow).sort((a, b) => elevation[b] - elevation[a]);
     goalAt = peaks.find((i) => goalFree(i) && openSides(i) >= GOAL_OPEN_SIDES && place(i, goal)) ?? -1;
     if (goalAt < 0) return null;
+    for (const ring of [LEDGE_RING, ICE_RING]) if (!addStepRing(map, goalAt, start, objects, ring)) return null;
   } else {
     for (const r of GOAL_REGIONS) {
       goalAt = cells.find((i) => {
@@ -642,6 +650,43 @@ function scatterObjects(
     if (place(i, 'chest_closed')) chests[r]++;
   }
   return objects;
+}
+
+/**
+ * Island 2: a ring of steep steps round the goal. The ring is every floor
+ * cell at one walking distance from the goal (counting river cells as a
+ * way, since bridges can cross them). Each step changes that distance by
+ * at most 1, so every way up, also over a bridge, has to cross the ring.
+ * A distance whose ring would touch the river, an object or the start
+ * can't be used. Returns false when no distance works.
+ */
+function addStepRing(
+  map: GameMap,
+  goalAt: number,
+  start: { x: number; y: number },
+  objects: Map<number, WorldObject>,
+  ring: { from: number; to: number; ground: Tile; kind: ObjectKind },
+): boolean {
+  const gx = goalAt % map.width;
+  const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
+  const dist = distanceMap(map, gx, (goalAt - gx) / map.width, (x, y) => map.isFloor(x, y) || isRiver(x, y));
+  if (dist[map.idx(start.x, start.y)] <= ring.to + 1) return false;
+  let best: number[] = [];
+  let bestShare = -1;
+  for (let d = ring.from; d <= ring.to; d++) {
+    const cells: number[] = [];
+    let ok = true;
+    for (let i = 0; i < dist.length && ok; i++) {
+      if (dist[i] !== d) continue;
+      ok = map.tiles[i] !== Tile.River && !objects.has(i);
+      cells.push(i);
+    }
+    if (!ok || !cells.length) continue;
+    const share = cells.filter((i) => map.tiles[i] === ring.ground).length / cells.length;
+    if (share > bestShare) [best, bestShare] = [cells, share];
+  }
+  for (const i of best) objects.set(i, { kind: ring.kind });
+  return best.length > 0;
 }
 
 /** The 8 cells round a cell, in ring order. */

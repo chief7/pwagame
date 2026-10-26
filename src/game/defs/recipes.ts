@@ -6,7 +6,7 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope';
 
 export type Recipe = {
   id: RecipeId;
@@ -15,6 +15,8 @@ export type Recipe = {
   skill?: SkillId;
   /** Only possible next to a campfire (cooking). */
   atFire?: true;
+  /** Built on this object in front of the explorer, which it replaces (a ladder on a rocky step). */
+  onto?: ObjectKind;
 } & ({ builds: ObjectKind } | { makes: ItemId });
 
 export const RECIPES: Record<RecipeId, Recipe> = {
@@ -27,6 +29,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   bridge: { id: 'bridge', builds: 'bridge_ns', cost: { wood: 6, leaves: 3 } },
   fishing_rod: { id: 'fishing_rod', makes: 'fishing_rod', cost: { wood: 3, leaves: 2 }, skill: 'fishing_rod' },
   cooked_fish: { id: 'cooked_fish', makes: 'cooked_fish', cost: { fish: 1 }, atFire: true },
+  // Island 2: ways up the steep steps.
+  ladder: { id: 'ladder', builds: 'ledge_ladder', onto: 'ledge', cost: { wood: 4, rope: 2 } },
+  climbing_rope: { id: 'climbing_rope', builds: 'ice_wall_rope', onto: 'ice_wall', cost: { wood: 1, rope: 4 } },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];

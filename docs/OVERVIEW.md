@@ -176,6 +176,8 @@ What `move` does when the target cell is not free:
 2. **Solid object there:** interact with it:
    - Spring: drink.
    - The island goal (the boat): give it materials (see 4.12).
+   - Steep step (rocky step, ice wall): say that it is too steep and what to
+     build on it (`tooSteep`, see 4.14). No turn passes.
    - Object with `gather`: gather from it. If it `needs` a tool that the
      player does not carry (bramble: axe), say so. No turn passes.
    - Other object: show its name. No turn passes.
@@ -346,6 +348,9 @@ Special recipes:
   (`BRIDGE_SPAN`), with free ground after them. The bridge fills all those
   cells. Facing left or right builds `bridge_ew`, else `bridge_ns`. If
   there is no such river, the message is `noBridgeSpot`.
+- **On a step** (a recipe with `onto`): the building replaces that object.
+  It goes on such an object in front of the player, else on the nearest one
+  next to the player. If there is none, the message is `noStep` (see 4.14).
 
 ### 4.9 Animals
 
@@ -374,6 +379,9 @@ at least `minHomeDistance` (25) cells from home. A new hurt message is
 Other rules:
 
 - Animals only walk on their `habitat` tiles. They never enter objects or the player's cell.
+  Exception: a `climber` (the mountain goat) also walks on steep steps and
+  on the ladders and ropes on them. It finds the way to the player over
+  steps (`climberDist`).
   No habitat has river tiles, so animals never cross the river, also not on bridges.
 - When they do not react, they wander (chance per turn = `wander`).
 - Shooed animals run away for 8 turns.
@@ -553,6 +561,29 @@ cells from camp) until the player has a dog.
 - The Bag panel shows a dog row with its Food and Water, and a "Feed dog"
   button on each item the dog can eat.
 
+### 4.14 Steep steps (island 2)
+
+On island 2, two rings of steep steps go round the peak (see §5). Every way
+up to the beacon crosses both rings.
+
+| Step (`steep`) | Where | Way up (recipe) | Cost | Becomes (`climb`) |
+|---|---|---|---|---|
+| Rocky step (`ledge`) | Outer ring, mostly scree | Ladder (`ladder`) | 4 wood, 2 rope | `ledge_ladder` |
+| Ice wall (`ice_wall`) | Inner ring, mostly snow | Climbing rope (`climbing_rope`) | 1 wood, 4 rope | `ice_wall_rope` |
+
+- Walking into a step logs `tooSteep` with the thing to build (`way`). No
+  turn passes.
+- The recipe has `onto`: it builds on such a step next to the player (see
+  4.8). The ladder does not fit an ice wall. Building gives 1 XP per item
+  (ladder 6, climbing rope 5). Handy builder makes them 1 wood cheaper.
+- The ladder and the rope are walkable. Stepping onto one costs 2 Energy
+  (`CLIMB_ENERGY`), with a float and the message `climb`. Stepping off is
+  a normal step. The dog follows over them.
+- Steps count as open for every "does this cut off the island" check
+  (`canBeOpened()` in `objects.ts`, like brambles).
+- The mountain goat (`climber`) walks over steps (see 4.9).
+- Island 1 has no steps. Island 2 saves from before have no steps either.
+
 ---
 
 ## 5. The world
@@ -636,6 +667,15 @@ changes (`biome: 'mountain'`):
 - **The goal** (`beacon_site`) goes on the highest snow cell that has at
   least 5 floor neighbours (`GOAL_OPEN_SIDES`), so the player can walk up
   to it. If no such cell exists, the island is made again.
+- **Steep steps** (`addStepRing`). Right after the goal, two rings go round
+  it: rocky steps (`LEDGE_RING`) and ice walls (`ICE_RING`). A ring is every
+  floor cell at one walking distance from the goal. This distance counts
+  river cells as a way (bridges cross them), so every way up crosses the
+  ring. Of the distances in the range (ledges 6–10, ice 3–4), the one with
+  the most scree (ledges) or snow (ice) wins. A distance can't be used when
+  its ring has a river cell or an object on it. The start must be further
+  out. If no distance works, the island is made again. A typical ring has
+  20–45 rocky steps and 10–25 ice walls.
 - **Scatter** uses the `mountain` table of `SCATTER`: driftwood and pebbles
   on the beach; spruce, birch, apple tree, broadleaf tree, fern, bushes and
   mushrooms in the forest; pebbles, boulders and some spruces on scree;
@@ -693,6 +733,8 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `lightRadius` | Lights cells at night. |
 | `frames` | Sprite names for an animation (2 frames, 220 ms each). |
 | `bridge` | Built across river cells (see 4.8). The player can walk on it. |
+| `steep` | A steep step: blocks the way until a recipe with `onto` builds on it (see 4.14). Counts as open for placement checks. |
+| `climb` | A way up a step: stepping onto it costs Energy (see 4.14). |
 | `goal` | The island goal: walking into it gives it materials (see 4.12). |
 | `done` | A finished goal after `sail()` (the lit beacon): `frames` to show instead and its `lightRadius`. |
 
@@ -709,8 +751,9 @@ axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
 ```
 
 A recipe has `builds` (an object) or `makes` (an item for the bag).
-Optional: `skill` (a skill must be learned first) and `atFire` (the player
-must be next to a campfire).
+Optional: `skill` (a skill must be learned first), `atFire` (the player
+must be next to a campfire) and `onto` (it builds on this object next to the
+player and replaces it, see 4.8).
 
 ### Skills
 
@@ -727,19 +770,19 @@ crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander:
 ```
 
 Also add the kind to the `AnimalKind` type. A new temper needs new code in
-`Game.animalAct()`.
+`Game.animalAct()`. `climber: true` lets an animal walk over steep steps.
 
 ### Current content
 
 | Type | Entries |
 |---|---|
 | Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
 | Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
 | Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
-| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow) |
+| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps) |
 
 ---
 
@@ -907,7 +950,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
@@ -945,6 +988,8 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Where the goal goes | `worldgen.ts` → `GOAL_REGIONS` | far side, forest, home |
 | River drink | `game.ts` → `RIVER_DRINK` | 35 |
 | Snow cold | `game.ts` → `SNOW_CHILL` | 40 |
+| Climb cost | `game.ts` → `CLIMB_ENERGY` | 2 Energy |
+| Rings of steps round the goal | `worldgen.ts` → `LEDGE_RING`, `ICE_RING` | 6–10 and 3–4 cells of walking |
 | Dog hunger, thirst | `game.ts` → `DOG_HUNGER`, `DOG_THIRST` | 0.3, 0.35 per turn |
 | Dog start, raw fish, drink | `game.ts` → `DOG_START_FOOD`, `DOG_START_WATER`, `DOG_RAW_FISH`, `DOG_DRINK` | 40 (+ the snack), 60, 30, 50 |
 | Dog ranges | `game.ts` → `DOG_REACH`, `DOG_DRINK_RANGE`, `DOG_BARK_RANGE`, `DOG_LOST` | 2, 3, 3, 12 cells |
@@ -980,6 +1025,10 @@ Also run `npm run build` (typecheck and build) before you commit.
   starts again on island 1.
 - Islands from saves before version 4 have no boat, so they have no goal.
 - During the boat trip, the boat faces right also when it sails up or down.
+- The rings of steep steps follow the walking distance, not the ground. Some
+  rocky steps stand on grass or snow, and some ice walls on scree. The step
+  sprites do not change with the ground below them.
+- The explorer stands in front of a ladder or rope and hides most of it.
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
 - The game has not been tested on a real phone.

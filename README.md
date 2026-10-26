@@ -41,6 +41,9 @@ npm run preview   # serve the build (service worker is only active here)
   off: chop through with a stone axe (which also gets more wood from trees).
   Behind it is the wild forest, and then a river: build a bridge to reach
   the far side, where most hills and caves are. Further out are more chests.
+  On the mountain island, the way up to the peak crosses a ring of rocky
+  steps (build a ladder on one) and then a ring of ice walls (hang a
+  climbing rope on one). Climbing costs a little Energy.
 - **Animals:** crabs pinch if you linger, monkeys snatch food, piglets and
   bats keep their distance, turtles don't mind you. Far from camp live wild
   animals that hurt: wild boars charge at you, snakes bite, wasps chase you
@@ -144,7 +147,7 @@ src/
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
     terrain.ts   sand, water, river, grass, rock, cave floor, scree, snow, and all edge transitions (also mixed ones)
     forest.ts    trees, bushes, berry bushes, mushrooms, brambles
-    objects.ts   stones, logs, chests, stalagmite, spring
+    objects.ts   stones, logs, chests, stalagmite, spring, steep steps (rocky step, ice wall) with ladder and rope
     palms.ts     palm trees (24×32), with bare versions
     structures.ts campfire (animated), lean-to, hut, bridges, boat (also sailing away), beacon (also lit)
     creatures.ts animals (with step frames and left facing), item icons

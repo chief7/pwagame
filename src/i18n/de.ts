@@ -117,6 +117,10 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   beacon_base: { g: 'n', word: 'Leuchtfeuer' },
   beacon_pyre: { g: 'n', word: 'Leuchtfeuer' },
   beacon_ready: { g: 'n', word: 'Leuchtfeuer' },
+  ledge: { g: 'f', word: 'Felsstufe' },
+  ledge_ladder: { g: 'f', word: 'Leiter' },
+  ice_wall: { g: 'f', word: 'Eiswand' },
+  ice_wall_rope: { g: 'n', word: 'Kletterseil' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -249,6 +253,8 @@ export const de: Strings = {
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
     fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
+    ladder: { name: 'Leiter', description: 'Bringt dich über eine Felsstufe in den Bergen. Stell dich neben die Stufe, um sie zu bauen.' },
+    climbing_rope: { name: 'Kletterseil', description: 'Bringt dich über eine Eiswand nahe am Gipfel. Stell dich neben die Wand, um es zu bauen.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
   stages: { hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte', base: 'Steinsockel', pyre: 'Holzstoß', tinder: 'Zunder' },
@@ -380,6 +386,9 @@ export const de: Strings = {
       case 'dogTired': return 'Dein Hund ist zu hungrig oder durstig, um zu helfen. Er trottet langsam hinter dir her.';
       case 'dogBack': return 'Dein Hund springt auf und ist wieder fröhlich!';
       case 'snowCold': return 'Brr! Der Schnee ist kalt, auch am Tag. Ein Feuer oder ein Unterschlupf hilft hier oben.';
+      case 'tooSteep': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu steil zum Klettern. Bau ${obj(msg.way, 'acc', 'a')} daran.`;
+      case 'noStep': return `Stell dich neben ${obj(msg.obj, 'acc', 'a')}, um das zu bauen.`;
+      case 'climb': return `Du kletterst ${contract(`an ${obj(msg.obj, 'dat', 'the')}`)} über die Stufe. Puh, das ist anstrengend!`;
       case 'legacy': return msg.text;
     }
   },

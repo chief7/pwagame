@@ -72,6 +72,12 @@ export type Msg =
   | { key: 'landIsland'; level: LevelId }
   /** Stepped onto snow: it is cold up here. */
   | { key: 'snowCold' }
+  /** Walked into a steep step: build `way` (a ladder, a climbing rope) on it to get up. */
+  | { key: 'tooSteep'; obj: ObjectKind; way: ObjectKind }
+  /** Tried to build a way up with no such step next to the explorer. */
+  | { key: 'noStep'; obj: ObjectKind }
+  /** Climbed over a step on a ladder or a rope. */
+  | { key: 'climb'; obj: ObjectKind }
   /** Walked into the stray dog without any food for it. */
   | { key: 'dogSniff' }
   | { key: 'dogAdopt'; item: ItemId }

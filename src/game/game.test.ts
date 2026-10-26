@@ -3,6 +3,7 @@ import { buildSprites, grassScreeTileName, grassTileName, riverBankTileName, sho
 import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
 import { ANIMALS } from './defs/animals';
+import { canBeOpened, OBJECTS, type ObjectKind } from './defs/objects';
 import { LEVELS } from './defs/levels';
 import { pointsForXp, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
@@ -154,7 +155,7 @@ describe('generateWorld: island 2, forest and mountains', () => {
     for (const { map, start, objects } of worlds) {
       const passable = (x: number, y: number) => {
         const o = objects.get(map.idx(x, y));
-        return map.isFloor(x, y) && (!o || o.kind === 'bramble');
+        return map.isFloor(x, y) && (!o || canBeOpened(o.kind));
       };
       const reach = reachWithBridges(map, start.x, start.y, passable, (x, y) => map.get(x, y) === Tile.River);
       for (let i = 0; i < map.tiles.length; i++) {
@@ -178,10 +179,34 @@ describe('generateWorld: island 2, forest and mountains', () => {
       // One of its neighbours is ground you can get to.
       const passable = (cx: number, cy: number) => {
         const o = objects.get(map.idx(cx, cy));
-        return map.isFloor(cx, cy) && (!o || o.kind === 'bramble');
+        return map.isFloor(cx, cy) && (!o || canBeOpened(o.kind));
       };
       const reach = reachWithBridges(map, start.x, start.y, passable, (cx, cy) => map.get(cx, cy) === Tile.River);
       expect([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => reach[map.idx(x + dx, y + dy)])).toBe(true);
+    }
+  });
+
+  it('rings the peak with rocky steps and then ice walls, so every way up needs a ladder and a climbing rope', () => {
+    for (const { map, start, objects } of worlds) {
+      const k = kinds(objects);
+      expect(k).toContain('ledge');
+      expect(k).toContain('ice_wall');
+      const [site] = [...objects].find(([, o]) => o.kind === 'beacon_site')!;
+      const sx = site % map.width;
+      const near = (i: number) => [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => map.idx(sx + dx, (site - sx) / map.width + dy) === i));
+      // With `open` steps passable (and every bridge built): can you get next to the beacon?
+      const upTo = (open: (kind: string) => boolean) => {
+        const passable = (x: number, y: number) => {
+          const o = objects.get(map.idx(x, y));
+          return map.isFloor(x, y) && (!o || o.kind === 'bramble' || open(o.kind) || !!OBJECTS[o.kind as ObjectKind].walkable);
+        };
+        const reach = reachWithBridges(map, start.x, start.y, passable, (x, y) => map.get(x, y) === Tile.River);
+        return [...reach.keys()].some((i) => reach[i] && near(i));
+      };
+      expect(upTo(() => false)).toBe(false);
+      expect(upTo((kind) => kind === 'ledge')).toBe(false);
+      expect(upTo((kind) => kind === 'ice_wall')).toBe(false);
+      expect(upTo((kind) => kind === 'ledge' || kind === 'ice_wall')).toBe(true);
     }
   });
 
@@ -784,11 +809,95 @@ describe('Game: brambles, the axe and the river', () => {
     expect(game.inventory.count('wood')).toBe(6);
   });
 
+  it('island 1 has no steep steps', () => {
+    for (const seed of [1, 2]) {
+      const { objects } = generateWorld(new Rng(seed));
+      expect([...objects.values()].some((o) => OBJECTS[o.kind].steep)).toBe(false);
+    }
+  });
+
   it('brambles and rivers do not stop you building a campfire', () => {
     const game = new Game(20);
     game.inventory.add('wood', 3);
     game.inventory.add('stone', 2);
     expect(game.build('campfire')).toBe(true);
+  });
+});
+
+describe('Game: steep steps, the ladder and the climbing rope', () => {
+  it('a rocky step blocks the way and tells you to build a ladder', () => {
+    const game = sandbox(60);
+    place(game, 1, 0, 'ledge');
+    const { x } = game.player;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.player.x).toBe(x);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooSteep', obj: 'ledge', way: 'ledge_ladder' });
+    place(game, 1, 0, 'ice_wall');
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooSteep', obj: 'ice_wall', way: 'ice_wall_rope' });
+  });
+
+  it('a ladder goes on the rocky step next to you, and climbing it costs Energy', () => {
+    const game = sandbox(61);
+    game.inventory.add('wood', 4);
+    game.inventory.add('rope', 2);
+    expect(game.buildProblem('ladder')).toEqual({ key: 'noStep', obj: 'ledge' });
+    place(game, 0, 1, 'ledge');
+    game.player.facing = 'right';
+    const xp = game.xp;
+    expect(game.build('ladder')).toBe(true);
+    const { x, y } = game.player;
+    expect(game.objectAt(x, y + 1)?.kind).toBe('ledge_ladder');
+    expect(game.inventory.count('wood')).toBe(0);
+    expect(game.inventory.count('rope')).toBe(0);
+    expect(game.xp - xp).toBe(6);
+    game.needs.energy = 50;
+    expect(game.move(0, 1)).toBe(true);
+    expect(game.player.y).toBe(y + 1);
+    expect(game.needs.energy).toBeLessThan(48.01);
+    expect(game.needs.energy).toBeGreaterThan(47);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'climb', obj: 'ledge_ladder' });
+    // Stepping off the ladder is a normal step.
+    game.needs.energy = 50;
+    expect(game.move(0, 1)).toBe(true);
+    expect(game.needs.energy).toBeGreaterThan(49);
+  });
+
+  it('a ladder does not fit an ice wall: that needs a climbing rope', () => {
+    const game = sandbox(62);
+    game.inventory.add('wood', 5);
+    game.inventory.add('rope', 6);
+    place(game, 1, 0, 'ice_wall');
+    expect(game.build('ladder')).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'noStep', obj: 'ledge' });
+    expect(game.build('climbing_rope')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('ice_wall_rope');
+    expect(game.inventory.count('rope')).toBe(2);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'climb', obj: 'ice_wall_rope' });
+  });
+
+  it('the mountain goat jumps over rocky steps without a ladder', () => {
+    const game = sandbox(63);
+    const { x, y } = game.player;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) game.map.set(x + dx, y + dy, Tile.Scree);
+    for (let dy = -3; dy <= 3; dy++) place(game, 2, dy, 'ledge');
+    const goat = { id: 99, kind: 'goat' as const, x: x + 3, y, facing: 'left' as const, flee: 0 };
+    game.animals = [goat];
+    game.wait();
+    expect(goat.x).toBeLessThan(x + 3);
+  });
+
+  it('steps still count as a way through when you build a campfire', () => {
+    const game = sandbox(64);
+    const { x, y } = game.player;
+    // A wall of ledges with one gap; a fire in the gap would not cut the island off.
+    for (let dy = -3; dy <= 3; dy++) if (dy !== 0) place(game, 2, dy, 'ledge');
+    game.inventory.add('wood', 3);
+    game.inventory.add('stone', 2);
+    game.player.facing = 'right';
+    expect(game.build('campfire')).toBe(true);
+    expect(game.objectAt(x + 1, y)?.kind).toBe('campfire');
   });
 });
 

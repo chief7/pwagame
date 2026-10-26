@@ -14,7 +14,8 @@ export type ObjectKind =
   | 'bramble' | 'bridge_ns' | 'bridge_ew'
   | 'boat_wreck' | 'boat_hull' | 'boat_mast' | 'boat_sail' | 'boat_ready'
   | 'tree_spruce' | 'tree_spruce_snow' | 'tree_birch' | 'tree_apple' | 'fern'
-  | 'beacon_site' | 'beacon_base' | 'beacon_pyre' | 'beacon_ready';
+  | 'beacon_site' | 'beacon_base' | 'beacon_pyre' | 'beacon_ready'
+  | 'ledge' | 'ledge_ladder' | 'ice_wall' | 'ice_wall_rope';
 
 export interface Yield {
   item: ItemId;
@@ -54,6 +55,10 @@ export interface ObjectDef {
   frames?: string[];
   /** Built over river cells rather than on the ground. */
   bridge?: true;
+  /** A steep step: blocks the way until the explorer builds a way up onto it (a recipe with `onto`). */
+  steep?: true;
+  /** A way up a steep step: walking onto it is tiring (costs Energy). */
+  climb?: true;
   /** The island's goal (see levels.ts): walking into it hands over materials. */
   goal?: true;
   /** A finished goal after the explorer used it (the lit beacon): its frames and how far its light reaches. */
@@ -168,7 +173,17 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     kind: 'beacon_ready', goal: true, frames: ['beacon_ready', 'beacon_ready_2'],
     done: { frames: ['beacon_lit', 'beacon_lit_2'], lightRadius: 7 },
   }),
+  // Island 2: steep steps on the way up to the peak, and the ways up them.
+  ledge: def({ kind: 'ledge', steep: true }),
+  ledge_ladder: def({ kind: 'ledge_ladder', walkable: true, climb: true }),
+  ice_wall: def({ kind: 'ice_wall', steep: true }),
+  ice_wall_rope: def({ kind: 'ice_wall_rope', walkable: true, climb: true }),
 };
+
+/** Objects the explorer can get past by building or clearing: brambles and steep steps. */
+export function canBeOpened(kind: ObjectKind): boolean {
+  return kind === 'bramble' || !!OBJECTS[kind].steep;
+}
 
 export interface WorldObject {
   kind: ObjectKind;
