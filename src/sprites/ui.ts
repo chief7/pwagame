@@ -205,3 +205,68 @@ function grillFrame(name: string, frame: 0 | 1): Sprite {
 export function grillButton(): Sprite[] {
   return [grillFrame('ui_grill', 0), grillFrame('ui_grill_2', 1)];
 }
+
+/** A paper map with a coast, a path and a red cross: the icon for the Map button. */
+export function mapIcon(): Sprite {
+  return fromRows('ui_map', [
+    '................',
+    '................',
+    '.dDDDDDDDDDDDDd.',
+    '.LwwwwwwwwwwwwD.',
+    '.LwwwwssssswwwD.',
+    '.LwwssfffffswwD.',
+    '.LwsffkkfffswwD.',
+    '.LwsfkkffrffswD.',
+    '.LwsffffffrfswD.',
+    '.LwwsfffffsrswD.',
+    '.LwwwsssfffxrxD.',
+    '.LwwwwwwssssxwD.',
+    '.LwwwwwwwwwrwrD.',
+    '.dDDDDDDDDDDDDd.',
+    '................',
+    '................',
+  ], {
+    '.': null, w: P.washSea, L: P.paperLight, d: P.paperDeep, D: P.paperDark,
+    s: P.washSand, f: P.washForest, k: P.washForestDark, r: P.inkRed, x: P.inkRed,
+  }).outline();
+}
+
+/** Small ink signs drawn on the map: where you are, huts, springs and the island goal. */
+export function mapMarkers(): Sprite[] {
+  const key = { '.': null, i: P.ink, r: P.inkRed, b: P.washRiver, w: P.paperLight, g: P.gold };
+  // A pale halo keeps each sign readable on any wash.
+  const halo = (s: Sprite) => s.outline(P.paperLight);
+  const you = fromRows('map_you', [
+    'r...r',
+    'rr.rr',
+    '.rrr.',
+    'rr.rr',
+    'r...r',
+  ], key);
+  const hut = fromRows('map_hut', [
+    '...i...',
+    '..iii..',
+    '.iiiii.',
+    'iiiiiii',
+    '.i...i.',
+    '.i.i.i.',
+    '.iiiii.',
+  ], key);
+  const spring = fromRows('map_spring', [
+    '..b..',
+    '.bbb.',
+    'bbwbb',
+    'bbbbb',
+    '.bbb.',
+  ], key);
+  const goal = fromRows('map_goal', [
+    '.irr...',
+    '.irrrr.',
+    '.irrr..',
+    '.ir....',
+    '.i.....',
+    '.i.....',
+    'iii....',
+  ], key);
+  return [you, hut, spring, goal].map(halo);
+}

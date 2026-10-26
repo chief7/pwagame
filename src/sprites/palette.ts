@@ -194,4 +194,21 @@ export const PALETTE = {
   dogNose: '#2a1d14',
   collar: '#d6334a',
   collarTag: '#f2c14e',
+
+  // The Cartographer's map: ink and washes on old paper.
+  paper: '#ead8ae',
+  paperLight: '#f5e8c6',
+  paperDark: '#cdb27c',
+  paperDeep: '#a68a56',
+  ink: '#4a3424',
+  inkRed: '#b0382c',
+  washSea: '#9cc2c0',
+  washSeaDeep: '#86b0b2',
+  washRiver: '#6fa6b4',
+  washSand: '#ecd29a',
+  washForest: '#a9c07c',
+  washForestDark: '#93ad68',
+  washRock: '#b0a48c',
+  washRockDark: '#998c74',
+  washSnow: '#f6f2e6',
 } as const;

@@ -6,7 +6,7 @@ import {
 } from './forest';
 import { beacon, boat, boatAway, bridge, campfire, hut, leanTo } from './structures';
 import { boulder, chestClosed, chestOpen, driftwood, iceWall, ledge, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
-import { appIcon, globe, grillButton, skillIcons } from './ui';
+import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
@@ -46,6 +46,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Boat', sprites: [...boat(), ...boatAway()] },
     { title: 'Beacon', sprites: beacon() },
     { title: 'Interface', sprites: [globe(), ...skillIcons(), ...grillButton(), appIcon()] },
+    { title: 'Map', sprites: [mapIcon(), ...mapMarkers()] },
   ];
 }
 
