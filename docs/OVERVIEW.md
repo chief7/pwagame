@@ -413,16 +413,18 @@ earned, the log says so (`skillPoint`) and the player sparkles.
 **Skills.** Three paths: Building (skills to build things), Explorer (skills
 that change the explorer) and Improving (skills that make things work
 better). In a path, a skill needs the skill before it. The first two skills
-on a path cost 1 point, the third and fourth cost 2.
+on a path cost 1 point, the third, fourth and fifth cost 2.
 
 | Path | Skill | Effect | Where |
 |---|---|---|---|
 | Building | Fishing rod | Unlocks the fishing rod recipe | `recipes.ts` (`skill`) |
 | | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
+| | Rope maker | The rope recipe makes 2 rope, not 1. The Build panel shows "Rope ×2". | `Game.recipeMakes()` |
 | Explorer | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
 | | Small appetite | Food drops 20% slower | `needs.ts` (`hunger`) |
 | | Thick skin | Warmth drops 30% slower | `needs.ts` (`chill`) |
 | | Night eyes | Up to 2 more cells of sight at night | `Game.sightRadius` |
+| | Sure foot | A climb onto a ladder or a rope costs no Energy (see 4.14) | `Game.climb()` |
 | Improving | Green thumb | Plants regrow in 70% of the time | `Game.interact()` |
 | | Patient angler | Bite chance 40% → 70% | `Game.fish()` |
 | | Animal friend | Crabs do not pinch, monkeys do not take food. Wild animals notice the player 2 cells later (at least 1) | `Game.noticeRange()`, `Game.animalAct()` |
@@ -576,9 +578,11 @@ up to the beacon crosses both rings.
 - The recipe has `onto`: it builds on such a step next to the player (see
   4.8). The ladder does not fit an ice wall. Building gives 1 XP per item
   (ladder 6, climbing rope 5). Handy builder makes them 1 wood cheaper.
+  Rope maker halves the leaves for the rope (see 4.10).
 - The ladder and the rope are walkable. Stepping onto one costs 2 Energy
-  (`CLIMB_ENERGY`), with a float and the message `climb`. Stepping off is
-  a normal step. The dog follows over them.
+  (`CLIMB_ENERGY`), with a float and the message `climb`. With Sure foot
+  it costs nothing (`climb` with `easy`, no float). Stepping off is a
+  normal step. The dog follows over them.
 - Steps count as open for every "does this cut off the island" check
   (`canBeOpened()` in `objects.ts`, like brambles).
 - The mountain goat (`climber`) walks over steps (see 4.9).
@@ -759,7 +763,7 @@ player and replaces it, see 4.8).
 
 `src/game/defs/skills.ts` has `PATHS` (each path's skills, in order) and the
 skill point thresholds. A skill's cost comes from its place in the path
-(1, 1, 2, 2). The effect of a skill is code where it applies: check it with
+(1, 1, 2, 2, 2). The effect of a skill is code where it applies: check it with
 `game.has(id)`. Names and descriptions are in `src/i18n/` (`skills`,
 `paths`). The path icons are `ui_path_<path>`.
 
@@ -779,7 +783,7 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 | Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
-| Skills | Building: fishing rod, handy builder. Explorer: small sips, small appetite, thick skin, night eyes. Improving: green thumb, patient angler, animal friend, wild sense |
+| Skills | Building: fishing rod, handy builder, rope maker. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
 | Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
 | Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps) |
@@ -999,7 +1003,7 @@ Also run `npm run build` (typecheck and build) before you commit.
 | XP per gather, per fish | `game.ts` → `GATHER_XP`, `CATCH_XP` | 1, 2 |
 | Skill point thresholds | `skills.ts` → `FIRST_POINT_XP`, `POINT_XP_STEP` | 10, 5 |
 | Bite chance | `game.ts` → `BITE_CHANCE`, `PATIENT_BITE_CHANCE` | 0.4, 0.7 |
-| Skill effects | `game.ts` → `SMALL_SIPS`, `SMALL_APPETITE`, `THICK_SKIN`, `GREEN_THUMB`, `NIGHT_EYES` | 0.8, 0.8, 0.7, 0.7, 2 |
+| Skill effects | `game.ts` → `SMALL_SIPS`, `SMALL_APPETITE`, `THICK_SKIN`, `GREEN_THUMB`, `NIGHT_EYES`, `ROPE_MAKER` | 0.8, 0.8, 0.7, 0.7, 2, 2 rope |
 | Beach width, hills | `worldgen.ts` → `BEACH_WIDTH`, `HILL_MIN_DIST` | 3, 5 |
 | Object density | `worldgen.ts` → `SCATTER` | chance per cell and biome |
 | Step speed | `animator.ts` → `STEP_MS` | 130 ms |

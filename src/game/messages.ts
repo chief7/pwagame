@@ -18,7 +18,8 @@ export type Msg =
   | { key: 'tooFull' }
   | { key: 'eat'; item: ItemId }
   | { key: 'build'; obj: ObjectKind }
-  | { key: 'make'; item: ItemId }
+  /** `count` is how many were made (default 1; Rope maker makes 2 ropes). */
+  | { key: 'make'; item: ItemId; count?: number }
   | { key: 'needMaterials' }
   | { key: 'noRoom' }
   | { key: 'noBridgeSpot' }
@@ -76,8 +77,8 @@ export type Msg =
   | { key: 'tooSteep'; obj: ObjectKind; way: ObjectKind }
   /** Tried to build a way up with no such step next to the explorer. */
   | { key: 'noStep'; obj: ObjectKind }
-  /** Climbed over a step on a ladder or a rope. */
-  | { key: 'climb'; obj: ObjectKind }
+  /** Climbed over a step on a ladder or a rope; `easy` with Sure foot (no Energy). */
+  | { key: 'climb'; obj: ObjectKind; easy?: true }
   /** Walked into the stray dog without any food for it. */
   | { key: 'dogSniff' }
   | { key: 'dogAdopt'; item: ItemId }

@@ -417,7 +417,9 @@ function renderSheet(): void {
         }
       });
       const costs = costList(game.recipeCost(id));
-      const { name, description } = words.recipes[id];
+      const { description } = words.recipes[id];
+      const makes = game.recipeMakes(id);
+      const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
       if (problem && (problem.key === 'needSkill' || problem.key === 'needFire')) {

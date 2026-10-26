@@ -207,6 +207,8 @@ export const en: Strings = {
     green_thumb: { name: 'Green thumb', description: 'Plants grow back faster.' },
     night_eyes: { name: 'Night eyes', description: 'You see further at night.' },
     animal_friend: { name: 'Animal friend', description: "Crabs don't pinch you, and monkeys don't take your food. Wild animals notice you later." },
+    rope_maker: { name: 'Rope maker', description: 'You twist 2 ropes from 2 big leaves, not 1.' },
+    sure_foot: { name: 'Sure foot', description: 'Climbing a ladder or a rope does not make you tired.' },
     wild_sense: { name: 'Wild sense', description: 'You see where animals would come after you or hurt you. These places look red.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].many}`,
@@ -223,7 +225,7 @@ export const en: Strings = {
       case 'tooFull': return "You're too full to eat that.";
       case 'eat': return `You eat ${itemCount(msg.item, 1)}. Yum!`;
       case 'build': return `You build ${a(obj(msg.obj))}.`;
-      case 'make': return `You make ${a(ITEM[msg.item].one)}.`;
+      case 'make': return `You make ${itemCount(msg.item, msg.count ?? 1)}.`;
       case 'needMaterials': return 'You need more materials.';
       case 'noRoom': return 'There is no room to build here.';
       case 'noBridgeSpot': return 'Stand at a river and face the water. A bridge can cross up to 3 steps.';
@@ -321,7 +323,9 @@ export const en: Strings = {
       case 'snowCold': return 'Brr! The snow is cold, even in the day. A fire or a shelter helps up here.';
       case 'tooSteep': return `The ${obj(msg.obj)} is too steep to climb. Build ${a(obj(msg.way))} on it.`;
       case 'noStep': return `Stand next to ${a(obj(msg.obj))} to build this.`;
-      case 'climb': return `You climb over the step with the ${obj(msg.obj)}. Phew, hard work!`;
+      case 'climb': return msg.easy
+        ? `You climb over the step with the ${obj(msg.obj)}. Easy!`
+        : `You climb over the step with the ${obj(msg.obj)}. Phew, hard work!`;
       case 'legacy': return msg.text;
     }
   },

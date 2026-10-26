@@ -26,6 +26,8 @@ function everyMessage(): Msg[] {
     { key: 'tooSteep', obj: 'ledge', way: 'ledge_ladder' }, { key: 'tooSteep', obj: 'ice_wall', way: 'ice_wall_rope' },
     { key: 'noStep', obj: 'ledge' }, { key: 'noStep', obj: 'ice_wall' },
     { key: 'climb', obj: 'ledge_ladder' }, { key: 'climb', obj: 'ice_wall_rope' },
+    { key: 'climb', obj: 'ledge_ladder', easy: true }, { key: 'climb', obj: 'ice_wall_rope', easy: true },
+    { key: 'make', item: 'rope', count: 2 },
   ];
   for (const level of [1, 2] as const) {
     msgs.push({ key: 'goalReady', level }, { key: 'sailAway', level }, { key: 'landIsland', level });
@@ -97,6 +99,8 @@ describe('i18n', () => {
     expect(de.ui.inShelter('hut')).toBe('In deiner Hütte');
     expect(de.clock(0)).toBe('Tag 1 · 8:00');
     expect(de.message({ key: 'make', item: 'axe' })).toBe('Du baust eine Steinaxt.');
+    expect(de.message({ key: 'make', item: 'rope', count: 2 })).toBe('Du baust 2 Seile.');
+    expect(en.message({ key: 'make', item: 'rope', count: 2 })).toBe('You make 2 ropes.');
     expect(de.message({ key: 'needTool', obj: 'bramble', item: 'axe' })).toBe(
       'Das Dornengestrüpp ist zu dornig für deine Hände. Du brauchst eine Steinaxt.',
     );

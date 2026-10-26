@@ -54,8 +54,9 @@ npm run preview   # serve the build (service worker is only active here)
   only comes back while Food and Water are both above 50.
 - **Skills:** gathering, building and fishing give XP. XP earns skill points
   (the first at 10 XP, each next one 5 XP more), which you spend in the
-  Skills panel on three paths: Building (fishing rod, cheaper building),
-  Explorer (needs drop slower, night eyes) and Improving (faster regrowth,
+  Skills panel on three paths: Building (fishing rod, cheaper building,
+  rope maker), Explorer (needs drop slower, night eyes, sure foot for
+  climbing) and Improving (faster regrowth,
   better catches, animal friend, wild sense). Each path is learned in order.
   Wild sense marks in red the ground where an animal would come after you.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the

@@ -50,6 +50,8 @@ const NIGHT_EYES = 2;
 const SNOW_CHILL = 40;
 /** Energy it costs to climb onto a ladder or a climbing rope. */
 const CLIMB_ENERGY = 2;
+/** Ropes from one rope recipe with Rope maker. */
+const ROPE_MAKER = 2;
 /** Turns a shooed (or barked at) animal runs away. */
 const SHOO_TURNS = 8;
 /** How much the dog's Food and Water drop each turn (half while you sleep). */
@@ -342,6 +344,11 @@ export class Game {
     return cost;
   }
 
+  /** How many items a recipe that `makes` an item gives now (Rope maker twists 2 ropes). */
+  recipeMakes(id: RecipeId): number {
+    return id === 'rope' && this.has('rope_maker') ? ROPE_MAKER : 1;
+  }
+
   /** Why a recipe can't be built right now, or null if it can. */
   buildProblem(id: RecipeId): Msg | null {
     const recipe = RECIPES[id];
@@ -471,8 +478,12 @@ export class Game {
     return true;
   }
 
-  /** Climbing onto a ladder or a climbing rope is hard work. */
+  /** Climbing onto a ladder or a climbing rope is hard work, unless you are sure-footed. */
   private climb(x: number, y: number, kind: ObjectKind): void {
+    if (this.has('sure_foot')) {
+      this.message({ key: 'climb', obj: kind, easy: true }, 'info');
+      return;
+    }
     this.needs.energy = Math.max(0, this.needs.energy - CLIMB_ENERGY);
     this.emit({ type: 'float', x, y, amount: -CLIMB_ENERGY, what: { need: 'energy' }, tone: 'info' });
     this.message({ key: 'climb', obj: kind }, 'info');
@@ -566,10 +577,12 @@ export class Game {
       // Cooking: reach towards the fire.
       const fire = recipe.atFire ? this.nearestFire(p.x, p.y) : null;
       if (fire) this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: fire.x, targetY: fire.y });
-      this.inventory.add(recipe.makes);
-      this.emit({ type: 'float', x: p.x, y: p.y, amount: 1, what: { item: recipe.makes }, tone: 'good' });
+      const count = this.recipeMakes(id);
+      this.inventory.add(recipe.makes, count);
+      this.emit({ type: 'float', x: p.x, y: p.y, amount: count, what: { item: recipe.makes }, tone: 'good' });
       this.emit({ type: 'sparkle', x: p.x, y: p.y });
-      this.message(recipe.atFire ? { key: 'cook', item: recipe.makes } : { key: 'make', item: recipe.makes }, 'good');
+      if (recipe.atFire) this.message({ key: 'cook', item: recipe.makes }, 'good');
+      else this.message(count > 1 ? { key: 'make', item: recipe.makes, count } : { key: 'make', item: recipe.makes }, 'good');
       this.gainXp(xp, p.x, p.y);
       this.endTurn();
       return true;

@@ -268,6 +268,8 @@ export const de: Strings = {
     green_thumb: { name: 'Grüner Daumen', description: 'Pflanzen wachsen schneller nach.' },
     night_eyes: { name: 'Eulenaugen', description: 'Du siehst nachts weiter.' },
     animal_friend: { name: 'Tierfreund', description: 'Krabben zwicken dich nicht, und Affen klauen dir kein Essen. Wilde Tiere bemerken dich später.' },
+    rope_maker: { name: 'Seilmacher', description: 'Du drehst 2 Seile aus 2 großen Blättern, nicht nur 1.' },
+    sure_foot: { name: 'Trittsicher', description: 'Klettern an Leiter oder Seil macht dich nicht müde.' },
     wild_sense: { name: 'Spürsinn', description: 'Du siehst, wo Tiere dich verfolgen oder dir wehtun würden. Diese Stellen sind rot.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].plural}`,
@@ -284,7 +286,7 @@ export const de: Strings = {
       case 'tooFull': return 'Du bist zu satt, um das zu essen.';
       case 'eat': return `Du isst ${itemCount(msg.item, 1)}. Lecker!`;
       case 'build': return `Du baust ${obj(msg.obj, 'acc', 'a')}.`;
-      case 'make': return `Du baust ${itemCount(msg.item, 1)}.`;
+      case 'make': return `Du baust ${itemCount(msg.item, msg.count ?? 1)}.`;
       case 'needMaterials': return 'Du brauchst mehr Material.';
       case 'noRoom': return 'Hier ist kein Platz zum Bauen.';
       case 'noBridgeSpot': return 'Stell dich an einen Fluss und schau zum Wasser. Eine Brücke reicht bis zu 3 Schritte weit.';
@@ -388,7 +390,7 @@ export const de: Strings = {
       case 'snowCold': return 'Brr! Der Schnee ist kalt, auch am Tag. Ein Feuer oder ein Unterschlupf hilft hier oben.';
       case 'tooSteep': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu steil zum Klettern. Bau ${obj(msg.way, 'acc', 'a')} daran.`;
       case 'noStep': return `Stell dich neben ${obj(msg.obj, 'acc', 'a')}, um das zu bauen.`;
-      case 'climb': return `Du kletterst ${contract(`an ${obj(msg.obj, 'dat', 'the')}`)} über die Stufe. Puh, das ist anstrengend!`;
+      case 'climb': return `Du kletterst ${contract(`an ${obj(msg.obj, 'dat', 'the')}`)} über die Stufe. ${msg.easy ? 'Ganz leicht!' : 'Puh, das ist anstrengend!'}`;
       case 'legacy': return msg.text;
     }
   },

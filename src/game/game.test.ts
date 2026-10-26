@@ -5,7 +5,7 @@ import { computeFov } from './fov';
 import { ANIMALS } from './defs/animals';
 import { canBeOpened, OBJECTS, type ObjectKind } from './defs/objects';
 import { LEVELS } from './defs/levels';
-import { pointsForXp, xpForPoints } from './defs/skills';
+import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
 import { Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -863,6 +863,18 @@ describe('Game: steep steps, the ladder and the climbing rope', () => {
     expect(game.needs.energy).toBeGreaterThan(49);
   });
 
+  it('sure-footed explorers climb without losing Energy', () => {
+    const game = sandbox(65);
+    game.skills.add('sure_foot');
+    place(game, 1, 0, 'ledge_ladder');
+    game.needs.energy = 50;
+    game.takeEvents();
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.needs.energy).toBeGreaterThan(49);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'climb', obj: 'ledge_ladder', easy: true });
+    expect(game.takeEvents().some((e) => e.type === 'float')).toBe(false);
+  });
+
   it('a ladder does not fit an ice wall: that needs a climbing rope', () => {
     const game = sandbox(62);
     game.inventory.add('wood', 5);
@@ -1112,6 +1124,32 @@ describe('Game: experience and skills', () => {
       type: 'lunge', id: game.player.id, targetX: game.player.x + 1, targetY: game.player.y,
     }));
     expect(game.nearestFire(game.player.x + 5, game.player.y)).toBeNull();
+  });
+
+  it('rope makers twist 2 ropes from one rope recipe', () => {
+    const game = sandbox(28);
+    game.inventory.add('leaves', 4);
+    expect(game.recipeMakes('rope')).toBe(1);
+    expect(game.build('rope')).toBe(true);
+    expect(game.inventory.count('rope')).toBe(1);
+    game.skills.add('rope_maker');
+    expect(game.recipeMakes('rope')).toBe(2);
+    expect(game.recipeMakes('axe')).toBe(1);
+    game.takeEvents();
+    expect(game.build('rope')).toBe(true);
+    expect(game.inventory.count('rope')).toBe(3);
+    expect(game.inventory.count('leaves')).toBe(0);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'make', item: 'rope', count: 2 });
+    expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'float', amount: 2, what: { item: 'rope' } }));
+  });
+
+  it('rope maker comes after handy builder, and sure foot after night eyes; both cost 2 points', () => {
+    expect(SKILLS.rope_maker).toMatchObject({ path: 'build', cost: 2 });
+    expect(SKILLS.sure_foot).toMatchObject({ path: 'explorer', cost: 2 });
+    const game = sandbox(29);
+    game.xp = xpForPoints(10);
+    expect(game.skillProblem('rope_maker')).toEqual({ key: 'needSkill', skill: 'handy_builder' });
+    expect(game.skillProblem('sure_foot')).toEqual({ key: 'needSkill', skill: 'night_eyes' });
   });
 
   it('handy builders use one wood less', () => {
