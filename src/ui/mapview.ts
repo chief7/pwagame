@@ -1,4 +1,4 @@
-import { OBJECTS, type WorldObject } from '../game/defs/objects';
+import { OBJECTS, type ObjectKind, type WorldObject } from '../game/defs/objects';
 import { Tile, type GameMap } from '../game/map';
 import { PALETTE as P } from '../sprites/palette';
 import { hash2, Sprite } from '../sprites/pixel';
@@ -13,6 +13,8 @@ export const MAP_BLOCK = 2;
 const PATCH = 3;
 /** Paper margin around the island, in pixels. */
 const MARGIN = 6;
+/** Cells around a bear sighting that the map shades as bear country. */
+export const BEAR_AREA = 5;
 
 type Ground = 'sea' | 'river' | 'sand' | 'forest' | 'rock' | 'scree' | 'snow';
 
@@ -38,8 +40,11 @@ const WASH: Record<Ground, [string, string]> = {
   snow: [P.washSnow, P.washSnow],
 };
 
+/** Objects that get a sign on the map (besides the island goal). */
+const SIGNS: Partial<Record<ObjectKind, string>> = { hut: 'map_hut', campfire: 'map_fire', spring: 'map_spring' };
+
 export interface MapMarker {
-  /** Sprite name: map_you, map_hut, map_spring or map_goal. */
+  /** Sprite name: map_you, map_hut, map_fire, map_spring, map_goal or map_bear. */
   sprite: string;
   x: number;
   y: number;
@@ -51,8 +56,14 @@ export interface MapPicture {
   markers: MapMarker[];
 }
 
-/** Draw what the explorer has seen of the island, with signs for places they know. */
-export function drawMap(map: GameMap, objects: Map<number, WorldObject>, player: { x: number; y: number }): MapPicture {
+/**
+ * Draw what the explorer has seen of the island, with signs for places they
+ * know. `bearSpots` are cells where they saw a cave bear: the map hatches the
+ * ground around each in red.
+ */
+export function drawMap(
+  map: GameMap, objects: Map<number, WorldObject>, player: { x: number; y: number }, bearSpots: readonly number[] = [],
+): MapPicture {
   const bw = Math.ceil(map.width / MAP_BLOCK);
   const bh = Math.ceil(map.height / MAP_BLOCK);
   // Each patch takes the most common ground among its explored cells.
@@ -110,6 +121,27 @@ export function drawMap(map: GameMap, objects: Map<number, WorldObject>, player:
     }
   }
 
+  // Bear country: red hatching on the known ground near each sighting.
+  for (const spot of bearSpots) {
+    const sx = spot % map.width;
+    const sy = Math.floor(spot / map.width);
+    for (let by = 0; by < bh; by++) {
+      for (let bx = 0; bx < bw; bx++) {
+        if (!patch(bx, by)) continue;
+        const dx = (bx + 0.5) * MAP_BLOCK - sx;
+        const dy = (by + 0.5) * MAP_BLOCK - sy;
+        if (dx * dx + dy * dy > BEAR_AREA * BEAR_AREA) continue;
+        for (let py = 0; py < PATCH; py++) {
+          for (let px = 0; px < PATCH; px++) {
+            const x = MARGIN + bx * PATCH + px;
+            const y = MARGIN + by * PATCH + py;
+            if ((x + y) % 3 === 0 && paper.get(x, y) !== P.ink) paper.set(x, y, P.inkRed);
+          }
+        }
+      }
+    }
+  }
+
   const at = (cx: number, cy: number) => ({
     x: MARGIN + Math.floor(cx / MAP_BLOCK) * PATCH + (PATCH >> 1),
     y: MARGIN + Math.floor(cy / MAP_BLOCK) * PATCH + (PATCH >> 1),
@@ -119,9 +151,10 @@ export function drawMap(map: GameMap, objects: Map<number, WorldObject>, player:
     const x = i % map.width;
     const y = Math.floor(i / map.width);
     if (!map.isExplored(x, y) || (x === player.x && y === player.y)) continue;
-    const sprite = o.kind === 'hut' ? 'map_hut' : o.kind === 'spring' ? 'map_spring' : OBJECTS[o.kind].goal ? 'map_goal' : null;
+    const sprite = SIGNS[o.kind] ?? (OBJECTS[o.kind].goal ? 'map_goal' : null);
     if (sprite) markers.push({ sprite, ...at(x, y) });
   }
+  for (const spot of bearSpots) markers.push({ sprite: 'map_bear', ...at(spot % map.width, Math.floor(spot / map.width)) });
   markers.push({ sprite: 'map_you', ...at(player.x, player.y) });
   return { paper, markers };
 }

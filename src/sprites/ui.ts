@@ -231,9 +231,9 @@ export function mapIcon(): Sprite {
   }).outline();
 }
 
-/** Small ink signs drawn on the map: where you are, huts, springs and the island goal. */
+/** Small ink signs drawn on the map: where you are, huts, campfires, springs, bears and the island goal. */
 export function mapMarkers(): Sprite[] {
-  const key = { '.': null, i: P.ink, r: P.inkRed, b: P.washRiver, w: P.paperLight, g: P.gold };
+  const key = { '.': null, i: P.ink, r: P.inkRed, o: P.flameOrange, y: P.flame, b: P.washRiver, w: P.paperLight };
   // A pale halo keeps each sign readable on any wash.
   const halo = (s: Sprite) => s.outline(P.paperLight);
   const you = fromRows('map_you', [
@@ -268,5 +268,23 @@ export function mapMarkers(): Sprite[] {
     '.i.....',
     'iii....',
   ], key);
-  return [you, hut, spring, goal].map(halo);
+  const fire = fromRows('map_fire', [
+    '...r...',
+    '..rr...',
+    '..roor.',
+    '.rooyr.',
+    '.royyr.',
+    '..rrr..',
+    'ii.i.ii',
+  ], key);
+  // A paw print: the cave bear lives near here.
+  const bear = fromRows('map_bear', [
+    'i..i..i',
+    '.......',
+    '..iii..',
+    '.iiiii.',
+    '.iiiii.',
+    '..iii..',
+  ], key);
+  return [you, hut, fire, spring, goal, bear].map(halo);
 }
