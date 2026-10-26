@@ -56,6 +56,8 @@ export interface ObjectDef {
   bridge?: true;
   /** The island's goal (see levels.ts): walking into it hands over materials. */
   goal?: true;
+  /** A finished goal after the explorer used it (the lit beacon): its frames and how far its light reaches. */
+  done?: { frames: string[]; lightRadius: number };
 }
 
 const def = (d: ObjectDef) => d;
@@ -162,7 +164,10 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   beacon_site: def({ kind: 'beacon_site', goal: true }),
   beacon_base: def({ kind: 'beacon_base', goal: true }),
   beacon_pyre: def({ kind: 'beacon_pyre', goal: true }),
-  beacon_ready: def({ kind: 'beacon_ready', goal: true, frames: ['beacon_ready', 'beacon_ready_2'] }),
+  beacon_ready: def({
+    kind: 'beacon_ready', goal: true, frames: ['beacon_ready', 'beacon_ready_2'],
+    done: { frames: ['beacon_lit', 'beacon_lit_2'], lightRadius: 7 },
+  }),
 };
 
 export interface WorldObject {

@@ -142,14 +142,14 @@ src/
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
-    terrain.ts   sand, water, river, grass, rock, cave floor, shore, grass-edge and river-bank transitions
+    terrain.ts   sand, water, river, grass, rock, cave floor, scree, snow, and all edge transitions (also mixed ones)
     forest.ts    trees, bushes, berry bushes, mushrooms, brambles
     objects.ts   stones, logs, chests, stalagmite, spring
     palms.ts     palm trees (24×32), with bare versions
-    structures.ts campfire (animated), lean-to, hut, bridges
-    creatures.ts animals, item icons
+    structures.ts campfire (animated), lean-to, hut, bridges, boat (also sailing away), beacon (also lit)
+    creatures.ts animals (with step frames and left facing), item icons
     ui.ts        interface icons (globe) and the app icon
-    characters.ts  male and female explorer, 4 facings × idle + 2 walk frames
+    characters.ts  male and female explorer, 4 facings × idle + 2 walk frames, fishing poses
     gallery.ts   the sprite gallery page
   fonts/       Pixelify Sans pixel font (OFL), loaded by fonts.css
 scripts/

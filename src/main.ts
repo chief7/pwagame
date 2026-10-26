@@ -1,15 +1,16 @@
 import './style.css';
 import { ITEMS, type ItemId } from './game/defs/items';
-import { levelDef } from './game/defs/levels';
+import { levelDef, nextLevel } from './game/defs/levels';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
 import { Game, type SaveData } from './game/game';
+import { Tile } from './game/map';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
 import { Animator, STEP_MS } from './ui/animator';
 import { commandForKey, directionFrom, type Command } from './ui/input';
-import { Renderer, type Body } from './ui/renderer';
+import { DEPART_MS, Renderer, type Body, type Departure } from './ui/renderer';
 
 const LOG_LINES = 3;
 /** Finger travel (CSS px) beyond which a touch is no longer a tap. */
@@ -242,7 +243,7 @@ function frame(now: number): void {
   frameQueued = false;
   renderer.render(game, anim, now);
   placeGrill(now);
-  if (anim.busy(now)) requestFrame();
+  if (anim.busy(now) || renderer.departure) requestFrame();
   else ambientTimer = window.setTimeout(requestFrame, AMBIENT_FRAME_MS);
 }
 
@@ -257,6 +258,7 @@ function afterTurn(): void {
 }
 
 function run(cmd: Command): void {
+  if (renderer.departure) return;
   switch (cmd.type) {
     case 'move': game.move(cmd.dx, cmd.dy); break;
     case 'wait': game.wait(); break;
@@ -510,9 +512,50 @@ function goalCard(): HTMLElement {
   return card;
 }
 
-/** The finished goal of this island: the ready boat, the ready beacon. */
+/** The finished goal of this island: the ready boat, the ready beacon (lit once used). */
 function goalDone(): string {
-  return levelDef(game.level).stages.at(-1)!.becomes;
+  const kind = levelDef(game.level).stages.at(-1)!.becomes;
+  const done = OBJECTS[kind].done;
+  return game.sailed && done ? done.frames[0] : kind;
+}
+
+/**
+ * Leave on the finished goal. Towards a next island, the boat first sails
+ * off over the water (not with reduced motion); the last goal ends the game.
+ */
+function setSail(): void {
+  closeSheet();
+  const trip = nextLevel(game.level) && !anim.reducedMotion ? boatTrip(performance.now()) : null;
+  const leave = () => {
+    renderer.departure = null;
+    if (!game.sail()) return;
+    afterTurn();
+    if (game.sailed) openSheet('end');
+  };
+  if (!trip) return leave();
+  stopAuto();
+  renderer.departure = trip;
+  requestFrame();
+  window.setTimeout(leave, DEPART_MS);
+}
+
+/** The boat's way out: the straight line from the goal with the least ground before the sea. */
+function boatTrip(now: number): Departure | null {
+  for (const [i, obj] of game.objects) {
+    if (!OBJECTS[obj.kind].goal) continue;
+    const x = i % game.map.width;
+    const y = (i - x) / game.map.width;
+    let best: Departure | null = null;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      for (let d = 1; d <= 12; d++) {
+        if (game.map.get(x + dx * d, y + dy * d) !== Tile.Water) continue;
+        if (!best || d + 4 < best.cells) best = { x, y, dx, dy, cells: d + 4, start: now };
+        break;
+      }
+    }
+    return best;
+  }
+  return null;
 }
 
 /** "Set sail?" before leaving, and the end screen after the last island. */
@@ -528,13 +571,7 @@ function renderVoyage(rows: HTMLElement): void {
   const foot = el('div', { className: 'sheet-foot' });
   if (leaving) {
     const go = el('button', { type: 'button', className: 'primary', textContent: words.levels[game.level].setSail });
-    go.addEventListener('click', () => {
-      if (!game.sail()) return closeSheet();
-      afterTurn();
-      // The boat of island 1 lands on the next island; the last goal ends the game.
-      if (game.sailed) openSheet('end');
-      else closeSheet();
-    });
+    go.addEventListener('click', setSail);
     const wait = el('button', { type: 'button', textContent: words.ui.notYet });
     wait.addEventListener('click', closeSheet);
     foot.append(wait, go);
@@ -674,7 +711,7 @@ function holdDirection(p: Press): [number, number] | null {
 
 canvas.addEventListener('pointerdown', (e) => {
   stopAuto();
-  if (press) return;
+  if (press || renderer.departure) return;
   canvas.setPointerCapture(e.pointerId);
   const { x, y } = local(e);
   const p: Press = { id: e.pointerId, startX: x, startY: y, x, y, holdTimer: 0, holding: false, cancelled: false };

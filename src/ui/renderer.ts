@@ -3,10 +3,26 @@ import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
 import { hash2 } from '../sprites/pixel';
 import { bake, buildSprites, edgeTileName, mixedTile, shoreTileName, type Sprite } from '../sprites';
-import { characterName } from '../sprites/characters';
+import { characterName, fishingName } from '../sprites/characters';
 import type { Animator } from './animator';
 
 export type Body = 'male' | 'female';
+
+/** How long the boat takes to sail away from island 1. */
+export const DEPART_MS = 1600;
+
+/**
+ * The finished boat sailing off from (x, y) with the explorer on board,
+ * `cells` far in direction (dx, dy). Only drawn; the game sails after it.
+ */
+export interface Departure {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  cells: number;
+  start: number;
+}
 
 const TILE = 16;
 const FOG = '#0a1720';
@@ -59,6 +75,8 @@ export class Renderer {
   private scale = 2;
   private dpr = 1;
   body: Body = 'male';
+  /** The boat trip that is playing, if any: the camera follows the boat instead of the explorer. */
+  departure: Departure | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -123,7 +141,9 @@ export class Renderer {
     const { ctx, cell } = this;
     const { map, player } = game;
     const playerPose = anim.pose(player.id, player.x, player.y, now);
-    this.camera = { x: playerPose.x, y: playerPose.y };
+    const trip = this.departure;
+    const boat = trip && this.boatAt(trip, now);
+    this.camera = boat ?? { x: playerPose.x, y: playerPose.y };
     const o = this.origin();
     const x0 = Math.floor(-o.x / cell) - 1;
     const y0 = Math.floor(-o.y / cell) - 1;
@@ -183,7 +203,7 @@ export class Renderer {
       actors.push({ id: a.id, name, pose, bob: pose.frame ? 0 : anim.idleBob(a.id, now) });
     }
     const dog = game.dog;
-    if (dog && map.isVisible(dog.x, dog.y)) {
+    if (dog && !trip && map.isVisible(dog.x, dog.y)) {
       const pose = anim.pose(dog.id, dog.x, dog.y, now);
       pose.hop = 0;
       const resting = dog.tired || dog.napping;
@@ -191,9 +211,9 @@ export class Renderer {
       const name = `${resting ? 'dog_rest' : 'dog'}${dog.facing === 'left' ? '_left' : ''}${step}`;
       actors.push({ id: dog.id, name, pose, bob: pose.frame || resting ? 0 : anim.idleBob(dog.id, now) });
     }
-    actors.push({
+    if (!trip) actors.push({
       id: player.id,
-      name: characterName(this.body, player.facing, playerPose.frame),
+      name: anim.casting(player.id, now) ? fishingName(this.body, player.facing) : characterName(this.body, player.facing, playerPose.frame),
       pose: { ...playerPose, hop: 0 },
       bob: playerPose.frame ? 0 : anim.idleBob(player.id, now),
     });
@@ -205,8 +225,9 @@ export class Renderer {
       for (let x = x0; x <= x1; x++) {
         if (!map.isExplored(x, y)) continue;
         const obj = game.objectAt(x, y);
-        if (!obj) continue;
-        const frames = OBJECTS[obj.kind].frames;
+        if (!obj || (trip && trip.x === x && trip.y === y)) continue;
+        const def = OBJECTS[obj.kind];
+        const frames = game.sailed && def.done ? def.done.frames : def.frames;
         const name = frames ? frames[fireFrame % frames.length] : game.objectSprite(obj);
         this.drawStanding(name, o.x + x * cell, o.y + y * cell);
       }
@@ -232,6 +253,12 @@ export class Renderer {
         ctx.fillStyle = map.isExplored(x, y) ? DIM : FOG;
         ctx.fillRect(o.x + x * cell, o.y + y * cell, cell, cell);
       }
+    }
+
+    // The boat stays in view while it sails out over dim or unknown water.
+    if (trip && boat) {
+      const name = `boat_away_${this.body}${trip.dx < 0 ? '_left' : ''}${fireFrame % 2 ? '_2' : ''}`;
+      this.drawStanding(name, Math.round(o.x + boat.x * cell), Math.round(o.y + boat.y * cell));
     }
 
     this.drawSparkles(anim, map, o, now);
@@ -330,6 +357,13 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(baked.canvas, 0, 0, c.width, c.height);
     return c.toDataURL();
+  }
+
+  /** Where the departing boat is at `now`: it eases in, then sails at full speed. */
+  private boatAt(trip: Departure, now: number): { x: number; y: number } {
+    const p = Math.min(1, Math.max(0, (now - trip.start) / DEPART_MS));
+    const d = p * p * trip.cells;
+    return { x: trip.x + trip.dx * d, y: trip.y + trip.dy * d };
   }
 
   private drawTile(name: string, sx: number, sy: number): void {

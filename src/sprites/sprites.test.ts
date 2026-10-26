@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSprites, grassTileName, shoreTileName, spriteGroups } from './index';
+import { buildSprites, edgeTileName, grassTileName, mixedTile, shoreTileName, spriteGroups } from './index';
 import { fromRows } from './pixel';
 
 describe('sprites', () => {
@@ -22,7 +22,7 @@ describe('sprites', () => {
 
   it('terrain tiles are opaque', () => {
     for (const [name, s] of buildSprites()) {
-      if (/^(water|sand|shore|grass|rock_|cave_floor)/.test(name)) {
+      if (/^(water|sand|shore|grass|rock_|cave_|scree|snow|bank|river|mouth)/.test(name)) {
         expect(s.pixels.every((p) => p !== null)).toBe(true);
       }
     }
@@ -44,12 +44,24 @@ describe('sprites', () => {
     const { ITEM_IDS } = await import('../game/defs/items');
     const { OBJECTS } = await import('../game/defs/objects');
     const sprites = buildSprites();
-    for (const kind of ANIMAL_KINDS) expect(sprites.has(`animal_${kind}`)).toBe(true);
+    for (const kind of ANIMAL_KINDS) {
+      for (const facing of ['', '_left']) {
+        for (const frame of ['', '_step1', '_step2']) expect(sprites.has(`animal_${kind}${facing}${frame}`)).toBe(true);
+      }
+    }
     for (const id of ITEM_IDS) expect(sprites.has(`item_${id}`)).toBe(true);
     for (const def of Object.values(OBJECTS)) {
-      for (const name of [def.kind, def.depletedSprite, ...(def.frames ?? [])]) {
+      for (const name of [def.kind, def.depletedSprite, ...(def.frames ?? []), ...(def.done?.frames ?? [])]) {
         if (name) expect(sprites.has(name), name).toBe(true);
       }
+    }
+  });
+
+  it('has a fishing pose for every facing and the boat trip for both explorers', () => {
+    const sprites = buildSprites();
+    for (const body of ['male', 'female']) {
+      for (const facing of ['down', 'up', 'right', 'left']) expect(sprites.has(`${body}_${facing}_fish`)).toBe(true);
+      for (const name of ['', '_2', '_left', '_left_2']) expect(sprites.has(`boat_away_${body}${name}`)).toBe(true);
     }
   });
 
@@ -77,5 +89,39 @@ describe('shoreTileName', () => {
       expect(sprites.has(shoreTileName(at(water)))).toBe(true);
       expect(sprites.has(grassTileName(at(water)))).toBe(true);
     }
+  });
+});
+
+describe('edgeTileName', () => {
+  const sprites = buildSprites();
+  const offsets: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  const around = (kinds: string) => (dx: number, dy: number) => kinds[offsets.findIndex(([x, y]) => x === dx && y === dy)];
+
+  it('uses the plain tile, one transition set, or a mixed tile', () => {
+    expect(edgeTileName('grass', 'grass', around('........'))).toBe('grass');
+    expect(edgeTileName('grass', 'grass', around('a.......'))).toBe('grass_edge_n');
+    expect(edgeTileName('scree', 'scree', around('.r......'))).toBe('scree_bank_edge_s');
+    expect(edgeTileName('river', '≈', around('...w....'))).toBe('mouth_edge_e');
+    expect(edgeTileName('grass', 'grass', around('a..c....'))).toBe('mix_grass_a..c....');
+  });
+
+  it('only gives names that exist or that mixedTile can paint, fully opaque', () => {
+    for (const [own, letters] of [['grass', '.arc'], ['snow', '.cr']] as const) {
+      // Every mix of neighbours (every 5th for grass, which has 4^8 of them).
+      const count = letters.length ** offsets.length;
+      for (let n = 0; n < count; n += own === 'grass' ? 5 : 1) {
+        const kinds = offsets.map((_, i) => letters[Math.floor(n / letters.length ** i) % letters.length]).join('');
+        const name = edgeTileName(own, own, around(kinds));
+        const sprite = sprites.get(name) ?? mixedTile(name);
+        expect(sprite, name).toBeTruthy();
+        expect(sprite!.pixels.every((p) => p !== null), name).toBe(true);
+      }
+    }
+  });
+
+  it('paints each side of a mixed tile with its own edge', () => {
+    const tile = mixedTile('mix_grass_a..c....')!;
+    expect(tile.get(8, 0)).not.toBe(tile.get(15, 8));
+    expect(mixedTile('mix_grass_zzzzzzzz')).toBeNull();
   });
 });

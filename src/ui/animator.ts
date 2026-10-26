@@ -12,6 +12,8 @@ const FLASH_MS = 140;
 const FLOAT_MS = 800;
 const SPARKLE_MS = 600;
 const FADE_MS = 700;
+/** How long the explorer holds the fishing pose after a cast. */
+const CAST_MS = 700;
 
 const TONE_COLORS: Record<Tone, string> = {
   info: '#fff1b0',
@@ -68,6 +70,8 @@ export class Animator {
   private tweens = new Map<number, Tween>();
   private lunges = new Map<number, Lunge>();
   private flashes = new Map<number, number>();
+  /** When each actor last cast a fishing rod. */
+  private casts = new Map<number, number>();
   private strides = new Map<number, number>();
   floats: FloatingText[] = [];
   sparkles: Sparkle[] = [];
@@ -96,6 +100,11 @@ export class Animator {
           if (this.reducedMotion) break;
           this.lunges.set(e.id, { dx: Math.sign(e.targetX - e.x), dy: Math.sign(e.targetY - e.y), start: t });
           this.extend(t + LUNGE_MS);
+          break;
+        case 'cast':
+          // The pose tells what happened, so it shows with reduced motion too.
+          this.casts.set(e.id, t);
+          this.extend(t + CAST_MS);
           break;
         case 'hit':
           this.flashes.set(e.id, t + LUNGE_MS / 2);
@@ -165,6 +174,15 @@ export class Animator {
     return { x: px, y: py, frame, hop, flash };
   }
 
+  /** True while the actor holds the fishing pose. */
+  casting(id: number, now: number): boolean {
+    const start = this.casts.get(id);
+    if (start === undefined) return false;
+    if (now - start < CAST_MS) return now >= start;
+    this.casts.delete(id);
+    return false;
+  }
+
   /** Gentle idle bob in sprite pixels (0 or 1), staggered per actor. */
   idleBob(id: number, now: number): number {
     if (this.reducedMotion) return 0;
@@ -212,6 +230,7 @@ export class Animator {
     this.tweens.clear();
     this.lunges.clear();
     this.flashes.clear();
+    this.casts.clear();
     this.floats = [];
     this.sparkles = [];
   }

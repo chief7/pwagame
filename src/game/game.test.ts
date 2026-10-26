@@ -282,7 +282,10 @@ describe('Game: sailing to island 2', () => {
     game.move(1, 0);
     expect(game.takeSailRequest()).toBe(true);
     expect(game.log.at(-1)?.msg).toEqual({ key: 'goalReady', level: 2 });
+    const beaconLight = () => game.lights().some(([x, y]) => game.map.idx(x, y) === at);
+    expect(beaconLight()).toBe(false);
     expect(game.sail()).toBe(true);
+    expect(beaconLight()).toBe(true);
     expect(game.level).toBe(2);
     expect(game.sailed).toBe(true);
     expect(game.goal()).toEqual({ state: 'sailed' });
@@ -840,6 +843,32 @@ describe('Game: no harsh endings', () => {
     expect(monkey.flee).toBeGreaterThan(0);
   });
 
+  it('animals face left or right and keep their side when they wander up or down', () => {
+    const wander = (vertical: boolean) => {
+      const game = sandbox(12);
+      const { map, player } = game;
+      // A corridor of sand two cells east of the explorer, walled with rock on both sides.
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+          const open = vertical ? dx === 2 : dy === 2 && dx >= 0;
+          map.set(player.x + dx, player.y + dy, open ? Tile.Sand : Tile.Rock);
+        }
+      }
+      map.set(player.x, player.y, Tile.Sand);
+      const turtle = { id: 99, kind: 'turtle' as const, x: player.x + 2, y: player.y + (vertical ? 0 : 2), facing: 'right' as const, flee: 0 };
+      game.animals = [turtle];
+      const start = { x: turtle.x, y: turtle.y };
+      for (let i = 0; i < 200 && turtle.x === start.x && turtle.y === start.y; i++) game.wait();
+      return { turtle, start };
+    };
+    const up = wander(true);
+    expect(up.turtle.y).not.toBe(up.start.y);
+    expect(up.turtle.facing).toBe('right');
+    const side = wander(false);
+    expect(side.turtle.x).not.toBe(side.start.x);
+    expect(side.turtle.facing).toBe(side.turtle.x < side.start.x ? 'left' : 'right');
+  });
+
   it('a monkey leaves the food you carry for the boat supplies alone', () => {
     const game = sandbox(11);
     for (const [i, o] of game.objects) if (o.kind.startsWith('boat_')) game.objects.delete(i);
@@ -921,7 +950,13 @@ describe('Game: experience and skills', () => {
     expect(game.build('fishing_rod')).toBe(true);
     game.map.set(game.player.x - 1, game.player.y, Tile.Water);
     const turn = game.turn;
-    for (let i = 0; i < 20; i++) expect(game.move(-1, 0)).toBe(true);
+    game.takeEvents();
+    expect(game.move(-1, 0)).toBe(true);
+    expect(game.player.facing).toBe('left');
+    expect(game.takeEvents()).toContainEqual(expect.objectContaining({
+      type: 'cast', id: game.player.id, targetX: game.player.x - 1, targetY: game.player.y,
+    }));
+    for (let i = 1; i < 20; i++) expect(game.move(-1, 0)).toBe(true);
     expect(game.turn).toBe(turn + 20);
     expect(game.inventory.count('fish')).toBeGreaterThan(2);
     expect(game.inventory.count('fish')).toBeLessThan(20);

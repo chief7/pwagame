@@ -98,6 +98,8 @@ export type GoalState =
 export type GameEvent = { late: boolean } & (
   | { type: 'move'; id: number; fromX: number; fromY: number; toX: number; toY: number }
   | { type: 'lunge'; id: number; x: number; y: number; targetX: number; targetY: number }
+  /** The explorer casts the fishing rod towards (targetX, targetY). */
+  | { type: 'cast'; id: number; x: number; y: number; targetX: number; targetY: number }
   | { type: 'hit'; id: number; x: number; y: number; damage: number }
   | { type: 'float'; x: number; y: number; amount: number; what: FloatWhat; tone: Tone }
   | { type: 'sparkle'; x: number; y: number }
@@ -261,11 +263,12 @@ export class Game {
     return Math.max(built, this.map.get(x, y) === Tile.CaveFloor ? CAVE_SHELTER : 0);
   }
 
-  /** Campfires and other light sources: [x, y, radius]. */
+  /** Campfires and other light sources (the lit beacon): [x, y, radius]. */
   lights(): [number, number, number][] {
     const out: [number, number, number][] = [];
     for (const [i, obj] of this.objects) {
-      const r = OBJECTS[obj.kind].lightRadius;
+      const def = OBJECTS[obj.kind];
+      const r = this.sailed && def.done ? def.done.lightRadius : def.lightRadius;
       if (r) out.push([i % this.map.width, Math.floor(i / this.map.width), r]);
     }
     return out;
@@ -772,7 +775,7 @@ export class Game {
   /** Cast the fishing rod into the sea at (x, y). Always takes a turn. */
   private fish(x: number, y: number): void {
     const p = this.player;
-    this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: x, targetY: y });
+    this.emit({ type: 'cast', id: p.id, x: p.x, y: p.y, targetX: x, targetY: y });
     if (!this.rng.chance(this.has('patient_angler') ? PATIENT_BITE_CHANCE : BITE_CHANCE)) {
       this.message({ key: 'noBite' }, 'info');
       return;

@@ -285,8 +285,10 @@ function boatAwaySprite(body: 'male' | 'female', frame: 0 | 1): Sprite {
   return s;
 }
 
+/** Both explorers on board, 2 frames each, sailing right and (mirrored, '…_left') left. */
 export function boatAway(): Sprite[] {
-  return (['male', 'female'] as const).flatMap((body) => [boatAwaySprite(body, 0), boatAwaySprite(body, 1)]);
+  const right = (['male', 'female'] as const).flatMap((body) => [boatAwaySprite(body, 0), boatAwaySprite(body, 1)]);
+  return [...right, ...right.map((s) => s.mirrored(s.name.replace(/(_2)?$/, (frame) => `_left${frame}`)))];
 }
 
 /** The boat in each stage; the ready boat has two frames for its pennant. */

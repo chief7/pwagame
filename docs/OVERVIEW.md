@@ -116,6 +116,7 @@ after each action and gives them to the animator.
 |---|---|---|
 | `move` | An actor moved one cell | Slide between cells, walk frames |
 | `lunge` | An actor reached towards a cell (gather, shoo, pinch, build, cook at the fire) | Short push towards the target |
+| `cast` | The explorer cast the fishing rod towards a sea cell | Fishing pose for 0.7 s (also with reduced motion) |
 | `hit` | An actor lost Health | White flash and a red number |
 | `float` | Show a number at a cell (`+2 wood`, `+35 water`, `+1 XP`): `amount` and `what` (an item, a need or XP) | Text rises and fades. XP has its own colour (lavender). |
 | `sparkle` | Something good happened at a cell (chest, building, skill point, skill learned) | Gold sparkles |
@@ -424,8 +425,8 @@ path. The Skills button shows a star when there are free points.
 
 ### 4.11 Fishing and cooking
 
-- Walking into the sea with a fishing rod in the bag casts the line. One turn
-  passes.
+- Walking into the sea with a fishing rod in the bag casts the line (a
+  `cast` event: the explorer shows the fishing pose). One turn passes.
 - Chance of a bite: 40%, or 70% with Patient angler. A catch gives 1 raw fish
   and 2 XP. Else the log says "Nothing bites".
 - The river is only for drinking. Fishing works only in the sea.
@@ -477,12 +478,20 @@ How it works:
 - Walking into the finished goal sets a flag that the UI reads with
   `game.takeSailRequest()`. The UI asks the level's question ("Set sail?",
   "Light the beacon?"). `game.sail()` logs `sailAway` and sends a `fade`.
+- **The boat trip.** Before the UI calls `sail()` on level 1, it plays the
+  boat sailing away for 1.6 s (`DEPART_MS`): `boatTrip()` in `main.ts` picks
+  the straight line from the boat with the fewest cells to the sea, and
+  `renderer.departure` draws `boat_away_<body>` with the explorer on board
+  while the camera follows it. Input is ignored during the trip. With
+  reduced motion there is no trip, only the fade.
 - **On level 1**, `sail()` then lands the player on level 2 (`landOn()`): a
   new island from `generateWorld(…, 2)`, the player on its start point
   (also the new home), new animals for that island, `goalGiven` cleared,
   and the clock at 8:00 the next day. The bag, XP, skills and needs stay.
   The log says `landIsland`. `sailed` stays false.
-- **On the last level** (2), `sail()` sets `sailed`. The end screen says
+- **On the last level** (2), `sail()` sets `sailed`. The beacon then burns
+  (`done.frames` of `beacon_ready`: `beacon_lit`, `beacon_lit_2`) and lights
+  7 cells at night (`done.lightRadius`); it does not warm. The end screen says
   that a ship took the player on board and the next island comes soon. The
   player can stay on the island or start a new island.
   `nextLevel(level)` gives the next level, or null on the last one.
@@ -685,6 +694,7 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `frames` | Sprite names for an animation (2 frames, 220 ms each). |
 | `bridge` | Built across river cells (see 4.8). The player can walk on it. |
 | `goal` | The island goal: walking into it gives it materials (see 4.12). |
+| `done` | A finished goal after `sail()` (the lit beacon): `frames` to show instead and its `lightRadius`. |
 
 Also add the kind to the `ObjectKind` type.
 
@@ -746,19 +756,40 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 - `outline()` adds a 1 px dark outline. `shadow()` adds a soft ground shadow.
   Call `outline()` first.
 - Sizes: terrain tiles are 16 × 16. Most objects are 16 × 16. Palms and trees
-  are 24 × 32, the boat 24 × 30, the hut and the beacon 24 × 28 and the lean-to 20 × 20. All are drawn
-  bottom-centre on their cell, so tall sprites overlap the cell above.
-- **Transition tiles** (shore, grass edges and river banks) are 12 tiles per
-  set: 4 edges, 4 outer corners and 4 inner corners. `transitionTileName()`
-  picks one from the neighbour cells. Sand next to the river uses the shore
-  set. Grass next to the river uses the `bank_*` set. On island 2, grass
-  next to scree uses the `grass_scree_*` set, and snow next to scree uses
-  the `snow_*` set. A grass cell shows one kind of edge: river bank first,
-  then sand, then scree. Scree and snow have hard edges against rock, cave
-  floor and the river.
+  are 24 × 32, the boat 24 × 30, the hut and the beacon 24 × 28, the lean-to
+  20 × 20 and the fishing pose 32 × 24. All are drawn bottom-centre on their
+  cell, so tall sprites overlap the cell above.
+- **Transition tiles** are 12 tiles per set: 4 edges, 4 outer corners and 4
+  inner corners. `transitionTileName()` picks one from the neighbour cells.
+  The sets:
+
+  | Cell | Next to | Set |
+  |---|---|---|
+  | Sand | sea or river | `shore_*` |
+  | Grass | sand / river / scree | `grass_*` / `bank_*` / `grass_scree_*` |
+  | Snow | scree / river | `snow_*` / `snow_bank_*` |
+  | Scree | river | `scree_bank_*` |
+  | Cave floor | river | `cave_bank_*` |
+  | River | sea | `mouth_*` (2 frames: `mouth_*`, `mouth2_*`) |
+
+  The renderer asks `edgeTileName()` for every cell. When a cell is next to
+  more than one kind (for example grass with sand on one side and scree on
+  another), it gets a mixed tile `mix_<ground>_<8 letters>` (one letter per
+  neighbour). `mixedTile()` paints it on first use: each pixel takes the edge
+  band of its nearest side. The bands are the same functions that paint the
+  sets. Scree and snow keep hard edges against rock and cave floor (cliffs).
 - The river has 2 frames (`river`, `river_2`), 220 ms each.
 - Characters have 4 facings × 3 frames (stand, step 1, step 2). The left
-  facing is the right facing, mirrored.
+  facing is the right facing, mirrored. Each facing also has a fishing pose
+  (`<body>_<facing>_fish`), shown while the `cast` event plays.
+- **Animals** are drawn facing right (or straight at you). `animal()` in
+  `creatures.ts` makes 6 sprites from one drawing: `animal_<kind>`,
+  `_step1`, `_step2`, and the same three mirrored (`animal_<kind>_left…`).
+  The step frames lift every other leg (the lowest row). The bat and the
+  wasps flap their wings instead, and the snake sways its tail. Walking
+  animals and the dog show step frames and do not hop; the bat and the
+  wasps still hop a little. An animal turns only when it moves left or
+  right (`tryStep`), so it keeps its side when it moves up or down.
 - The gallery page (`/sprites.html`) shows every sprite.
 - The preview page (`/preview.html?show=…`) shows chosen sprites in close-up,
   their animation frames, and a scene at game size next to existing sprites.
@@ -938,27 +969,19 @@ Also run `npm run build` (typecheck and build) before you commit.
   The harder food and animal values (see 4.1 and 4.9) are a first guess.
 - A wild animal only checks the distance from home when it appears. It can
   wander closer to camp later.
-- Animals have no walk frames. They hop when they move. They always face down.
-  The dog only faces left or right (`dog_left`, `dog_rest_left` are the
-  mirrored sprites); when it walks straight up or down it keeps its side. A
-  tired dog shows its resting sprite also while it walks.
+- Animals and the dog only face left or right; when they walk straight up
+  or down they keep their side. A tired dog shows its resting sprite also
+  while it walks.
 - Only one dog: after the first is adopted, no other stray dog appears.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
 - Only two levels exist. After the beacon on island 2, there is no next
   island yet: the player stays on the island or starts a new one.
 - Island 1 cannot be visited again after sailing. "New island" always
   starts again on island 1.
-- On island 2, a grass cell next to both scree and sand (or the river) shows
-  only one edge, so the scree side has a hard edge. Scree and snow next to
-  the river also have hard edges.
 - Islands from saves before version 4 have no boat, so they have no goal.
-- The boat does not move when the player sails. The UI shows a fade (and
-  the end screen after the beacon). The beacon does not show a fire.
+- During the boat trip, the boat faces right also when it sails up or down.
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
-- The player has no fishing pose. Fishing shows the normal lunge.
-- Where the river meets the sea, the two water colours meet in a hard line.
-- Cave floor next to the river has no bank tile.
 - The game has not been tested on a real phone.
 
 ---
