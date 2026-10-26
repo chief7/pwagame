@@ -327,27 +327,6 @@ export function dogFacings(): Sprite[] {
   return [dog, dog.mirrored('dog_left'), rest, rest.mirrored('dog_rest_left')];
 }
 
-export function raft(): Sprite {
-  return fromRows('raft', [
-    '................',
-    '................',
-    '................',
-    '.oooooooooooooo.',
-    '.BBrBBBBBBBrBBB.',
-    '.bbrbbbbbbbrbbb.',
-    '.oooooooooooooo.',
-    '.BBrBBBBBBBrBBB.',
-    '.bbrbbbbbbbrbbb.',
-    '.oooooooooooooo.',
-    '.BBrBBBBBBBrBBB.',
-    '.bbrbbbbbbbrbbb.',
-    '..d.........d...',
-    '................',
-    '................',
-    '................',
-  ], { '.': null, o: '#b07a43', B: '#8a5a32', b: '#6b4223', r: '#e0cf9c', d: '#4a2c18' }).outline().shadow(8, 13.5, 8, 1.4);
-}
-
 export function animalSet(): Sprite[] {
   return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), ...dogFacings()];
 }

@@ -34,7 +34,7 @@ function everyMessage(): Msg[] {
   }
   for (const skill of SKILL_IDS) msgs.push({ key: 'needSkill', skill }, { key: 'learn', skill });
   for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
-  for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need }, { key: 'faintWhy', empty: [need] });
+  for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need }, { key: 'low', need, level: 2 }, { key: 'faintWhy', empty: [need] });
   for (const obj of OBJECT_KINDS) {
     msgs.push({ key: 'stepInto', obj }, { key: 'build', obj }, { key: 'fallAsleep', obj }, { key: 'look', obj }, { key: 'nothingLeft', obj });
     msgs.push({ key: 'gather', obj, got: [] }, { key: 'gather', obj, got: [['coconut', 1], ['wood', 3]] });

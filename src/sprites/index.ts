@@ -1,5 +1,5 @@
 import { characterSet } from './characters';
-import { animalSet, itemIcons, raft, skillItemIcons } from './creatures';
+import { animalSet, itemIcons, skillItemIcons } from './creatures';
 import {
   berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
   treeSpruce, treeSpruceSnow,
@@ -42,7 +42,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
     { title: 'Animals', sprites: animalSet() },
     { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
-    { title: 'Boat', sprites: [...boat(), raft()] },
+    { title: 'Boat', sprites: boat() },
     { title: 'Beacon', sprites: beacon() },
     { title: 'Interface', sprites: [globe(), ...skillIcons(), ...grillButton(), appIcon()] },
   ];

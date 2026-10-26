@@ -313,7 +313,7 @@ export const de: Strings = {
       case 'shoo': return ANIMAL[msg.animal].shoo;
       case 'low': return {
         food: 'Dein Magen knurrt. Zeit, etwas zu essen zu finden.',
-        water: 'Du hast Durst. Such eine Quelle oder eine Kokosnuss.',
+        water: msg.level === 2 ? 'Du hast Durst. Trink an einer Quelle oder am Fluss.' : 'Du hast Durst. Such eine Quelle oder eine Kokosnuss.',
         energy: 'Du wirst müde. Eine Pause würde helfen.',
         warmth: 'Brr, dir wird kalt. Ein Feuer oder ein Unterschlupf würde helfen.',
       }[msg.need];

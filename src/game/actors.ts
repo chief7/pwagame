@@ -31,6 +31,8 @@ export interface Dog {
   water: number;
   /** Food or Water ran out: it trails behind slowly and doesn't bark until both are back above 0. */
   tired: boolean;
+  /** Lying down next to the sleeping explorer; it gets up on the first turn after you wake. Missing in older saves. */
+  napping?: boolean;
 }
 
 /** The player's id; animals count up from here. */

@@ -378,6 +378,12 @@ export class Game {
     return left;
   }
 
+  /** What the goal's current stage still needs; nothing before it is found or once it is done. */
+  private goalStillNeeds(): Items {
+    const goal = this.goal();
+    return goal.state === 'build' ? goal.left : {};
+  }
+
   /** True once after the explorer walked into the finished goal. */
   takeSailRequest(): boolean {
     const asked = this.sailAsked;
@@ -645,6 +651,11 @@ export class Game {
     }
     const keep = this.events.length;
     this.sleeping = true;
+    if (this.dog) {
+      // The dog comes over and lies down next to you for the night.
+      this.dogToPlayer();
+      this.dog.napping = true;
+    }
     let reason: WakeReason = 'none';
     for (let i = 0; i < SLEEP_LIMIT && this.sleeping; i++) {
       this.endTurn();
@@ -938,7 +949,7 @@ export class Game {
     for (const need of WARN_NEEDS) {
       if (this.needs[need] < LOW && !this.warned.has(need)) {
         this.warned.add(need);
-        this.message({ key: 'low', need }, 'warn');
+        this.message({ key: 'low', need, level: this.level }, 'warn');
       } else if (this.needs[need] >= LOW + 10) {
         this.warned.delete(need);
       }
@@ -991,6 +1002,7 @@ export class Game {
       this.message({ key: 'dogTired' }, 'warn');
     }
     if (this.sleeping) return;
+    dog.napping = false;
 
     const byWater = DIRS.some(([dx, dy]) => {
       const obj = this.objectAt(dog.x + dx, dog.y + dy);
@@ -1149,7 +1161,9 @@ export class Game {
           if (dist() > 1) this.stepToward(a, playerDist);
           return;
         case 'cheeky': {
-          const foods = this.inventory.foods();
+          // Food you carry for the goal is safe; only spare food tempts a monkey.
+          const keep = this.goalStillNeeds();
+          const foods = this.inventory.foods().filter((id) => this.inventory.count(id) > (keep[id] ?? 0));
           if (friendly || !foods.length) break;
           if (dist() <= 1) {
             const item = this.rng.pick(foods);

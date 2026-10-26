@@ -395,6 +395,17 @@ describe('Game: the dog', () => {
     expect(near(game)).toBeLessThanOrEqual(1);
   });
 
+  it('lies down next to you while you sleep and gets up on your next turn', () => {
+    const game = withDog(54);
+    game.dog!.x = game.player.x + 3;
+    game.needs.energy = 50;
+    game.sleep();
+    expect(near(game)).toBe(1);
+    expect(game.dog!.napping).toBe(true);
+    game.wait();
+    expect(game.dog!.napping).toBe(false);
+  });
+
   it('barks small nuisance animals away, but not the big wild ones', () => {
     const game = withDog(52);
     const monkey = { id: 90, kind: 'monkey' as const, x: game.player.x + 2, y: game.player.y, facing: 'down' as const, flee: 0 };
@@ -827,6 +838,29 @@ describe('Game: no harsh endings', () => {
     monkey.y = game.player.y;
     game.move(1, 0);
     expect(monkey.flee).toBeGreaterThan(0);
+  });
+
+  it('a monkey leaves the food you carry for the boat supplies alone', () => {
+    const game = sandbox(11);
+    for (const [i, o] of game.objects) if (o.kind.startsWith('boat_')) game.objects.delete(i);
+    place(game, -2, 0, 'boat_sail');
+    game.map.explored[game.map.idx(game.player.x - 2, game.player.y)] = 1;
+    for (const [id] of game.inventory.entries()) game.inventory.take(id, game.inventory.count(id));
+    game.inventory.add('coconut', 5);
+    game.inventory.add('cooked_fish', 3);
+    game.map.set(game.player.x + 1, game.player.y, Tile.Grass);
+    const monkey = { id: 99, kind: 'monkey' as const, x: game.player.x + 1, y: game.player.y, facing: 'down' as const, flee: 0 };
+    game.animals = [monkey];
+    game.wait();
+    expect(game.inventory.count('coconut')).toBe(4);
+
+    monkey.flee = 0;
+    monkey.x = game.player.x + 1;
+    monkey.y = game.player.y;
+    game.wait();
+    expect(game.inventory.count('coconut')).toBe(4);
+    expect(game.inventory.count('cooked_fish')).toBe(3);
+    expect(game.log.filter((e) => e.msg.key === 'snatch')).toHaveLength(1);
   });
 });
 

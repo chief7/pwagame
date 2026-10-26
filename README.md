@@ -147,7 +147,7 @@ src/
     objects.ts   stones, logs, chests, stalagmite, spring
     palms.ts     palm trees (24×32), with bare versions
     structures.ts campfire (animated), lean-to, hut, bridges
-    creatures.ts animals, item icons, raft
+    creatures.ts animals, item icons
     ui.ts        interface icons (globe) and the app icon
     characters.ts  male and female explorer, 4 facings × idle + 2 walk frames
     gallery.ts   the sprite gallery page

@@ -214,7 +214,9 @@ What this means in play (awake, no food or drink):
 
 **Warnings.** When a need goes below 25 (`LOW`), the log shows a warning one
 time. The warning resets when the need is above 35 again. The HUD bar of a
-low need pulses.
+low need pulses. The Water warning gives a tip for the island: a spring or a
+coconut on island 1, a spring or the river on island 2 (no coconuts there).
+The `low` message carries the `level` for this.
 
 ### 4.2 Fainting (no death)
 
@@ -354,7 +356,7 @@ Animals have a **temper**. They only react when the player is within their
 | `calm` | Ignores the player. | turtle |
 | `shy` | Moves away from the player. | piglet, bat, rabbit |
 | `grumpy` | If next to the player: `hitChance` (default 50%) per turn to hurt (−`damage` Health), then runs away for `fleeAfter` turns (default 4). | crab (−4), snake (70%, −8), cave bear (50%, −20) |
-| `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. | monkey, squirrel |
+| `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. It does not take food that the goal's current stage still needs (for example the coconuts and cooked fish for the boat supplies), only the extra food. | monkey, squirrel |
 | `stray` | Stays near its place (`notice` 0). Walking into it with food adopts it (see 4.13). | stray dog |
 | `charger` | Runs at the player, 2 cells per turn (`CHARGE_STEPS`), with the message `alert`. When it starts a turn next to the player, it knocks them over (−`damage` Health), then trots off for 10 turns. | wild boar (−12), mountain goat (−10) |
 | `chaser` | Follows the player for 6 turns (`CHASE_TURNS`, stored as `chase` on the animal) and stings each turn it is next to them (−3 Health). It gives up at once when the player stands off its habitat (sand, cave, shelter). Then it flies off for 8 turns. | wasps |
@@ -535,6 +537,10 @@ cells from camp) until the player has a dog.
   trails behind every other turn, stays up to 2 cells away, does not bark
   and shows `dog_rest`. It never dies. When Food and Water are both above 0
   again, it is happy again (`dogBack`).
+- **Sleep.** When the player sleeps, the dog comes next to the player
+  (`dogToPlayer`) and lies down (`napping`, shows `dog_rest`). It gets up on
+  the first turn after the player wakes. Saves from before have no
+  `napping`; that means awake.
 - The Bag panel shows a dog row with its Food and Water, and a "Feed dog"
   button on each item the dog can eat.
 
@@ -936,7 +942,6 @@ Also run `npm run build` (typecheck and build) before you commit.
   The dog only faces left or right (`dog_left`, `dog_rest_left` are the
   mirrored sprites); when it walks straight up or down it keeps its side. A
   tired dog shows its resting sprite also while it walks.
-- The dog does not lie down while the player sleeps.
 - Only one dog: after the first is adopted, no other stray dog appears.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
 - Only two levels exist. After the beacon on island 2, there is no next
@@ -946,13 +951,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 - On island 2, a grass cell next to both scree and sand (or the river) shows
   only one edge, so the scree side has a hard edge. Scree and snow next to
   the river also have hard edges.
-- The low-water warning still says "a spring or a coconut", also on island 2.
 - Islands from saves before version 4 have no boat, so they have no goal.
 - The boat does not move when the player sails. The UI shows a fade (and
   the end screen after the beacon). The beacon does not show a fire.
-- Cheeky monkeys can take the coconuts and cooked fish that the player
-  carries for the supplies.
-- The raft sprite is not used.
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
 - The player has no fishing pose. Fishing shows the normal lunge.

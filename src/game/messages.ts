@@ -36,7 +36,8 @@ export type Msg =
   | { key: 'nothingLeft'; obj: ObjectKind }
   | { key: 'gather'; obj: ObjectKind; got: [ItemId, number][] }
   | { key: 'shoo'; animal: AnimalKind }
-  | { key: 'low'; need: Exclude<NeedId, 'health'> }
+  /** A need ran low. `level` picks the tip (no coconuts on island 2); old saved logs have none. */
+  | { key: 'low'; need: Exclude<NeedId, 'health'>; level?: LevelId }
   | { key: 'faint' }
   | { key: 'wakeAtCamp' }
   /** Why the explorer fainted: the needs that ran out; none means animals hurt them. */
