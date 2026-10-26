@@ -208,3 +208,87 @@ export function spring(): Sprite {
   s.set(10, 11, P.waterGlint);
   return s.outline().shadow(8, 14.6, 7, 1.2);
 }
+
+/** What hangs on a steep step once the explorer makes it climbable. */
+export type ClimbAid = 'none' | 'ladder' | 'rope';
+
+interface StepColors {
+  top: string;
+  topLight: string;
+  face: string;
+  faceLight: string;
+  faceDark: string;
+}
+
+const LEDGE_COLORS: StepColors = {
+  top: P.scree, topLight: P.screeLight, face: P.rockFace, faceLight: P.rockFaceLight, faceDark: P.rockFaceDark,
+};
+const ICE_COLORS: StepColors = {
+  top: P.snow, topLight: P.snowLight, face: P.ice, faceLight: P.iceLight, faceDark: P.iceDark,
+};
+
+/** A steep step of rock (or ice): a flat top and a tall face towards the viewer. */
+function drawStep(s: Sprite, c: StepColors, seed: number): void {
+  for (let x = 1; x <= 14; x++) {
+    // The top edge dips a little, so the band does not look like a wall of bricks.
+    const top = 2 + Math.round(hash2(x >> 1, 0, seed) * 1.5);
+    // Round the four corners.
+    const edge = x === 1 || x === 14;
+    for (let y = top + (edge ? 1 : 0); y <= (edge ? 13 : 14); y++) {
+      const lip = y <= top + 2;
+      const strata = (x + (hash2(x >> 2, 1, seed) < 0.5 ? 0 : 1)) % 4 === 0;
+      let col: string;
+      if (lip) col = y === top || x < 5 ? c.topLight : c.top;
+      else if (y === top + 3) col = c.faceLight;
+      else if (strata || x > 12 || y === 14) col = c.faceDark;
+      else col = hash2(x, y, seed + 1) < 0.12 ? c.faceLight : c.face;
+      s.set(x, y, col);
+    }
+  }
+}
+
+function drawLadder(s: Sprite): void {
+  for (let y = 0; y <= 14; y++) {
+    s.set(5, y, P.woodLight);
+    s.set(10, y, P.woodDark);
+    if (y % 3 === 1) for (let x = 6; x <= 9; x++) s.set(x, y, x === 6 ? P.woodLight : P.wood);
+  }
+  // Rope lashings where the rungs meet the rails.
+  for (const y of [4, 10]) {
+    s.set(5, y, P.strawLight);
+    s.set(10, y, P.straw);
+  }
+}
+
+function drawRope(s: Sprite): void {
+  // A wooden stake on the top, the rope hangs down the face with knots to hold on to.
+  for (let y = 0; y <= 3; y++) s.set(7, y, y === 0 ? P.woodLight : P.wood);
+  s.set(8, 1, P.woodDark);
+  s.set(8, 2, P.woodDark);
+  s.set(6, 2, P.straw);
+  for (let y = 3; y <= 15; y++) {
+    const x = 8 + (y % 6 < 3 ? 0 : 1);
+    const knot = y % 4 === 2;
+    s.set(x - 1, y, knot ? P.strawDark : P.strawLight);
+    s.set(x, y, knot ? P.strawDark : P.straw);
+    if (knot) s.set(x + 1, y, P.strawDeep);
+  }
+}
+
+function stepSprite(name: string, c: StepColors, seed: number, aid: ClimbAid): Sprite {
+  const s = new Sprite(name);
+  drawStep(s, c, seed);
+  if (aid === 'ladder') drawLadder(s);
+  if (aid === 'rope') drawRope(s);
+  return s.outline().shadow(8, 15, 7.5, 1);
+}
+
+/** A rocky step in the mountain scree: too steep to walk up without a ladder. */
+export function ledge(aid: 'none' | 'ladder' = 'none'): Sprite {
+  return stepSprite(aid === 'none' ? 'ledge' : 'ledge_ladder', LEDGE_COLORS, 61, aid);
+}
+
+/** An icy wall below the peak: the explorer needs a climbing rope. */
+export function iceWall(aid: 'none' | 'rope' = 'none'): Sprite {
+  return stepSprite(aid === 'none' ? 'ice_wall' : 'ice_wall_rope', ICE_COLORS, 62, aid);
+}

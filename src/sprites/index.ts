@@ -5,7 +5,7 @@ import {
   treeSpruce, treeSpruceSnow,
 } from './forest';
 import { beacon, boat, boatAway, bridge, campfire, hut, leanTo } from './structures';
-import { boulder, chestClosed, chestOpen, driftwood, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
+import { boulder, chestClosed, chestOpen, driftwood, iceWall, ledge, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
 import { appIcon, globe, grillButton, skillIcons } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
@@ -32,6 +32,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Northern forest', sprites: [treeSpruce(), treeSpruceSnow(), treeBirch(), treeApple(), treeAppleBare(), fern()] },
     { title: 'Grass', sprites: [grass(), grassFlowers(), ...grassEdgeSet(), ...grassScreeSet()] },
     { title: 'Mountains', sprites: [scree(), screeStones(), snow(), snowTracks(), ...snowEdgeSet()] },
+    { title: 'Steep steps', sprites: [ledge(), ledge('ladder'), iceWall(), iceWall('rope')] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },

@@ -181,6 +181,12 @@ export const PALETTE = {
   goatDark: '#9a907c',
   goatHorn: '#6e6252',
 
+  // Island 2: icy cliffs near the peak.
+  iceLight: '#e4f6fc',
+  ice: '#aad6e8',
+  iceDark: '#7fb0c8',
+  iceDeep: '#5a86a2',
+
   // The dog the explorer can adopt.
   dog: '#c48a4e',
   dogLight: '#e6b97e',
