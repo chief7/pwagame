@@ -644,7 +644,7 @@ function renderVoyage(rows: HTMLElement): void {
 /** The Cartographer's map of the explored island, at the largest whole scale that fits. */
 function renderMap(rows: HTMLElement): void {
   const words = t();
-  const picture = drawMap(game.map, game.objects, game.player, game.bearSpots);
+  const picture = drawMap(game.map, game.objects, game.player, game.bearSpots, game.caves().flatMap((c) => c.entrances));
   const paper = bake(stampSigns(picture, (name) => renderer.sprite(name)));
   const dpr = window.devicePixelRatio || 1;
   const room = Math.max(ui.sheetBody.clientWidth, 200) * dpr;
@@ -657,7 +657,7 @@ function renderMap(rows: HTMLElement): void {
   view.setAttribute('role', 'img');
   view.setAttribute('aria-label', words.ui.yourMap);
   const shown = new Set(picture.markers.map((m) => m.sign));
-  const signs = (['you', 'hut', 'fire', 'spring', 'goal', 'bear'] as MapSign[])
+  const signs = (['you', 'hut', 'fire', 'spring', 'goal', 'cave', 'bear'] as MapSign[])
     .filter((sign) => shown.has(sign))
     .map((sign) => el('li', {}, [el('img', { src: icon(`map_${sign}`), alt: '' }), words.ui.mapSigns[sign]]));
   rows.append(el('div', { className: 'map' }, [view, el('ul', { className: 'map-signs' }, signs)]));

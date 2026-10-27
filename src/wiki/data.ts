@@ -3,13 +3,13 @@ import { ITEMS, ITEM_IDS, type ItemId } from '../game/defs/items';
 import { LEVELS, type StageId } from '../game/defs/levels';
 import { OBJECTS, type Gather, type ObjectKind, type Yield } from '../game/defs/objects';
 import { RECIPES, RECIPE_IDS, type RecipeId } from '../game/defs/recipes';
-import { ISLET_OBJECTS, SCATTER } from '../game/worldgen';
+import { CAVE_OBJECTS, ISLET_OBJECTS, SCATTER } from '../game/worldgen';
 
 // What the compendium shows, read from the game's own registries so its
 // tables never fall behind the game. No DOM here, so it can be tested.
 
 /** Objects that the world generator places on every island outside its scatter table. */
-const EVERYWHERE: ObjectKind[] = ['chest_closed', 'spring', 'bramble'];
+const EVERYWHERE: ObjectKind[] = ['chest_closed', 'spring', 'bramble', ...CAVE_OBJECTS];
 
 /** The islands where an object can be found in the wild. */
 export function objectIslands(kind: ObjectKind): number[] {

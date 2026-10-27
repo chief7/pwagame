@@ -88,6 +88,7 @@ flowchart TB
 | `src/game/clock.ts` | Time of day, daylight, day and night phases. |
 | `src/game/inventory.ts` | What the player carries (a count per item). |
 | `src/game/worldgen.ts` | Makes a new island: terrain, caves, objects. |
+| `src/game/caves.ts` | Finds the deep caves (big caves with few ways in) from the tiles (see 4.18). |
 | `src/game/map.ts` | The tile grid, plus the "explored" and "visible" layers. |
 | `src/game/fov.ts` | Field of view (recursive shadowcasting). |
 | `src/game/pathing.ts` | Breadth-first distance maps (8 directions). |
@@ -291,9 +292,14 @@ The UI does not animate each turn of sleep. It shows one `fade` event.
 - One day is 240 turns. One turn is 6 minutes. A new game starts at 8:00 on day 1.
 - Phases: dawn 5:00–7:00, day 7:00–19:00, dusk 19:00–21:00, night 21:00–5:00.
 - Daylight is 1 in the day, 0 at night, and changes smoothly at dawn and dusk.
-- The view distance is 4 + 4 × daylight cells (8 by day, 4 at night).
-- The renderer darkens cells at night. Campfires light 5 cells around them.
-  The player always lights a small area around themselves.
+- The view distance is 4 + 4 × daylight cells (8 by day, 4 at night). Night
+  eyes and the crystal lantern each add up to 2 cells, × (1 − daylight).
+- **Deep caves are dark** (see 4.18): `daylightAt(x, y)` is 0 on their floor
+  and on the rock round them. The view distance uses the daylight of the
+  player's cell, so in a deep cave it is 4 (6 with the lantern), also by day.
+- The renderer darkens each cell by `daylightAt()`. Campfires light 5 cells
+  around them, glowcaps 1 cell (not while they regrow). The player always
+  lights a small area around themselves, a larger one with the lantern.
 - **Tide** (`isLowTide()` in `clock.ts`): low tide from 5:00 to 11:00 and
   from 17:00 to 23:00, high tide the rest of the time. Only the sandbar to
   the tide islet cares (see 4.16).
@@ -663,7 +669,8 @@ keeps a map on the wall of every hut. There is no map anywhere else.
   mark the coast (land next to sea). The edge of what the explorer knows has
   no line, so it does not look like a shore.
 - Signs (`map_<sign>` sprites, `MapSign`): where you are (`you`), huts,
-  campfires, springs, the island goal once seen, and bear areas. A list under
+  campfires, springs, the island goal once seen, each way into a deep cave
+  once its cell is explored (`cave`, see 4.18), and bear areas. A list under
   the map names the signs that are on it. The panel draws the map at the
   largest whole-number scale that fits.
 - **Bear areas.** After each sight update, `updateFov()` stores the cell of
@@ -729,6 +736,44 @@ the goal.
   `ui_star` when earned, else a grey `ui_star_empty` and the progress. The
   end screen shows all stars earned ("Stars: 4 of 6").
 
+### 4.18 Deep caves
+
+Every new island has big caves dug into its hills: 3 on island 1, 2 on
+island 2 (`DEEP_CAVES`). Each has 45 to 80 cells of winding cave floor, a
+wall of rock all round, and one way in (see §5).
+
+- **What is a deep cave.** `findCaves()` in `caves.ts` finds them from the
+  tiles: each 8-way connected patch of cave floor with at least 30 cells
+  (`DEEP_CAVE_CELLS`) and at most 4 ways in (`MAX_WAYS_IN`). A way in is a
+  cave cell next to open ground; ways in 3 cells apart or closer count as
+  one. If the river cuts a cave off from open ground (a bridge leads in),
+  the cells by the river are its ways in. The save stores nothing for
+  caves. `game.caves()` keeps them for the current map.
+- **Dark.** `game.inCave(x, y)` is true on the floor of a deep cave. There,
+  and on the rock round it, there is no daylight (see 4.5). Walking in from
+  outside logs `caveEnter` (with `lantern` when the explorer carries it).
+  Warmth does not change: caves still give 0.5 shelter.
+- **What grows there.** Each deep cave gets a chest at the cell furthest
+  from its way in, 3–5 glowcap clumps (`CAVE_GLOWCAPS`) and 2–4 crystal
+  clusters (`CAVE_CRYSTALS`), plus the normal cave scatter. Glowcaps and
+  crystals grow nowhere else (`CAVE_OBJECTS`).
+
+| Thing | Gives | After |
+|---|---|---|
+| Glowcap clump (`glowcap`) | 2–3 glowcaps | Regrows in 160 turns; shows `glowcap_picked` and does not glow until then |
+| Crystal cluster (`crystal_cluster`) | 1–2 crystals | Removed |
+
+- **Glowcap** (food): 6 Food, 4 Water, 15 Energy. The only food that gives
+  much Energy.
+- **Crystal lantern** (`lantern`, a tool): 3 crystals, 1 wood, 1 rope. It
+  adds 2 cells of sight at night and in deep caves (`LANTERN_SIGHT`), and
+  the renderer lights more round the explorer (`LANTERN_LIGHT`).
+- **The map.** With Cartographer, the map shows a cave sign at each way in
+  the explorer has seen (see 4.15).
+- **Old islands.** Islands from before have no dug caves. A patch of their
+  cave floor can still count as a deep cave (dark, on the map), with no
+  glowcaps or crystals.
+
 ---
 
 ## 5. The world
@@ -755,10 +800,20 @@ Steps:
      noise makes `CaveFloor`.
    - Cave floor needs rock around it, else it becomes grass. Grass never
      touches the sea.
-4. **Start point.** A random sand cell with free floor on all 8 sides.
-5. **Connect.** Any floor that the start cannot reach gets a tunnel. The
+4. **Deep caves** (`digCaves`, see 4.18). For each cave: start on a random
+   cell at least 8 cells from the sea (rock first), then take a random walk
+   (4 ways, sometimes jumping back to a cell already dug, so it branches)
+   until it has 45–80 cells (`DEEP_CAVE_SIZE`). Its cells stay at least 6
+   cells from the sea (`DEEP_CAVE_INLAND`), off snow, and 3 cells from
+   other caves (`DEEP_CAVE_GAP`). The cells round it become rock. The way
+   in goes straight out from the cave to the nearest open ground, at most
+   8 cells (`DEEP_CAVE_MOUTH`), and becomes cave floor. If the island has no
+   room for all its caves, it is made again. Then the grass is cleaned as
+   in step 3.
+5. **Start point.** A random sand cell with free floor on all 8 sides.
+6. **Connect.** Any floor that the start cannot reach gets a tunnel. The
    tunnel follows the shortest path through land and turns rock into cave floor.
-6. **Regions.** Measure the walking distance (8 ways) from the start to all
+7. **Regions.** Measure the walking distance (8 ways) from the start to all
    floor. Two distances split the floor into three regions:
    - **Home coast** (region 0): the nearest 38% of the floor (`HOME_SHARE`).
    - **Wild forest** (region 1): up to 70% (`FOREST_SHARE`).
@@ -772,7 +827,7 @@ Steps:
    becomes sand). The island is made again if the far side is too small, or
    if some floor cannot be reached with bridges of up to 3 cells
    (`reachWithBridges` in `pathing.ts`).
-7. **Objects.** The brambles come first. Each other free floor cell can get
+8. **Objects.** The brambles come first. Each other free floor cell can get
    one object, with chances per biome (`SCATTER`). Forest density follows a
    noise map, so trees form groves. Cells next to the river (4 ways) stay
    free, so a bridge always has a place to land. An object is not placed if
@@ -781,11 +836,12 @@ Steps:
    around the new object still touch each other. Then the generator adds 8
    springs (forest or cave, at least 2 on the home coast) and 8 chests
    (2 home, 3 forest, 3 far side; 10 or more cells from the start).
+   Each deep cave then gets its chest, glowcaps and crystals (see 4.18).
    The island goal (the boat wreck) is placed first, before the scatter: on
    a sand cell next to the sea, in the far side if possible
    (`GOAL_REGIONS`: far side, then forest, then home coast). Its 8
    neighbour cells stay free, so the big sprite is not hidden by trees.
-8. **The tide islet** (island 1 only, `addIslet`). After the objects, the
+9. **The tide islet** (island 1 only, `addIslet`). After the objects, the
    generator looks for a sand cell (with no object) in the wild forest,
    then the far side, then the home coast, with 2 to 5 sea cells straight
    out from it (`SANDBAR`) and room for the islet after them. The islet is
@@ -797,7 +853,7 @@ Steps:
    (`ISLET_OBJECTS`) on it, not next to where the sandbar lands, so every
    free islet cell stays reachable. If no beach has room, the island is
    made again (this has not happened in tests).
-9. **Animals.** `Game` adds each animal kind of the island
+10. **Animals.** `Game` adds each animal kind of the island
    (`islandAnimals`) up to its population, on its habitat, 8 or more cells
    from the start. Animals in other regions stay there.
 
@@ -843,11 +899,11 @@ changes (`biome: 'mountain'`):
   be on scree.
 
 A typical island 2 has about 1,700 forest, 450 scree, 250 rock and 100 snow
-cells. Generation takes 0.1 to 0.3 seconds.
+cells. Generation takes 0.1 to 0.6 seconds.
 
 A typical island has about 3,100 floor cells (about 1,150 home, 1,000 forest,
 850 far side), 50 to 200 river cells and 50 to 80 brambles, plus the islet.
-Generation takes 0.1 to 0.35 seconds.
+Generation takes 0.1 to 0.6 seconds.
 
 ---
 
@@ -942,9 +998,9 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, logs, leaves, stone, fish, rope (materials; fish is raw; logs only from trees with the axe); tar, resin (rare goal materials); stone axe, fishing rod (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (6 logs, 2 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
+| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin (rare goal materials); stone axe, fishing rod, crystal lantern (tools) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Deep caves (both islands): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (6 logs, 2 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
 | Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound (see 4.17) |
@@ -1096,6 +1152,9 @@ Auto-walk (travel and hold) stops when:
 - The Bag panel has "New island" and "Reset all progress" (tap two times to
   confirm each). Reset also forgets the chosen explorer and shows the
   explorer picker again. The language stays.
+- The deep caves need no change to the save: the game finds them from the
+  tiles (see 4.18). Glowcaps, crystals and the lantern are normal objects
+  and items. `SAVE_VERSION` stays 8.
 
 **Test a special situation in the browser.** You can start the game in any
 state: edit a save and load it before the game starts. The game saves on
@@ -1125,10 +1184,10 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
-| `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching |
+| `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching, cave signs |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
 
 To add content, use the `add-content` skill (`.claude/skills/add-content/`).
@@ -1191,6 +1250,11 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Snowy spruces on island 2 | `worldgen.ts` → `RESIN_TREES` | at least 4 |
 | Bear sleep, prowl | `animals.ts` → `nocturnal`, `notice`, `fleeAfter`; `game.ts` → `PROWL_TURNS` | 7:00–19:00; 3 cells; 10 turns; 5 turns |
 | Island stars | `game.ts` → `STAR_FISH`, `STAR_EXPLORE`, `STAR_SAFE_DAYS`, `STAR_XP` | 5 fish, 75%, 3 days, 5 XP |
+| Deep caves per island, size | `worldgen.ts` → `DEEP_CAVES`, `DEEP_CAVE_SIZE` | 3 (island 1), 2 (island 2); 45–80 cells |
+| Deep cave room | `worldgen.ts` → `DEEP_CAVE_INLAND`, `DEEP_CAVE_GAP`, `DEEP_CAVE_MOUTH` | 6 cells from the sea, 3 cells apart, way in up to 8 cells |
+| What a deep cave holds | `worldgen.ts` → `CAVE_GLOWCAPS`, `CAVE_CRYSTALS` | 3–5 glowcap clumps, 2–4 crystal clusters, 1 chest |
+| What counts as a deep cave | `caves.ts` → `DEEP_CAVE_CELLS`, `MAX_WAYS_IN` | 30 cells, 4 ways in |
+| Lantern | `game.ts` → `LANTERN_SIGHT`; `renderer.ts` → `LANTERN_LIGHT` | +2 cells of sight; light 0.85 next to the explorer |
 
 ---
 
@@ -1223,6 +1287,10 @@ Also run `npm run build` (typecheck and build) before you commit.
 - The islet has no shore drawing of its own: the sandbar sprite meets the
   normal shore tiles, so a few pixels of shallow water show at each end.
 - Animals can appear on the islet (crabs, monkeys, also snakes).
+- The random walk of a deep cave can leave single cells of rock inside it,
+  and the river or the ring of steep steps (island 2) can cross a cave.
+- Each deep cave adds a chest, so the Treasure hunter star needs more
+  chests than before.
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
 - The game has not been tested on a real phone.

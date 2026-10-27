@@ -16,7 +16,8 @@ export type ObjectKind =
   | 'tree_spruce' | 'tree_spruce_snow' | 'tree_birch' | 'tree_apple' | 'fern'
   | 'beacon_site' | 'beacon_base' | 'beacon_pyre' | 'beacon_ready'
   | 'ledge' | 'ledge_ladder' | 'ice_wall' | 'ice_wall_rope'
-  | 'barrel' | 'barrel_empty' | 'sandbar_ns' | 'sandbar_ew';
+  | 'barrel' | 'barrel_empty' | 'sandbar_ns' | 'sandbar_ew'
+  | 'glowcap' | 'crystal_cluster';
 
 export interface Yield {
   item: ItemId;
@@ -50,7 +51,7 @@ export interface ObjectDef {
   shelter?: number;
   /** Warms everyone within this many cells. */
   warmthRadius?: number;
-  /** Lights up this many cells at night. */
+  /** Lights up this many cells at night (and in dark caves), unless it is picked and regrowing. */
   lightRadius?: number;
   /** Animation frames (sprite names), cycled by the renderer. */
   frames?: string[];
@@ -202,6 +203,15 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   barrel_empty: def({ kind: 'barrel_empty' }),
   sandbar_ns: def({ kind: 'sandbar_ns', walkable: true, tidal: true }),
   sandbar_ew: def({ kind: 'sandbar_ew', walkable: true, tidal: true }),
+  // The deep caves: glowing mushrooms that grow back, and crystals.
+  glowcap: def({
+    kind: 'glowcap', depletedSprite: 'glowcap_picked', frames: ['glowcap', 'glowcap_2'], lightRadius: 1,
+    gather: { yields: [{ item: 'glowcap', min: 2, max: 3 }], after: { regrow: 160 } },
+  }),
+  crystal_cluster: def({
+    kind: 'crystal_cluster',
+    gather: { yields: [{ item: 'crystal', min: 1, max: 2 }], after: { remove: true } },
+  }),
 };
 
 /** Objects the explorer can get past by building, clearing or waiting for low tide: brambles, steep steps, sandbars. */

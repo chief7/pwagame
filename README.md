@@ -70,6 +70,11 @@ preview folders and branches); the preview checks are in `preview.yml`.
   On the mountain island, the way up to the peak crosses a ring of rocky
   steps (build a ladder on one) and then a ring of ice walls (hang a
   climbing rope on one). Climbing costs a little Energy.
+- **Deep caves:** every island has a few big caves in its rocky hills, each
+  with one way in. Inside it is dark, also in the day. Glowing mushrooms
+  (glowcaps: food with lots of Energy, they grow back), crystals and a
+  chest at the far end are only found there. Make a crystal lantern from
+  crystals to see further in caves and at night.
 - **Animals:** crabs pinch if you linger, monkeys snatch food, piglets and
   bats keep their distance, turtles don't mind you. Far from camp live wild
   animals that hurt: wild boars charge at you, snakes bite, wasps chase you
@@ -88,7 +93,7 @@ preview folders and branches); the preview checks are in `preview.yml`.
   Wild sense marks in red the ground where an animal would come after you.
   A cartographer can look at a rough map of the explored island, but only
   in a hut (the Map button). It shows huts, campfires, springs, the island
-  goal and where you saw cave bears.
+  goal, the ways into the deep caves you found and where you saw cave bears.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
   campfire (tap the grill button above the fire, or use the Build panel).
@@ -173,7 +178,8 @@ src/
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
-    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow), bramble wall, river, scenery
+    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow), deep caves, bramble wall, river, scenery
+    caves.ts     finds the deep caves (big caves with few ways in) from the tiles
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view
     pathing.ts   BFS distance maps (travel, animals, placement), reach across bridgeable rivers
@@ -192,7 +198,7 @@ src/
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
     terrain.ts   sand, water, river, grass, rock, cave floor, scree, snow, and all edge transitions (also mixed ones)
     forest.ts    trees, bushes, berry bushes, mushrooms, brambles
-    objects.ts   stones, logs, chests, stalagmite, spring, steep steps (rocky step, ice wall) with ladder and rope
+    objects.ts   stones, logs, chests, stalagmite, spring, steep steps (rocky step, ice wall) with ladder and rope, glowcaps and crystals
     palms.ts     palm trees (24×32), with bare versions
     structures.ts campfire (animated), lean-to, hut, bridges, boat (also sailing away), beacon (also lit)
     creatures.ts animals (with step frames and left facing), item icons

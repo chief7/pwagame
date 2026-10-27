@@ -76,6 +76,8 @@ export type Msg =
   | { key: 'landIsland'; level: LevelId }
   /** Stepped onto snow: it is cold up here. */
   | { key: 'snowCold' }
+  /** Walked into a deep cave from outside: it is dark in there, unless you carry the crystal lantern. */
+  | { key: 'caveEnter'; lantern?: true }
   /** Walked into a steep step: build `way` (a ladder, a climbing rope) on it to get up. */
   | { key: 'tooSteep'; obj: ObjectKind; way: ObjectKind }
   /** Tried to build a way up with no such step next to the explorer. */

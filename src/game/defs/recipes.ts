@@ -6,7 +6,7 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern';
 
 export type Recipe = {
   id: RecipeId;
@@ -32,6 +32,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   // Island 2: ways up the steep steps.
   ladder: { id: 'ladder', builds: 'ledge_ladder', onto: 'ledge', cost: { wood: 4, rope: 2 } },
   climbing_rope: { id: 'climbing_rope', builds: 'ice_wall_rope', onto: 'ice_wall', cost: { wood: 1, rope: 4 } },
+  // From the crystals of the deep caves: you see further in caves and at night.
+  lantern: { id: 'lantern', makes: 'lantern', cost: { crystal: 3, wood: 1, rope: 1 } },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];

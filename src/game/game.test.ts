@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSprites, grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName } from '../sprites';
+import { DEEP_CAVE_CELLS, findCaves } from './caves';
 import { daylight, isLowTide, isNight, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
 import { ANIMALS } from './defs/animals';
@@ -7,10 +8,11 @@ import { canBeOpened, OBJECTS, type ObjectKind } from './defs/objects';
 import { LEVELS } from './defs/levels';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
-import { Tile } from './map';
+import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
 import { distanceMap, reachWithBridges } from './pathing';
 import { Rng } from './rng';
+import { drawMap } from '../ui/mapview';
 import { generateWorld, NO_REGION, WORLD_HEIGHT, WORLD_WIDTH } from './worldgen';
 
 describe('Rng', () => {
@@ -409,6 +411,11 @@ describe('Game: the dog', () => {
       expect(near(game)).toBeLessThanOrEqual(1);
     }
     expect(game.dog!.facing).toBe('right');
+    // The walk took the explorer to the edge of the cleared sand: clear the way back to the dog.
+    for (let dx = 1; dx <= 3; dx++) {
+      game.map.set(game.player.x + dx, game.player.y, Tile.Sand);
+      game.objects.delete(game.map.idx(game.player.x + dx, game.player.y));
+    }
     game.dog!.x = game.player.x + 3;
     game.dog!.y = game.player.y;
     game.wait();
@@ -1821,6 +1828,146 @@ describe('Game: island stars', () => {
     const old = Game.fromSave(JSON.parse(JSON.stringify(v7)));
     expect(old.stars).toEqual([]);
     expect(old.safeSince).toBe(game.turn);
+  });
+});
+
+describe('deep caves', () => {
+  /** An island with the explorer on open ground next to a way into a deep cave, by day. */
+  function atCaveMouth(seed: number) {
+    const game = new Game(seed);
+    game.animals = [];
+    const { map } = game;
+    for (const cave of game.caves()) {
+      for (const e of cave.entrances) {
+        const ex = e % map.width;
+        const ey = Math.floor(e / map.width);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ox = ex - dx;
+          const oy = ey - dy;
+          if (!map.isFloor(ox, oy) || game.inCave(ox, oy) || map.get(ox, oy) === Tile.CaveFloor) continue;
+          game.objects.delete(map.idx(ox, oy));
+          game.objects.delete(e);
+          game.player.x = ox;
+          game.player.y = oy;
+          return { game, dx, dy, cave };
+        }
+      }
+    }
+    throw new Error('no cave mouth');
+  }
+
+  it('digs deep caves into every island, each with a chest, glowcaps and crystals', () => {
+    for (const level of [1, 2]) {
+      for (const seed of [1, 2, 3]) {
+        const world = generateWorld(new Rng(seed), WORLD_WIDTH, WORLD_HEIGHT, level);
+        const caves = findCaves(world.map);
+        expect(caves.length, `island ${level}, seed ${seed}`).toBeGreaterThanOrEqual(level === 1 ? 3 : 2);
+        for (const cave of caves) {
+          expect(cave.cells.length).toBeGreaterThanOrEqual(DEEP_CAVE_CELLS);
+          expect(cave.entrances.length).toBeGreaterThanOrEqual(1);
+          expect(cave.entrances.length).toBeLessThanOrEqual(4);
+          const kinds = cave.cells.map((i) => world.objects.get(i)?.kind);
+          expect(kinds).toContain('chest_closed');
+          expect(kinds).toContain('glowcap');
+          expect(kinds).toContain('crystal_cluster');
+        }
+        // Glowcaps and crystals grow nowhere else.
+        for (const [i, o] of world.objects) {
+          if (o.kind === 'glowcap' || o.kind === 'crystal_cluster') expect(caves.some((c) => c.cells.includes(i))).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('is dark inside, also by day; the crystal lantern helps there and at night', () => {
+    const { game, dx, dy } = atCaveMouth(3);
+    expect(game.phase).toBe('day');
+    expect(game.sightRadius).toBe(8);
+    expect(game.move(dx, dy)).toBe(true);
+    expect(game.inCave(game.player.x, game.player.y)).toBe(true);
+    expect(game.daylightAt(game.player.x, game.player.y)).toBe(0);
+    expect(game.sightRadius).toBe(4);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'caveEnter' });
+    game.inventory.add('lantern', 1);
+    expect(game.sightRadius).toBe(6);
+    // Outside by day the lantern changes nothing; at night it does.
+    game.player.x -= dx;
+    game.player.y -= dy;
+    expect(game.sightRadius).toBe(8);
+    game.turn = nightTurn() + 20;
+    expect(game.sightRadius).toBe(6);
+  });
+
+  it('says that the lantern lights the way into a cave', () => {
+    const { game, dx, dy } = atCaveMouth(4);
+    game.inventory.add('lantern', 1);
+    expect(game.move(dx, dy)).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'caveEnter', lantern: true });
+  });
+
+  it('marks the ways in the explorer has seen on the map', () => {
+    const { game, dx, dy } = atCaveMouth(5);
+    const signs = () => drawMap(game.map, game.objects, game.player, [], game.caves().flatMap((c) => c.entrances)).markers.map((m) => m.sign);
+    game.map.explored.fill(0);
+    expect(signs()).not.toContain('cave');
+    game.move(dx, dy);
+    expect(signs()).toContain('cave');
+  });
+
+  it('has glowcaps that give energy food, glow, and grow back', () => {
+    const game = sandbox(60);
+    place(game, 1, 0, 'glowcap');
+    const at = game.map.idx(game.player.x + 1, game.player.y);
+    expect(game.lights()).toContainEqual([game.player.x + 1, game.player.y, 1]);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('glowcap')).toBeGreaterThanOrEqual(2);
+    expect(game.inventory.count('glowcap')).toBeLessThanOrEqual(3);
+    expect(game.objects.get(at)?.kind).toBe('glowcap');
+    expect(game.objectSprite(game.objects.get(at)!)).toBe('glowcap_picked');
+    // A picked clump does not glow until it grows back.
+    expect(game.lights()).not.toContainEqual([game.player.x + 1, game.player.y, 1]);
+    game.needs.energy = 50;
+    game.needs.food = 50;
+    expect(game.eat('glowcap')).toBe(true);
+    expect(game.needs.energy).toBeCloseTo(50 + 15, 0);
+  });
+
+  it('has crystals for the crystal lantern', () => {
+    const game = sandbox(61);
+    place(game, 1, 0, 'crystal_cluster');
+    expect(game.move(1, 0)).toBe(true);
+    const got = game.inventory.count('crystal');
+    expect(got).toBeGreaterThanOrEqual(1);
+    expect(got).toBeLessThanOrEqual(2);
+    expect(game.objectAt(game.player.x + 1, game.player.y)).toBeUndefined();
+    game.inventory.add('crystal', 3 - got);
+    game.inventory.add('wood', 1);
+    game.inventory.add('rope', 1);
+    expect(game.build('lantern')).toBe(true);
+    expect(game.inventory.count('lantern')).toBe(1);
+    expect(game.inventory.count('crystal')).toBe(0);
+    game.inventory.add('crystal', 3);
+    game.inventory.add('wood', 1);
+    game.inventory.add('rope', 1);
+    expect(game.buildProblem('lantern')).toEqual({ key: 'haveTool', item: 'lantern' });
+  });
+
+  it('finds big caves with few ways in, not small nooks or open rows of them', () => {
+    const map = new GameMap(40, 20);
+    map.tiles.fill(Tile.Rock);
+    const dig = (x0: number, y0: number, w: number, h: number) => {
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) map.set(x, y, Tile.CaveFloor);
+    };
+    for (let x = 0; x < 40; x++) map.set(x, 19, Tile.Grass);
+    // A nook of 6 cells, a room of 40 with one way out, and a row of nooks open to the grass.
+    dig(1, 1, 3, 2);
+    dig(8, 2, 8, 5);
+    dig(11, 7, 1, 12);
+    dig(14, 16, 25, 3);
+    const caves = findCaves(map);
+    expect(caves).toHaveLength(1);
+    expect(caves[0].cells.length).toBe(40 + 12);
+    expect(caves[0].entrances).toEqual([map.idx(11, 18)]);
   });
 });
 

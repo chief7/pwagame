@@ -54,4 +54,11 @@ describe('the Cartographer map', () => {
     const stamped = stampSigns(picture, (name) => sprites.get(name));
     expect(stamped.pixels.filter((c) => c === P.inkRed).length).toBeGreaterThan(0);
   });
+
+  it('shows a cave sign at each way into a deep cave the explorer has seen', () => {
+    const map = new GameMap(20, 16);
+    map.explored[map.idx(3, 3)] = 1;
+    const picture = drawMap(map, new Map(), { x: 8, y: 8 }, [], [map.idx(3, 3), map.idx(15, 12)]);
+    expect(picture.markers.filter((m) => m.sign === 'cave')).toHaveLength(1);
+  });
 });

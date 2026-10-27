@@ -80,6 +80,9 @@ const ITEM: ItemWords<CountNoun> = {
   rope: { g: 'n', word: 'Seil', plural: 'Seile', short: ['Seil', 'Seile'] },
   tar: { g: 'm', word: 'Topf Teer', plural: 'Töpfe Teer', short: ['Teer', 'Teer'] },
   resin: { g: 'n', word: 'Stück Harz', plural: 'Stück Harz', short: ['Harz', 'Harz'] },
+  glowcap: { g: 'm', word: 'Leuchtpilz', plural: 'Leuchtpilze', short: ['Leuchtpilz', 'Leuchtpilze'] },
+  crystal: { g: 'm', word: 'Kristall', plural: 'Kristalle', short: ['Kristall', 'Kristalle'] },
+  lantern: { g: 'f', word: 'Kristalllaterne', plural: 'Kristalllaternen', short: ['Laterne', 'Laternen'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -130,6 +133,8 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   barrel_empty: { g: 'n', word: 'Fass', adj: 'leer' },
   sandbar_ns: { g: 'f', word: 'Sandbank' },
   sandbar_ew: { g: 'f', word: 'Sandbank' },
+  glowcap: { g: 'pl', word: 'Leuchtpilze', gather: 'Du pflückst die leuchtenden Pilze' },
+  crystal_cluster: { g: 'f', word: 'Kristallgruppe', gather: 'Du brichst ein paar Kristalle ab' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -239,7 +244,7 @@ export const de: Strings = {
     dogTired: 'Müde. Gib ihm Essen und geh an Wasser vorbei, damit er trinken kann.',
     map: 'Karte',
     yourMap: 'Deine Karte',
-    mapSigns: { you: 'Du', hut: 'Hütte', fire: 'Lagerfeuer', spring: 'Quelle', goal: 'Ziel', bear: 'Bären' },
+    mapSigns: { you: 'Du', hut: 'Hütte', fire: 'Lagerfeuer', spring: 'Quelle', goal: 'Ziel', bear: 'Bären', cave: 'Höhle' },
     feedDog: 'Füttern',
     islandStars: 'Inselsterne',
     endStars: (n, of) => `Sterne: ${n} von ${of}`,
@@ -291,6 +296,7 @@ export const de: Strings = {
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
     ladder: { name: 'Leiter', description: 'Bringt dich über eine Felsstufe in den Bergen. Stell dich neben die Stufe, um sie zu bauen.' },
     climbing_rope: { name: 'Kletterseil', description: 'Bringt dich über eine Eiswand nahe am Gipfel. Stell dich neben die Wand, um es zu bauen.' },
+    lantern: { name: 'Kristalllaterne', description: 'Höhlenkristalle leuchten in einem kleinen Holzrahmen. Du siehst weiter in dunklen Höhlen und in der Nacht.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
   objectName: (kind) => name(OBJECT[kind]),
@@ -431,6 +437,9 @@ export const de: Strings = {
       case 'dogTired': return 'Dein Hund ist zu hungrig oder durstig, um zu helfen. Er trottet langsam hinter dir her.';
       case 'dogBack': return 'Dein Hund springt auf und ist wieder fröhlich!';
       case 'snowCold': return 'Brr! Der Schnee ist kalt, auch am Tag. Ein Feuer oder ein Unterschlupf hilft hier oben.';
+      case 'caveEnter': return msg.lantern
+        ? 'Du gehst in eine tiefe Höhle. Deine Kristalllaterne leuchtet dir den Weg.'
+        : 'Du gehst in eine tiefe Höhle. Hier ist es dunkel, auch am Tag.';
       case 'tooSteep': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu steil zum Klettern. Bau ${obj(msg.way, 'acc', 'a')} daran.`;
       case 'noStep': return `Stell dich neben ${obj(msg.obj, 'acc', 'a')}, um das zu bauen.`;
       case 'climb': return `Du kletterst ${contract(`an ${obj(msg.obj, 'dat', 'the')}`)} über die Stufe. ${msg.easy ? 'Ganz leicht!' : 'Puh, das ist anstrengend!'}`;

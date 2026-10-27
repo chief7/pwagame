@@ -78,10 +78,12 @@ export function stampSigns(picture: MapPicture, sprite: (name: string) => Sprite
 /**
  * Draw what the explorer has seen of the island, with signs for places they
  * know. `bearSpots` are cells where they saw a cave bear: the map hatches the
- * ground around each in red.
+ * ground around each in red. `caveEntrances` are the ways into the deep
+ * caves: each one the explorer has seen gets a cave sign.
  */
 export function drawMap(
   map: GameMap, objects: Map<number, WorldObject>, player: { x: number; y: number }, bearSpots: readonly number[] = [],
+  caveEntrances: readonly number[] = [],
 ): MapPicture {
   const bw = Math.ceil(map.width / MAP_BLOCK);
   const bh = Math.ceil(map.height / MAP_BLOCK);
@@ -172,6 +174,11 @@ export function drawMap(
     if (!map.isExplored(x, y) || (x === player.x && y === player.y)) continue;
     const sign = SIGNS[o.kind] ?? (OBJECTS[o.kind].goal ? 'goal' : null);
     if (sign) markers.push({ sign, ...at(x, y) });
+  }
+  for (const i of caveEntrances) {
+    const x = i % map.width;
+    const y = Math.floor(i / map.width);
+    if (map.isExplored(x, y)) markers.push({ sign: 'cave', ...at(x, y) });
   }
   for (const spot of bearSpots) markers.push({ sign: 'bear', ...at(spot % map.width, Math.floor(spot / map.width)) });
   markers.push({ sign: 'you', ...at(player.x, player.y) });

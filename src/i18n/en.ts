@@ -19,6 +19,9 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   rope: { one: 'rope', many: 'ropes', short: ['rope', 'ropes'] },
   tar: { one: 'pot of tar', many: 'pots of tar', short: ['tar', 'tar'] },
   resin: { one: 'lump of resin', many: 'lumps of resin', short: ['resin', 'resin'] },
+  glowcap: { one: 'glowcap', many: 'glowcaps', short: ['glowcap', 'glowcaps'] },
+  crystal: { one: 'crystal', many: 'crystals', short: ['crystal', 'crystals'] },
+  lantern: { one: 'crystal lantern', many: 'crystal lanterns', short: ['lantern', 'lanterns'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -69,6 +72,8 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   barrel_empty: { name: 'empty barrel' },
   sandbar_ns: { name: 'sandbar' },
   sandbar_ew: { name: 'sandbar' },
+  glowcap: { name: 'glowcaps', gather: 'You pick the glowing mushrooms' },
+  crystal_cluster: { name: 'crystal cluster', gather: 'You break off some crystals' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -177,7 +182,7 @@ export const en: Strings = {
     dogTired: 'Tired. Give it food, and walk past water so it can drink.',
     map: 'Map',
     yourMap: 'Your map',
-    mapSigns: { you: 'You', hut: 'Hut', fire: 'Campfire', spring: 'Spring', goal: 'Goal', bear: 'Bears' },
+    mapSigns: { you: 'You', hut: 'Hut', fire: 'Campfire', spring: 'Spring', goal: 'Goal', bear: 'Bears', cave: 'Cave' },
     feedDog: 'Feed dog',
     islandStars: 'Island stars',
     endStars: (n, of) => `Stars: ${n} of ${of}`,
@@ -229,6 +234,7 @@ export const en: Strings = {
     cooked_fish: { name: 'Cook a fish', description: 'Stand next to a campfire. Cooked fish is tasty food.' },
     ladder: { name: 'Ladder', description: 'Gets you up a rocky step in the mountains. Stand next to the step to build it.' },
     climbing_rope: { name: 'Climbing rope', description: 'Gets you up a wall of ice near the peak. Stand next to the wall to build it.' },
+    lantern: { name: 'Crystal lantern', description: 'Cave crystals glow in a little wooden frame. You see further in dark caves and at night.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
   objectName: (kind) => cap(OBJECT[kind].name),
@@ -361,6 +367,9 @@ export const en: Strings = {
       case 'dogTired': return 'Your dog is too hungry or thirsty to help. It trails slowly behind you.';
       case 'dogBack': return 'Your dog jumps up, happy again!';
       case 'snowCold': return 'Brr! The snow is cold, even in the day. A fire or a shelter helps up here.';
+      case 'caveEnter': return msg.lantern
+        ? 'You step into a deep cave. Your crystal lantern lights the way.'
+        : 'You step into a deep cave. It is dark in here, even in the day.';
       case 'tooSteep': return `The ${obj(msg.obj)} is too steep to climb. Build ${a(obj(msg.way))} on it.`;
       case 'noStep': return `Stand next to ${a(obj(msg.obj))} to build this.`;
       case 'climb': return msg.easy

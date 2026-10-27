@@ -1,4 +1,5 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Dog, type Player } from './actors';
+import { CAVE_FLOOR, caveMask, findCaves, type Cave } from './caves';
 import { daylight, isLowTide, isNight, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
@@ -46,6 +47,8 @@ const THICK_SKIN = 0.7;
 const GREEN_THUMB = 0.7;
 /** Extra cells the explorer sees at night with Night eyes. */
 const NIGHT_EYES = 2;
+/** Extra cells the explorer sees at night and in deep caves with the crystal lantern. */
+const LANTERN_SIGHT = 2;
 /** How much colder it is out in the open on snow, day and night (see warmthTarget). */
 const SNOW_CHILL = 40;
 /** Energy it costs to climb onto a ladder or a climbing rope. */
@@ -207,6 +210,8 @@ export class Game {
   private sailAsked = false;
   /** climberDist() of this turn. */
   private climbDist: { turn: number; dist: Int32Array } | null = null;
+  /** The deep caves of this map (found from its tiles, which never change). */
+  private caveCache: { map: GameMap; caves: Cave[]; mask: Uint8Array } | null = null;
 
   constructor(seed = (Math.random() * 2 ** 32) >>> 0, save?: SaveData) {
     this.seed = seed;
@@ -345,11 +350,40 @@ export class Game {
     return Math.max(built, this.map.get(x, y) === Tile.CaveFloor ? CAVE_SHELTER : 0);
   }
 
-  /** Campfires and other light sources (the lit beacon): [x, y, radius]. */
+  /** The deep caves of this island: big caves with only a few ways in (see caves.ts). */
+  caves(): Cave[] {
+    return this.caveData().caves;
+  }
+
+  private caveData(): { caves: Cave[]; mask: Uint8Array } {
+    if (this.caveCache?.map !== this.map) {
+      const caves = findCaves(this.map);
+      this.caveCache = { map: this.map, caves, mask: caveMask(this.map, caves) };
+    }
+    return this.caveCache;
+  }
+
+  /** On the floor of a deep cave: dark there, also in the day. */
+  inCave(x: number, y: number): boolean {
+    return this.map.inBounds(x, y) && this.caveData().mask[this.map.idx(x, y)] === CAVE_FLOOR;
+  }
+
+  /** Daylight at a cell: none in a deep cave and on the rock round it. */
+  daylightAt(x: number, y: number): number {
+    return this.map.inBounds(x, y) && this.caveData().mask[this.map.idx(x, y)] ? 0 : this.daylight;
+  }
+
+  /** The explorer carries the crystal lantern. */
+  get hasLantern(): boolean {
+    return this.inventory.count('lantern') > 0;
+  }
+
+  /** Campfires and other light sources (the lit beacon, glowcaps that are not picked): [x, y, radius]. */
   lights(): [number, number, number][] {
     const out: [number, number, number][] = [];
     for (const [i, obj] of this.objects) {
       const def = OBJECTS[obj.kind];
+      if (obj.readyAt !== undefined && obj.readyAt > this.turn) continue;
       const r = this.sailed && def.done ? def.done.lightRadius : def.lightRadius;
       if (r) out.push([i % this.map.width, Math.floor(i / this.map.width), r]);
     }
@@ -406,10 +440,11 @@ export class Game {
     return phase(this.turn);
   }
 
-  /** How far the explorer can see: less at night. */
+  /** How far the explorer can see: less at night and in deep caves. */
   get sightRadius(): number {
-    const night = this.has('night_eyes') ? NIGHT_EYES * (1 - this.daylight) : 0;
-    return Math.round(4 + 4 * this.daylight + night);
+    const day = this.daylightAt(this.player.x, this.player.y);
+    const extra = (this.has('night_eyes') ? NIGHT_EYES : 0) + (this.hasLantern ? LANTERN_SIGHT : 0);
+    return Math.round(4 + 4 * day + extra * (1 - day));
   }
 
   has(skill: SkillId): boolean {
@@ -582,6 +617,7 @@ export class Game {
     }
     this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
     const onSnow = this.map.get(p.x, p.y) === Tile.Snow;
+    const inCave = this.inCave(p.x, p.y);
     p.x = nx;
     p.y = ny;
     if (obj && OBJECTS[obj.kind].shelter) {
@@ -589,6 +625,7 @@ export class Game {
       if (this.canReadMap()) this.message({ key: 'mapHint' }, 'info');
     } else if (obj && OBJECTS[obj.kind].climb) this.climb(nx, ny, obj.kind);
     else if (!onSnow && this.map.get(nx, ny) === Tile.Snow) this.message({ key: 'snowCold' }, 'warn');
+    else if (!inCave && this.inCave(nx, ny)) this.message(this.hasLantern ? { key: 'caveEnter', lantern: true } : { key: 'caveEnter' }, 'info');
     this.endTurn();
     return true;
   }

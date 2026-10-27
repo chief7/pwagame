@@ -1,3 +1,4 @@
+import { findCaves } from './caves';
 import { levelDef, type Biome } from './defs/levels';
 import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { GameMap, Tile } from './map';
@@ -50,6 +51,21 @@ const LEDGE_RING = { from: 6, to: 10, ground: Tile.Scree, kind: 'ledge' } as con
 const ICE_RING = { from: 3, to: 4, ground: Tile.Snow, kind: 'ice_wall' } as const;
 /** Island 2: at least this many snowy spruces, which give the resin for the beacon. */
 const RESIN_TREES = 4;
+
+/** Deep caves dug into the hills of each kind of island, and how many floor cells each gets. */
+const DEEP_CAVES: Record<Biome, number> = { tropical: 3, mountain: 2 };
+const DEEP_CAVE_SIZE = { min: 45, max: 80 };
+/** A deep cave's floor stays at least this many cells from the sea. */
+const DEEP_CAVE_INLAND = 6;
+/** Cells kept between two deep caves (walls included), so each is its own cave. */
+const DEEP_CAVE_GAP = 3;
+/** The longest way in that is dug from a deep cave through rock to open ground. */
+const DEEP_CAVE_MOUTH = 8;
+/** What each deep cave holds: glowcap clumps and crystal clusters (min, max), plus a chest at its far end. */
+const CAVE_GLOWCAPS = { min: 3, max: 5 };
+const CAVE_CRYSTALS = { min: 2, max: 4 };
+/** Objects that only grow in the deep caves (every island has some). */
+export const CAVE_OBJECTS: ObjectKind[] = ['glowcap', 'crystal_cluster'];
 
 /**
  * Island 1: the tide islet. Its cells are those within this squared radius
@@ -115,6 +131,9 @@ export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIG
     const map = landmass(width, height, rng);
     if (!map) continue;
     const elevation = biome === 'mountain' ? addMountains(map, rng) : (addBiomes(map, rng), null);
+    if (!digCaves(map, rng, DEEP_CAVES[biome])) continue;
+    if (biome === 'mountain') cleanGrass(map);
+    else removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, Tile.Sand));
     const start = pickStart(map, rng);
     if (!start) continue;
     connectFloor(map, start, biome === 'mountain' ? Tile.Scree : Tile.CaveFloor);
@@ -351,6 +370,111 @@ function addMountains(map: GameMap, rng: Rng): Float32Array {
   removeThin(map, (x, y) => map.get(x, y) === Tile.Snow, (x, y) => map.set(x, y, Tile.Scree));
   cleanGrass(map);
   return elevation;
+}
+
+/**
+ * Dig `count` deep caves into the hills: winding cave floor (a random walk),
+ * a wall of rock all round it, and one way in, dug straight through the
+ * rock to the nearest open ground. Prefers to start in rock, so the caves
+ * sit in the rocky hills. Returns false if the island has no room for them.
+ */
+function digCaves(map: GameMap, rng: Rng, count: number): boolean {
+  const seaDist = distanceMap4(map);
+  const taken = new Uint8Array(map.tiles.length);
+  const free = (x: number, y: number) => {
+    if (!map.inBounds(x, y)) return false;
+    const i = map.idx(x, y);
+    const t = map.tiles[i];
+    if (seaDist[i] < DEEP_CAVE_INLAND || t === Tile.Water || t === Tile.River || t === Tile.Snow) return false;
+    for (let gy = -DEEP_CAVE_GAP; gy <= DEEP_CAVE_GAP; gy++) {
+      for (let gx = -DEEP_CAVE_GAP; gx <= DEEP_CAVE_GAP; gx++) {
+        if (map.inBounds(x + gx, y + gy) && taken[map.idx(x + gx, y + gy)]) return false;
+      }
+    }
+    return true;
+  };
+  const centres = [...map.tiles.keys()].filter((i) => seaDist[i] >= DEEP_CAVE_INLAND + 2);
+  for (let n = centres.length - 1; n > 0; n--) {
+    const j = rng.int(0, n);
+    [centres[n], centres[j]] = [centres[j], centres[n]];
+  }
+  // Rocky hills first; the shuffle keeps the order random within each.
+  centres.sort((a, b) => Number(map.tiles[b] === Tile.Rock) - Number(map.tiles[a] === Tile.Rock));
+
+  let dug = 0;
+  for (const centre of centres) {
+    if (dug >= count) break;
+    const cx = centre % map.width;
+    const cy = (centre - cx) / map.width;
+    if (!free(cx, cy)) continue;
+    const size = rng.int(DEEP_CAVE_SIZE.min, DEEP_CAVE_SIZE.max);
+    const cave = new Set([centre]);
+    const order = [centre];
+    let cur = centre;
+    for (let tries = 0; cave.size < size && tries < size * 30; tries++) {
+      // Now and then start again from somewhere in the cave, so it branches into chambers.
+      if (rng.chance(0.2)) cur = rng.pick(order);
+      const [dx, dy] = rng.pick([[1, 0], [-1, 0], [0, 1], [0, -1]] as const);
+      const x = (cur % map.width) + dx;
+      const y = Math.floor(cur / map.width) + dy;
+      if (!free(x, y)) continue;
+      cur = map.idx(x, y);
+      if (!cave.has(cur)) {
+        cave.add(cur);
+        order.push(cur);
+      }
+    }
+    if (cave.size < DEEP_CAVE_SIZE.min) continue;
+
+    // The way in: straight out from the cave through its wall and the rock
+    // behind it, to the nearest open ground that is not part of the cave.
+    let mouth: number[] | null = null;
+    for (const i of order) {
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const path: number[] = [];
+        for (let k = 1; k <= DEEP_CAVE_MOUTH; k++) {
+          const px = x + dx * k;
+          const py = y + dy * k;
+          if (!map.inBounds(px, py) || seaDist[map.idx(px, py)] < 1) break;
+          const p = map.idx(px, py);
+          if (cave.has(p)) break;
+          const t = map.tiles[p];
+          // Ground that will be the wall of the cave is rock too.
+          const wall = DIRS.some(([wx, wy]) => cave.has(map.idx(px + wx, py + wy)));
+          if (k > 1 && !wall && t !== Tile.Rock && map.isFloor(px, py)) {
+            if (!mouth || path.length < mouth.length) mouth = path.slice();
+            break;
+          }
+          if (t === Tile.River || t === Tile.Water) break;
+          path.push(p);
+        }
+      }
+    }
+    if (!mouth) continue;
+
+    for (const i of cave) {
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      for (const [dx, dy] of DIRS) {
+        if (!map.inBounds(x + dx, y + dy)) continue;
+        const n = map.idx(x + dx, y + dy);
+        if (!cave.has(n) && map.tiles[n] !== Tile.Water) map.tiles[n] = Tile.Rock;
+        taken[n] = 1;
+      }
+    }
+    for (const i of cave) {
+      map.tiles[i] = Tile.CaveFloor;
+      taken[i] = 1;
+    }
+    for (const i of mouth) {
+      map.tiles[i] = Tile.CaveFloor;
+      taken[i] = 1;
+    }
+    dug++;
+  }
+  return dug >= count;
 }
 
 /**
@@ -664,6 +788,27 @@ function scatterObjects(
     const y = (i - x) / map.width;
     if (Math.abs(x - start.x) + Math.abs(y - start.y) < 10) continue;
     if (place(i, 'chest_closed')) chests[r]++;
+  }
+
+  // The deep caves: glowcaps and crystals, and a chest at the far end of each.
+  for (const cave of findCaves(map)) {
+    const from = cave.entrances[0] ?? cave.cells[0];
+    const depth = distanceMap(map, from % map.width, Math.floor(from / map.width), (x, y) => map.get(x, y) === Tile.CaveFloor);
+    const deepest = cave.cells.filter((i) => free(i)).sort((a, b) => depth[b] - depth[a]);
+    deepest.find((i) => place(i, 'chest_closed'));
+    const spots = cave.cells.filter((i) => free(i));
+    for (let n = spots.length - 1; n > 0; n--) {
+      const j = rng.int(0, n);
+      [spots[n], spots[j]] = [spots[j], spots[n]];
+    }
+    let glowcaps = rng.int(CAVE_GLOWCAPS.min, CAVE_GLOWCAPS.max);
+    let crystals = rng.int(CAVE_CRYSTALS.min, CAVE_CRYSTALS.max);
+    for (const i of spots) {
+      if (!glowcaps && !crystals) break;
+      if (!free(i)) continue;
+      if (glowcaps && place(i, 'glowcap')) glowcaps--;
+      else if (crystals && place(i, 'crystal_cluster')) crystals--;
+    }
   }
 
   // Island 2: enough snowy spruces for the beacon's resin.

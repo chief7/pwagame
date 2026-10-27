@@ -44,6 +44,9 @@ const FLYERS = new Set(['bat', 'wasps']);
 /** Night tint; its alpha comes from how dark a cell is. */
 const NIGHT_RGB = '10, 16, 42';
 const NIGHT_MAX = 0.62;
+/** Light round the explorer, without and with the crystal lantern: brightness next to them, and how fast it fades per cell. */
+const OWN_LIGHT = { glow: 0.45, fade: 0.12 };
+const LANTERN_LIGHT = { glow: 0.85, fade: 0.13 };
 /** Same pixel font as the page (src/fonts.css). */
 const FONT = "'Pixelify Sans', ui-monospace, Menlo, Consolas, monospace";
 
@@ -230,7 +233,9 @@ export class Renderer {
         if (!obj || (trip && trip.x === x && trip.y === y)) continue;
         const def = OBJECTS[obj.kind];
         const frames = game.sailed && def.done ? def.done.frames : def.frames;
-        const name = frames ? frames[fireFrame % frames.length] : game.objectSprite(obj);
+        // A picked plant shows its bare sprite, not its animation (picked glowcaps don't glow).
+        const regrowing = obj.readyAt !== undefined && obj.readyAt > game.turn;
+        const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj);
         this.drawStanding(name, o.x + x * cell, o.y + y * cell);
       }
       for (const a of actors) {
@@ -276,17 +281,19 @@ export class Renderer {
   }
 
   /**
-   * Darken the scene by time of day. Campfires light a pool around them and
-   * the explorer always sees a little around themselves.
+   * Darken the scene by time of day; deep caves are dark also by day.
+   * Campfires and glowcaps light a pool around them and the explorer always
+   * sees a little around themselves (more with the crystal lantern).
    */
   private drawNight(game: Game, o: { x: number; y: number }, x0: number, y0: number, x1: number, y1: number, pose: { x: number; y: number }): void {
-    const day = game.daylight;
-    if (day >= 1) return;
     const lights = game.lights();
+    const own = game.hasLantern ? LANTERN_LIGHT : OWN_LIGHT;
     const { ctx, cell } = this;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        let light = Math.max(day, 0.45 - Math.hypot(x - pose.x, y - pose.y) * 0.12);
+        const day = game.daylightAt(x, y);
+        if (day >= 1) continue;
+        let light = Math.max(day, own.glow - Math.hypot(x - pose.x, y - pose.y) * own.fade);
         for (const [lx, ly, r] of lights) {
           light = Math.max(light, 1 - Math.hypot(x - lx, y - ly) / (r + 1));
         }

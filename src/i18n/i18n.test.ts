@@ -20,7 +20,7 @@ function everyMessage(): Msg[] {
     { key: 'notSleepy' }, { key: 'fallAsleep' }, { key: 'dozeOff' }, { key: 'notThirsty' }, { key: 'drink' },
     { key: 'faint' }, { key: 'wakeAtCamp' }, { key: 'faintWhy', empty: [] }, { key: 'faintWhy', empty: ['food', 'water', 'energy', 'warmth'] }, { key: 'legacy', text: 'Old line.' }, { key: 'noBridgeSpot' }, { key: 'drinkRiver' },
     { key: 'needFire' }, { key: 'needPoints' }, { key: 'skillPoint' }, { key: 'catch' }, { key: 'noBite' },
-    { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalFound', obj: 'beacon_site' }, { key: 'snowCold' },
+    { key: 'goalFound', obj: 'boat_wreck' }, { key: 'goalFound', obj: 'beacon_site' }, { key: 'snowCold' }, { key: 'caveEnter' }, { key: 'caveEnter', lantern: true },
     { key: 'dogSniff' }, { key: 'dogFull' }, { key: 'dogFar' }, { key: 'dogTired' }, { key: 'dogBack' },
     { key: 'dogLow', need: 'food' }, { key: 'dogLow', need: 'water' },
     { key: 'tooSteep', obj: 'ledge', way: 'ledge_ladder' }, { key: 'tooSteep', obj: 'ice_wall', way: 'ice_wall_rope' },

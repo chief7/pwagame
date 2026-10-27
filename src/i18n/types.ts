@@ -10,7 +10,7 @@ import type { NeedId } from '../game/needs';
 export type Lang = 'en' | 'de';
 
 /** The signs on the Cartographer's map; each is drawn by the sprite `map_<sign>`. */
-export type MapSign = 'you' | 'hut' | 'fire' | 'spring' | 'goal' | 'bear';
+export type MapSign = 'you' | 'hut' | 'fire' | 'spring' | 'goal' | 'bear' | 'cave';
 
 /** Every word the player can see, in one language. */
 export interface Strings {
