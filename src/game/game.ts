@@ -22,15 +22,15 @@ const CAVE_SHELTER = 0.5;
 const RESPAWN_EVERY = 50;
 const SLEEP_LIMIT = 200;
 /** The most Energy a sleep gives out in the open and in a cave; shelters set their own (`rest`). */
-const OPEN_REST = 50;
-const CAVE_REST = 60;
+export const OPEN_REST = 50;
+export const CAVE_REST = 60;
 /** Health comes back this much faster asleep in a hut bed, and in a hut with a hearth. */
-const BED_HEAL = 2;
-const HEARTH_HEAL = 3;
+export const BED_HEAL = 2;
+export const HEARTH_HEAL = 3;
 /** Extra rope from the rope recipe at the workbench. */
-const WORKSHOP_ROPE = 1;
+export const WORKSHOP_ROPE = 1;
 /** Water from one drink at the rain barrel. */
-const BARREL_DRINK = 35;
+export const BARREL_DRINK = 35;
 /** How far the hearth lights the night round the hut. */
 const HEARTH_LIGHT = 2;
 /** Default chance per turn that a grumpy animal next to you hurts you. */

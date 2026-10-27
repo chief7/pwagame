@@ -1331,8 +1331,8 @@ type. The language button then needs a menu instead of a toggle.
 guide for players in both languages. Its explanations are in
 `src/wiki/text.ts`. Names of objects and animals come from `objectName()` and
 `animalName()` in `Strings`. Its tables (food, gathering, items, recipes,
-skills, animals, goal stages, warmth and sleep) are read from the registries
-and from `needs.ts`, so they follow the game. When you add content, check
+skills, animals, goal stages, hut rooms, warmth, rest limits and sleep) are read from the registries
+and from `needs.ts` and the constants that `game.ts` exports, so they follow the game. When you add content, check
 that the compendium text still fits (for example the chains in
 `together`). It uses the language of the game (`pwagame.lang`) or `?lang=`.
 

@@ -5,7 +5,9 @@ import { ITEMS, type ItemId } from '../game/defs/items';
 import { LEVELS } from '../game/defs/levels';
 import { OBJECTS, type ObjectKind, type Yield } from '../game/defs/objects';
 import { RECIPES, RECIPE_IDS } from '../game/defs/recipes';
+import { ROOMS, ROOM_IDS, hutSprite, type RoomId } from '../game/defs/rooms';
 import { PATHS, PATH_IDS, SKILLS, xpForPoints } from '../game/defs/skills';
+import { BARREL_DRINK, BED_HEAL, CAVE_REST, HEARTH_HEAL, OPEN_REST, WORKSHOP_ROPE } from '../game/game';
 import { Tile } from '../game/map';
 import { NEED_IDS, tickNeeds, warmthTarget } from '../game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang } from '../i18n';
@@ -193,11 +195,11 @@ function timeSection(): HTMLElement {
   return section('time', w.title, [para(w.paras[0]), timeline, legend, para(w.paras[1])]);
 }
 
-/** Turns to sleep from Energy 20 to 100 with this much shelter, by the game's own rules. */
-function sleepTurns(shelter: number): number {
+/** Turns to sleep from Energy 20 up to the place's rest limit with this much shelter, by the game's own rules. */
+function sleepTurns(shelter: number, rest: number): number {
   const n = { health: 100, food: 100, water: 100, energy: 20, warmth: 100 };
   let turns = 0;
-  while (n.energy < 100 && turns < 1000) {
+  while (n.energy < rest && turns < 1000) {
     tickNeeds(n, { sleeping: true, shelter, nearFire: true, daylight: 1 });
     turns++;
   }
@@ -206,21 +208,47 @@ function sleepTurns(shelter: number): number {
 
 function warmthSection(): HTMLElement {
   const w = W.warmth;
-  const places: [Child, number, boolean][] = [
-    [w.open, 0, false],
-    [el('span', 'named', [sprite('cave_floor'), w.cave]), 0.5, false],
-    [el('span', 'named', [sprite('lean_to', 1.5), t().objectName('lean_to')]), OBJECTS.lean_to.shelter!, false],
-    [el('span', 'named', [sprite('hut', 1.5), t().objectName('hut')]), OBJECTS.hut.shelter!, false],
-    [el('span', 'named', [sprite('campfire'), w.fire]), 0, true],
+  // Where you are, its shelter, rest limit and whether a fire is near.
+  const places: [Child, number, number, boolean][] = [
+    [w.open, 0, OPEN_REST, false],
+    [el('span', 'named', [sprite('cave_floor'), w.cave]), 0.5, CAVE_REST, false],
+    [el('span', 'named', [sprite('lean_to', 1.5), t().objectName('lean_to')]), OBJECTS.lean_to.shelter!, OBJECTS.lean_to.rest!, false],
+    [el('span', 'named', [sprite('hut', 1.5), t().objectName('hut')]), OBJECTS.hut.shelter!, OBJECTS.hut.rest!, false],
+    [el('span', 'named', [sprite('campfire'), w.fire]), 0, OPEN_REST, true],
   ];
-  const rows = places.map(([label, shelter, nearFire]) => {
+  const rows = places.map(([label, shelter, rest, nearFire]) => {
     const target = Math.round(warmthTarget({ sleeping: false, shelter, nearFire, daylight: 0 }));
-    return [label, el('span', 'bar-num', [bar(target * 0.4, 'warmth'), String(target)]), W.hours(Math.round(turnsToHours(sleepTurns(shelter)) * 2) / 2)];
+    const hours = Math.round(turnsToHours(sleepTurns(shelter, rest)) * 2) / 2;
+    return [label, el('span', 'bar-num', [bar(target * 0.4, 'warmth'), String(target)]), el('span', 'bar-num', [bar(rest * 0.4, 'energy'), String(rest)]), W.hours(hours)];
   });
   return section('warmth', w.title, [
     ...w.paras.map(para),
-    table([w.cols.place, w.cols.target, w.cols.sleep], rows),
+    table([w.cols.place, w.cols.target, w.cols.rest, w.cols.sleep], rows),
     el('p', 'tip', [rich(w.tip)]),
+  ]);
+}
+
+function campSection(): HTMLElement {
+  const c = W.camp;
+  const effect: Record<RoomId, string> = {
+    workshop: c.workshop(WORKSHOP_ROPE),
+    hearth: c.hearth(BED_HEAL, HEARTH_HEAL),
+    barrel: c.barrel(BARREL_DRINK),
+  };
+  const rows = ROOM_IDS.map((id) => [
+    el('span', 'named', [sprite(hutSprite([id]), 1.5), el('strong', undefined, [t().rooms[id].name])]),
+    cost(ROOMS[id].cost),
+    el('span', undefined, [t().rooms[id].description, el('br'), el('small', undefined, [effect[id]])]),
+  ]);
+  const inside = el('div', 'hut-inside', ['room_main_map', ...ROOM_IDS.map((id) => `room_${id}`)].map((name) => sprite(name, 3)));
+  return section('camp', c.title, [
+    el('div', 'camp-head', [sprite(hutSprite(ROOM_IDS), 3), el('div', undefined, c.paras.map(para))]),
+    el('h3', undefined, [c.hutCost]),
+    cost(RECIPES.hut.cost),
+    el('h3', undefined, [c.roomsTitle]),
+    para(c.roomsIntro),
+    inside,
+    table([c.cols.room, c.cols.cost, c.cols.effect], rows),
   ]);
 }
 
@@ -430,7 +458,7 @@ function render(lang: Lang): void {
   const play = Object.assign(el('a', 'play', [W.play, ' ▶']), { href: '../' });
 
   const sections = [
-    startSection(), togetherSection(), needsSection(), healthSection(), timeSection(), warmthSection(),
+    startSection(), togetherSection(), needsSection(), healthSection(), timeSection(), warmthSection(), campSection(),
     gatherSection(), itemsSection(), buildSection(), skillsSection(), animalsSection(), dogSection(),
     islandsSection(), tipsSection(),
   ];
