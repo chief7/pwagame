@@ -313,10 +313,32 @@ things happens:
 
 Two optional fields use tools:
 
-- `needs: item`: the player must carry this item to gather at all. A
-  bramble needs the axe. Brambles are removed and never come back.
-- `bonus: { tool, item, amount }`: extra items when the player carries the
-  tool. Trees give 1 more wood with the axe.
+- `needs: item` (on the gather): the player must carry this item to gather
+  at all. A bramble needs the axe. Brambles are removed and never come back.
+- `tool: item` (on a yield): this yield drops only when the player carries
+  the tool. Yields of the same item add up.
+
+**Wood and logs.** Every tree that gives wood (broadleaf, pine, spruce, snowy
+spruce, birch) uses `TREE_WOOD` in `objects.ts`:
+
+| | Wood | Logs |
+|---|---|---|
+| By hand | 1 | none |
+| With the axe | 1–2 | 1–2 |
+
+Logs come only from trees, and only with the axe. Fallen logs, log piles,
+driftwood and chests give wood, also with the axe. The hut, the bridge, the
+boat hull and mast, and the beacon wood pile need logs (see 4.8 and 4.12).
+The campfire, the lean-to and the axe need only wood, so the first camp
+and the axe are possible by hand.
+
+The gather message tells what happened (`gather` in `messages.ts`):
+
+- `used`: a tool yield was possible. The text is "You chop at the pine
+  tree" instead of the object's gather text.
+- `lack: { tool, item }`: a tool yield of a new item was skipped. The text
+  adds a hint ("With a stone axe you could also chop logs"). There is no
+  hint for more of an item the player already gets.
 
 Tools (`tool: true` on the item) stay in the bag. They are never used up.
 
@@ -422,7 +444,7 @@ The player gets XP (experience):
 | Action | XP |
 |---|---|
 | Gather from an object | 1 |
-| Build or make a recipe | 1 for each item in its cost (campfire 5, hut 22, cook a fish 1) |
+| Build or make a recipe | 1 for each item in its cost (campfire 5, hut 20, cook a fish 1) |
 | Catch a fish | 2 |
 | Give an item to the island goal (the boat) | 1 for each item |
 
@@ -491,14 +513,14 @@ Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
 
 | Stage | Cost | The boat becomes |
 |---|---|---|
-| Hull | 20 wood, 6 stone, 4 tar | `boat_hull` |
-| Mast | 10 wood, 6 rope | `boat_mast` |
+| Hull | 12 logs, 6 wood, 6 stone, 4 tar | `boat_hull` |
+| Mast | 4 logs, 2 wood, 6 rope | `boat_mast` |
 | Sail | 12 leaves, 3 rope | `boat_sail` |
 | Supplies | 4 coconuts, 3 cooked fish | `boat_ready` |
 
-Rope is a recipe: 2 leaves make 1 rope. All stages together need 30 wood,
-6 stone, 30 leaves, 4 tar, 4 coconuts and 3 cooked fish (about three huts,
-fishing, and a trip to the tide islet).
+Rope is a recipe: 2 leaves make 1 rope. All stages together need 16 logs,
+8 wood, 6 stone, 30 leaves, 4 tar, 4 coconuts and 3 cooked fish (about
+eleven trees chopped with the axe, fishing, and a trip to the tide islet).
 
 **Rare materials.** Tar (island 1) and resin (island 2) are items with
 `rareFrom`: only these objects give them. Tar comes from the 3 old barrels
@@ -553,11 +575,11 @@ highest snow of the mountain. The player builds a signal beacon on it.
 | Stage | Cost | The beacon becomes |
 |---|---|---|
 | Stone base | 16 stone | `beacon_base` |
-| Wood pile | 18 wood, 4 rope | `beacon_pyre` |
+| Wood pile | 10 logs, 4 wood, 4 rope | `beacon_pyre` |
 | Tinder | 12 leaves, 4 wood, 3 resin | `beacon_ready` |
 
-All stages together need 22 wood, 16 stone, 20 leaves (8 of them for
-rope) and 3 resin. There are no coconuts on island 2: apples, berries, mushrooms and
+All stages together need 10 logs, 8 wood, 16 stone, 20 leaves (8 of them
+for rope) and 3 resin. There are no coconuts on island 2: apples, berries, mushrooms and
 fish are the food there.
 
 ### 4.13 The dog
@@ -920,9 +942,9 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); tar, resin (rare goal materials); stone axe, fishing rod (tools) |
+| Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, logs, leaves, stone, fish, rope (materials; fish is raw; logs only from trees with the axe); tar, resin (rare goal materials); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (6 logs, 2 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
 | Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound (see 4.17) |
@@ -1156,6 +1178,7 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Skill effects | `game.ts` → `SMALL_SIPS`, `SMALL_APPETITE`, `THICK_SKIN`, `GREEN_THUMB`, `NIGHT_EYES`, `ROPE_MAKER` | 0.8, 0.8, 0.7, 0.7, 2, 2 rope |
 | Beach width, hills | `worldgen.ts` → `BEACH_WIDTH`, `HILL_MIN_DIST` | 3, 5 |
 | Object density | `worldgen.ts` → `SCATTER` | chance per cell and biome |
+| Wood and logs from trees | `objects.ts` → `TREE_WOOD` | 1 wood by hand; 1–2 wood and 1–2 logs with the axe |
 | Step speed | `animator.ts` → `STEP_MS` | 130 ms |
 | Cells across a phone | `renderer.ts` → `TILES_ACROSS` | 12 |
 | Grill button frame time, lift above the fire | `main.ts` → `GRILL_FRAME_MS`, `GRILL_LIFT` | 220 ms, 6 px |

@@ -6,7 +6,7 @@ import type { ObjectKind } from './objects';
 
 export type ItemId =
   | 'coconut' | 'berries' | 'mushroom' | 'cooked_fish' | 'apple'
-  | 'wood' | 'leaves' | 'stone' | 'fish' | 'rope'
+  | 'wood' | 'log' | 'leaves' | 'stone' | 'fish' | 'rope'
   | 'axe' | 'fishing_rod'
   | 'tar' | 'resin';
 
@@ -38,6 +38,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   cooked_fish: { id: 'cooked_fish', eat: { food: 40, energy: 10 } },
   apple: { id: 'apple', eat: { food: 12, water: 8 } },
   wood: { id: 'wood' },
+  // Chopped from trees with the axe; the big builds need them.
+  log: { id: 'log' },
   leaves: { id: 'leaves' },
   stone: { id: 'stone' },
   fish: { id: 'fish', raw: true },

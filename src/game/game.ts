@@ -856,22 +856,27 @@ export class Game {
     }
 
     const got: [ItemId, number][] = [];
+    let used: ItemId | undefined;
+    let lack: { tool: ItemId; item: ItemId } | undefined;
     for (const y0 of gather.yields) {
+      if (y0.tool && this.inventory.count(y0.tool) === 0) {
+        // Tell the explorer what the tool would give, but not for more of what they already get.
+        if (!lack && !gather.yields.some((o) => !o.tool && o.item === y0.item)) lack = { tool: y0.tool, item: y0.item };
+        continue;
+      }
+      if (y0.tool) used = y0.tool;
       if (y0.chance !== undefined && !this.rng.chance(y0.chance)) continue;
       const n = this.rng.int(y0.min, y0.max);
-      if (n > 0) got.push([y0.item, n]);
-    }
-    const bonus = gather.bonus;
-    if (bonus && this.inventory.count(bonus.tool) > 0) {
-      const same = got.find(([item]) => item === bonus.item);
-      if (same) same[1] += bonus.amount;
-      else got.push([bonus.item, bonus.amount]);
+      if (n <= 0) continue;
+      const same = got.find(([item]) => item === y0.item);
+      if (same) same[1] += n;
+      else got.push([y0.item, n]);
     }
     for (const [item, n] of got) {
       this.inventory.add(item, n);
       this.emit({ type: 'float', x, y, amount: n, what: { item }, tone: 'loot' });
     }
-    this.message({ key: 'gather', obj: obj.kind, got }, 'loot');
+    this.message({ key: 'gather', obj: obj.kind, got, ...(used && { used }), ...(lack && { lack }) }, 'loot');
     this.gainXp(GATHER_XP, x, y);
 
     const after = gather.after;

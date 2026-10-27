@@ -22,11 +22,11 @@ export type Recipe = {
 export const RECIPES: Record<RecipeId, Recipe> = {
   campfire: { id: 'campfire', builds: 'campfire', cost: { wood: 3, stone: 2 } },
   lean_to: { id: 'lean_to', builds: 'lean_to', cost: { wood: 4, leaves: 5 } },
-  hut: { id: 'hut', builds: 'hut', cost: { wood: 10, leaves: 8, stone: 4 } },
+  hut: { id: 'hut', builds: 'hut', cost: { log: 6, wood: 2, leaves: 8, stone: 4 } },
   axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
   rope: { id: 'rope', makes: 'rope', cost: { leaves: 2 } },
   // Faces the way the explorer does; game.ts turns it into bridge_ew when needed.
-  bridge: { id: 'bridge', builds: 'bridge_ns', cost: { wood: 6, leaves: 3 } },
+  bridge: { id: 'bridge', builds: 'bridge_ns', cost: { log: 3, wood: 2, leaves: 3 } },
   fishing_rod: { id: 'fishing_rod', makes: 'fishing_rod', cost: { wood: 3, leaves: 2 }, skill: 'fishing_rod' },
   cooked_fish: { id: 'cooked_fish', makes: 'cooked_fish', cost: { fish: 1 }, atFire: true },
   // Island 2: ways up the steep steps.

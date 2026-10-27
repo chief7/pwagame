@@ -24,14 +24,14 @@ export interface Yield {
   max: number;
   /** Chance (0..1) to get anything at all; defaults to 1. */
   chance?: number;
+  /** Only when the explorer carries this tool (logs need the axe). */
+  tool?: ItemId;
 }
 
 export interface Gather {
   yields: Yield[];
   /** A tool the explorer must carry to gather at all. */
   needs?: ItemId;
-  /** Extra items when the explorer carries a tool. */
-  bonus?: { tool: ItemId; item: ItemId; amount: number };
   /** Gone for good, turned into another object, or ready again after some turns. */
   after: { remove: true } | { becomes: ObjectKind } | { regrow: number };
 }
@@ -73,6 +73,13 @@ export interface ObjectDef {
 
 const def = (d: ObjectDef) => d;
 
+/** What a tree gives: a branch by hand, more wood and logs with the axe. */
+const TREE_WOOD: Yield[] = [
+  { item: 'wood', min: 1, max: 1 },
+  { item: 'wood', min: 0, max: 1, tool: 'axe' },
+  { item: 'log', min: 1, max: 2, tool: 'axe' },
+];
+
 export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   palm_tall: def({
     kind: 'palm_tall', depletedSprite: 'palm_tall_bare',
@@ -88,11 +95,11 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   }),
   tree_broadleaf: def({
     kind: 'tree_broadleaf', blocksSight: true,
-    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 } },
+    gather: { yields: TREE_WOOD, after: { regrow: 70 } },
   }),
   tree_pine: def({
     kind: 'tree_pine', blocksSight: true,
-    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 } },
+    gather: { yields: TREE_WOOD, after: { regrow: 70 } },
   }),
   bush: def({
     kind: 'bush',
@@ -151,20 +158,20 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   // Island 2: the northern forest and the beacon on the peak.
   tree_spruce: def({
     kind: 'tree_spruce', blocksSight: true,
-    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 } },
+    gather: { yields: TREE_WOOD, after: { regrow: 70 } },
   }),
   tree_spruce_snow: def({
     kind: 'tree_spruce_snow', blocksSight: true,
     gather: {
-      yields: [{ item: 'wood', min: 1, max: 2 }, { item: 'resin', min: 1, max: 1, chance: 0.5 }],
-      bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 },
+      yields: [...TREE_WOOD, { item: 'resin', min: 1, max: 1, chance: 0.5 }],
+      after: { regrow: 70 },
     },
   }),
   tree_birch: def({
     kind: 'tree_birch', blocksSight: true,
     gather: {
-      yields: [{ item: 'wood', min: 1, max: 2 }, { item: 'leaves', min: 1, max: 1, chance: 0.5 }],
-      bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 },
+      yields: [...TREE_WOOD, { item: 'leaves', min: 1, max: 1, chance: 0.5 }],
+      after: { regrow: 70 },
     },
   }),
   tree_apple: def({

@@ -703,7 +703,8 @@ describe('Game: building and sleeping', () => {
 
   it('sleeping in a hut restores energy, keeps you warm and makes it home', () => {
     const game = sandbox(7);
-    game.inventory.add('wood', 10);
+    game.inventory.add('log', 6);
+    game.inventory.add('wood', 2);
     game.inventory.add('leaves', 8);
     game.inventory.add('stone', 4);
     game.player.facing = 'right';
@@ -754,26 +755,27 @@ describe('Game: the island goal (the boat)', () => {
   it('takes what it needs from the bag in as many trips as you like', () => {
     const game = boatNextTo(sandbox(32));
     expect(game.move(1, 0)).toBe(false);
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalNeeds', stage: 'hull', left: [['wood', 20], ['stone', 6], ['tar', 4]] });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalNeeds', stage: 'hull', left: [['log', 12], ['wood', 6], ['stone', 6], ['tar', 4]] });
 
-    game.inventory.add('wood', 12);
+    game.inventory.add('log', 8);
     game.inventory.add('coconut', 3);
     const xp = game.xp;
     game.takeEvents();
     expect(game.move(1, 0)).toBe(true);
-    expect(game.inventory.count('wood')).toBe(0);
+    expect(game.inventory.count('log')).toBe(0);
     expect(game.inventory.count('coconut')).toBe(3 + 2);
-    expect(game.goalGiven).toEqual({ wood: 12 });
-    expect(game.xp).toBe(xp + 12);
-    expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'float', amount: -12, what: { item: 'wood' } }));
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', stage: 'hull', given: [['wood', 12]], left: [['wood', 8], ['stone', 6], ['tar', 4]] });
+    expect(game.goalGiven).toEqual({ log: 8 });
+    expect(game.xp).toBe(xp + 8);
+    expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'float', amount: -8, what: { item: 'log' } }));
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', stage: 'hull', given: [['log', 8]], left: [['log', 4], ['wood', 6], ['stone', 6], ['tar', 4]] });
 
-    game.inventory.add('wood', 30);
+    game.inventory.add('log', 30);
+    game.inventory.add('wood', 6);
     game.inventory.add('stone', 6);
     game.inventory.add('tar', 4);
     game.move(1, 0);
     expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('boat_hull');
-    expect(game.inventory.count('wood')).toBe(22);
+    expect(game.inventory.count('log')).toBe(26);
     expect(game.goalGiven).toEqual({});
     expect(game.log.at(-1)?.msg).toEqual({ key: 'goalStage', stage: 'hull' });
     expect(game.goal()).toMatchObject({ state: 'build', obj: 'boat_hull', index: 1, stage: mast });
@@ -808,7 +810,7 @@ describe('Game: the island goal (the boat)', () => {
     game.move(1, 0);
     const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
     expect(copy.goalGiven).toEqual({ wood: 5 });
-    expect(copy.goal()).toMatchObject({ state: 'build', left: { wood: 15, stone: 6 } });
+    expect(copy.goal()).toMatchObject({ state: 'build', left: { log: 12, wood: 1, stone: 6 } });
   });
 });
 
@@ -837,12 +839,55 @@ describe('Game: brambles, the axe and the river', () => {
     expect(game.objectAt(game.player.x + 1, game.player.y)).toBeUndefined();
   });
 
-  it('the axe gets an extra piece of wood from trees', () => {
+  it('by hand a tree gives one piece of wood and a hint about the axe', () => {
     const game = sandbox(16);
     place(game, 1, 0, 'tree_pine');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('wood')).toBe(1);
+    expect(game.inventory.count('log')).toBe(0);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'gather', obj: 'tree_pine', got: [['wood', 1]], lack: { tool: 'axe', item: 'log' } });
+  });
+
+  it('with the axe, every tree gives logs and more wood', () => {
+    for (const kind of ['tree_broadleaf', 'tree_pine', 'tree_spruce', 'tree_spruce_snow', 'tree_birch'] as const) {
+      const game = sandbox(160);
+      place(game, 1, 0, kind);
+      game.inventory.add('axe');
+      for (let i = 0; i < 8; i++) {
+        game.inventory.take('log', game.inventory.count('log'));
+        game.inventory.take('wood', game.inventory.count('wood'));
+        game.turn += 100;
+        game.move(1, 0);
+        expect(game.inventory.count('log')).toBeGreaterThanOrEqual(1);
+        expect(game.inventory.count('log')).toBeLessThanOrEqual(2);
+        expect(game.inventory.count('wood')).toBeGreaterThanOrEqual(1);
+        expect(game.inventory.count('wood')).toBeLessThanOrEqual(2);
+        const msg = game.log.filter((l) => l.msg.key === 'gather').at(-1)?.msg;
+        expect(msg).toMatchObject({ key: 'gather', obj: kind, used: 'axe' });
+        expect(msg).not.toHaveProperty('lack');
+      }
+    }
+  });
+
+  it('logs on the ground give wood, not logs, also with the axe', () => {
+    const game = sandbox(19);
+    place(game, 1, 0, 'log_pile');
     game.inventory.add('axe');
     game.move(1, 0);
-    expect(game.inventory.count('wood')).toBeGreaterThanOrEqual(2);
+    expect(game.inventory.count('wood')).toBeGreaterThanOrEqual(3);
+    expect(game.inventory.count('log')).toBe(0);
+    expect(game.log.at(-1)?.msg).not.toHaveProperty('lack');
+  });
+
+  it('the hut and the bridge need logs; the lean-to and the axe do not', () => {
+    const game = sandbox(20);
+    game.inventory.add('wood', 20);
+    game.inventory.add('leaves', 20);
+    game.inventory.add('stone', 20);
+    expect(game.buildProblem('hut')).toEqual({ key: 'needMaterials' });
+    expect(game.build('axe')).toBe(true);
+    game.player.facing = 'right';
+    expect(game.build('lean_to')).toBe(true);
   });
 
   it('you can drink from the river, but not walk into it', () => {
@@ -861,7 +906,8 @@ describe('Game: brambles, the axe and the river', () => {
   it('a bridge spans the river in front of you and can be walked over', () => {
     const game = sandbox(18);
     river(game);
-    game.inventory.add('wood', 12);
+    game.inventory.add('log', 6);
+    game.inventory.add('wood', 4);
     game.inventory.add('leaves', 6);
     game.player.facing = 'up';
     expect(game.buildProblem('bridge')).toEqual({ key: 'noBridgeSpot' });
@@ -870,7 +916,8 @@ describe('Game: brambles, the axe and the river', () => {
     const { x, y } = game.player;
     expect(game.objectAt(x + 1, y)?.kind).toBe('bridge_ew');
     expect(game.objectAt(x + 2, y)?.kind).toBe('bridge_ew');
-    expect(game.inventory.count('wood')).toBe(6);
+    expect(game.inventory.count('log')).toBe(3);
+    expect(game.inventory.count('wood')).toBe(2);
     for (let i = 0; i < 3; i++) expect(game.move(1, 0)).toBe(true);
     expect(game.player.x).toBe(x + 3);
   });
@@ -878,11 +925,13 @@ describe('Game: brambles, the axe and the river', () => {
   it('a river too wide for one bridge cannot be bridged', () => {
     const game = sandbox(19);
     river(game, 4);
-    game.inventory.add('wood', 6);
+    game.inventory.add('log', 3);
+    game.inventory.add('wood', 2);
     game.inventory.add('leaves', 3);
     game.player.facing = 'right';
+    expect(game.buildProblem('bridge')).toEqual({ key: 'noBridgeSpot' });
     expect(game.build('bridge')).toBe(false);
-    expect(game.inventory.count('wood')).toBe(6);
+    expect(game.inventory.count('log')).toBe(3);
   });
 
   it('island 1 has no steep steps', () => {
@@ -1683,12 +1732,12 @@ describe('Game: rare materials for the goal', () => {
 
   it('the hull needs tar, except on an island without tar barrels (from an old save)', () => {
     const game = boatNextTo(sandbox(101));
-    expect(game.goal()).toMatchObject({ left: { wood: 20, stone: 6, tar: 4 } });
+    expect(game.goal()).toMatchObject({ left: { log: 12, wood: 6, stone: 6, tar: 4 } });
     // Empty barrels still count: the tar went into your bag.
     for (const [i, o] of game.objects) if (o.kind === 'barrel') game.objects.set(i, { kind: 'barrel_empty' });
     expect(game.stageCost(hull)).toEqual(hull.cost);
     for (const [i, o] of game.objects) if (o.kind.startsWith('barrel')) game.objects.delete(i);
-    expect(game.goal()).toMatchObject({ left: { wood: 20, stone: 6 } });
+    expect(game.goal()).toMatchObject({ left: { log: 12, wood: 6, stone: 6 } });
   });
 
   it('the beacon tinder needs resin, which snowy spruces sometimes give', () => {

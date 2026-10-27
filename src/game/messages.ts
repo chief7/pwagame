@@ -37,7 +37,8 @@ export type Msg =
   | { key: 'drinkRiver' }
   | { key: 'look'; obj: ObjectKind }
   | { key: 'nothingLeft'; obj: ObjectKind }
-  | { key: 'gather'; obj: ObjectKind; got: [ItemId, number][] }
+  /** `used`: a tool gave more. `lack`: carrying this tool would also give that item. */
+  | { key: 'gather'; obj: ObjectKind; got: [ItemId, number][]; used?: ItemId; lack?: { tool: ItemId; item: ItemId } }
   | { key: 'shoo'; animal: AnimalKind }
   /** A need ran low. `level` picks the tip (no coconuts on island 2); old saved logs have none. */
   | { key: 'low'; need: Exclude<NeedId, 'health'>; level?: LevelId }

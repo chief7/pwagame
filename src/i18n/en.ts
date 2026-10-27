@@ -8,6 +8,7 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   berries: { one: 'handful of berries', many: 'handfuls of berries', short: ['berries', 'berries'] },
   mushroom: { one: 'mushroom', many: 'mushrooms', short: ['mushroom', 'mushrooms'] },
   wood: { one: 'piece of wood', many: 'pieces of wood', short: ['wood', 'wood'] },
+  log: { one: 'log', many: 'logs', short: ['log', 'logs'] },
   leaves: { one: 'big leaf', many: 'big leaves', short: ['leaf', 'leaves'] },
   stone: { one: 'stone', many: 'stones', short: ['stone', 'stones'] },
   axe: { one: 'stone axe', many: 'stone axes', short: ['axe', 'axes'] },
@@ -221,7 +222,7 @@ export const en: Strings = {
     campfire: { name: 'Campfire', description: 'Keeps you warm and lights up the night.' },
     lean_to: { name: 'Lean-to', description: 'A simple shelter. Sleep here to rest well and stay warmer.' },
     hut: { name: 'Hut', description: 'A cosy home. Toasty nights and the best sleep.' },
-    axe: { name: 'Stone axe', description: 'Chops through brambles, and gets you more wood from trees.' },
+    axe: { name: 'Stone axe', description: 'Chops logs from trees and clears brambles.' },
     rope: { name: 'Rope', description: 'Twisted from big leaves. You need rope for the island goal.' },
     bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
     fishing_rod: { name: 'Fishing rod', description: 'Walk into the sea with it to catch fish.' },
@@ -291,9 +292,10 @@ export const en: Strings = {
       }
       case 'nothingLeft': return `The ${obj(msg.obj)} has nothing left. Come back later.`;
       case 'gather': {
-        const verb = OBJECT[msg.obj].gather ?? 'You search';
+        const verb = msg.used ? `You chop at the ${obj(msg.obj)}` : OBJECT[msg.obj].gather ?? 'You search';
         const list = msg.got.map(([item, n]) => itemCount(item, n)).join(' and ');
-        return list ? `${verb} and get ${list}.` : `${verb}, but find nothing.`;
+        const hint = msg.lack ? ` With ${a(ITEM[msg.lack.tool].one)} you could also chop ${ITEM[msg.lack.item].many}.` : '';
+        return (list ? `${verb} and get ${list}.` : `${verb}, but find nothing.`) + hint;
       }
       case 'shoo': return ANIMAL[msg.animal].shoo;
       case 'low': return {

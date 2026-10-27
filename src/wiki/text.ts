@@ -70,7 +70,7 @@ export interface WikiWords {
     gone: string;
     becomes: (name: string) => string;
     needs: (tool: string) => string;
-    bonus: (n: number, item: string, tool: string) => string;
+    withTool: (tool: string) => string;
     chance: (p: number) => string;
     water: string;
     river: string;
@@ -150,7 +150,7 @@ const en: WikiWords = {
   percent: (p) => `${p}%`,
   items: {
     coconut: 'Coconut', berries: 'Berries', mushroom: 'Mushroom', cooked_fish: 'Cooked fish', apple: 'Apple',
-    wood: 'Wood', leaves: 'Big leaves', stone: 'Stone', fish: 'Raw fish', rope: 'Rope',
+    wood: 'Wood', log: 'Logs', leaves: 'Big leaves', stone: 'Stone', fish: 'Raw fish', rope: 'Rope',
     axe: 'Stone axe', fishing_rod: 'Fishing rod', tar: 'Tar', resin: 'Resin',
   },
   ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow' },
@@ -162,7 +162,7 @@ const en: WikiWords = {
       '**Gather.** Walk into palms, bushes, logs and pebbles. Palms give coconuts (food and drink) and big leaves.',
       '**Drink.** Find a spring. Coconuts also give water, but the sea is too salty.',
       '**Build a campfire** (3 wood, 2 stones) before dark. It keeps you warm and lights the night.',
-      '**Build a shelter.** A lean-to is cheap; a hut is the best. Sleep in it, and it becomes your home.',
+      '**Build a shelter.** A lean-to is cheap; a hut is the best, but it needs logs, and logs need the stone axe. Sleep in it, and it becomes your home.',
       '**Sleep at night.** Nights are dark and cold. Sleep in your shelter next to your fire.',
       '**Grow.** Everything you gather and build gives XP. Spend skill points on skills, and learn the fishing rod first.',
     ],
@@ -226,7 +226,7 @@ const en: WikiWords = {
     gone: 'Gone for good',
     becomes: (name) => `Becomes: ${name}`,
     needs: (tool) => `Needs the ${tool.toLowerCase()}`,
-    bonus: (n, item, tool) => `+${n} ${item.toLowerCase()} with the ${tool.toLowerCase()}`,
+    withTool: (tool) => `with the ${tool.toLowerCase()}`,
     chance: (p) => `${p}% chance`,
     water: 'Water',
     river: 'River',
@@ -357,7 +357,7 @@ const en: WikiWords = {
     intro: 'Most things on the island help with something else. These chains show the most important ones.',
     chains: [
       { title: 'From fish to a full tummy', steps: ['Earn 10 XP', 'Learn “Fishing rod”', 'Make a fishing rod', 'Walk into the sea to fish', 'Cook the fish at a campfire', 'Best food, and supplies for the boat'] },
-      { title: 'Opening up the island', steps: ['Wood, stones, a leaf', 'Make a stone axe', 'Chop through the brambles', 'More wood from every tree', 'Build a bridge', 'Reach the far side and the boat'] },
+      { title: 'Opening up the island', steps: ['Wood, stones, a leaf', 'Make a stone axe', 'Chop through the brambles', 'Chop logs from trees', 'Build a bridge', 'Reach the far side and the boat'] },
       { title: 'A warm, safe home', steps: ['Campfire by your camp', 'Lean-to, then a hut', 'Sleep there: it becomes home', 'Warm nights, fast sleep', 'You wake up here after fainting', 'Cartographer: a map on the hut wall'] },
       { title: 'Rope for the goals', steps: ['Gather big leaves', 'Twist rope (2 leaves)', 'Rope maker: 2 ropes for 2 leaves', 'Mast, sail and beacon', 'Ladders and climbing ropes'] },
       { title: 'Staying safe from wild animals', steps: ['Eat and drink well (above 50)', 'Health comes back', 'Wild sense shows danger', 'Animal friend: they notice you later', 'Your dog barks snakes away'] },
@@ -388,7 +388,7 @@ const de: WikiWords = {
   percent: (p) => `${p} %`,
   items: {
     coconut: 'Kokosnuss', berries: 'Beeren', mushroom: 'Pilz', cooked_fish: 'Gebratener Fisch', apple: 'Apfel',
-    wood: 'Holz', leaves: 'Große Blätter', stone: 'Stein', fish: 'Roher Fisch', rope: 'Seil',
+    wood: 'Holz', log: 'Holzstämme', leaves: 'Große Blätter', stone: 'Stein', fish: 'Roher Fisch', rope: 'Seil',
     axe: 'Steinaxt', fishing_rod: 'Angelrute', tar: 'Teer', resin: 'Harz',
   },
   ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee' },
@@ -400,7 +400,7 @@ const de: WikiWords = {
       '**Sammle.** Lauf gegen Palmen, Büsche, Baumstämme und Kiesel. Palmen geben Kokosnüsse (Essen und Trinken) und große Blätter.',
       '**Trink.** Such eine Quelle. Kokosnüsse geben auch Wasser, aber das Meer ist zu salzig.',
       '**Bau ein Lagerfeuer** (3 Holz, 2 Steine), bevor es dunkel wird. Es hält dich warm und macht die Nacht hell.',
-      '**Bau einen Unterschlupf.** Ein Unterstand ist billig, eine Hütte ist am besten. Schlaf darin, dann wird er dein Zuhause.',
+      '**Bau einen Unterschlupf.** Ein Unterstand ist billig, eine Hütte ist am besten. Für sie brauchst du Holzstämme, und dafür die Steinaxt. Schlaf darin, dann wird er dein Zuhause.',
       '**Schlaf in der Nacht.** Nächte sind dunkel und kalt. Schlaf in deinem Unterschlupf neben deinem Feuer.',
       '**Werde besser.** Alles, was du sammelst und baust, gibt EP. Gib Talentpunkte für Talente aus. Lerne zuerst die Angelrute.',
     ],
@@ -464,7 +464,7 @@ const de: WikiWords = {
     gone: 'Für immer weg',
     becomes: (name) => `Wird zu: ${name}`,
     needs: (tool) => `Braucht die ${tool}`,
-    bonus: (n, item, tool) => `+${n} ${item} mit der ${tool}`,
+    withTool: (tool) => `mit der ${tool}`,
     chance: (p) => `${p} % Chance`,
     water: 'Wasser',
     river: 'Fluss',
@@ -595,7 +595,7 @@ const de: WikiWords = {
     intro: 'Fast alles auf der Insel hilft bei etwas anderem. Diese Ketten zeigen die wichtigsten.',
     chains: [
       { title: 'Vom Fisch zum vollen Bauch', steps: ['10 EP sammeln', 'Talent „Angelrute“ lernen', 'Angelrute bauen', 'Ins Meer laufen und angeln', 'Fisch am Lagerfeuer braten', 'Bestes Essen und Vorräte für das Boot'] },
-      { title: 'Die Insel öffnen', steps: ['Holz, Steine, ein Blatt', 'Steinaxt bauen', 'Durch das Dornengestrüpp', 'Mehr Holz von jedem Baum', 'Brücke bauen', 'Zur anderen Seite und zum Boot'] },
+      { title: 'Die Insel öffnen', steps: ['Holz, Steine, ein Blatt', 'Steinaxt bauen', 'Durch das Dornengestrüpp', 'Holzstämme von Bäumen schlagen', 'Brücke bauen', 'Zur anderen Seite und zum Boot'] },
       { title: 'Ein warmes, sicheres Zuhause', steps: ['Lagerfeuer beim Lager', 'Unterstand, dann Hütte', 'Dort schlafen: Es wird dein Zuhause', 'Warme Nächte, schneller Schlaf', 'Hier wachst du nach einer Ohnmacht auf', 'Kartograf: eine Karte an der Hüttenwand'] },
       { title: 'Seile für die Inselziele', steps: ['Große Blätter sammeln', 'Seil drehen (2 Blätter)', 'Seilmacher: 2 Seile für 2 Blätter', 'Mast, Segel und Leuchtfeuer', 'Leitern und Kletterseile'] },
       { title: 'Sicher vor wilden Tieren', steps: ['Gut essen und trinken (über 50)', 'Leben kommt zurück', 'Spürsinn zeigt die Gefahr', 'Tierfreund: Sie bemerken dich später', 'Dein Hund verbellt Schlangen'] },

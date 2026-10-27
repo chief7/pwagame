@@ -41,8 +41,8 @@ export const LEVELS: LevelDef[] = [
     site: 'boat_wreck',
     stages: [
       // Tar from the barrels on the tide islet seals the hull.
-      { id: 'hull', cost: { wood: 20, stone: 6, tar: 4 }, becomes: 'boat_hull' },
-      { id: 'mast', cost: { wood: 10, rope: 6 }, becomes: 'boat_mast' },
+      { id: 'hull', cost: { log: 12, wood: 6, stone: 6, tar: 4 }, becomes: 'boat_hull' },
+      { id: 'mast', cost: { log: 4, wood: 2, rope: 6 }, becomes: 'boat_mast' },
       { id: 'sail', cost: { leaves: 12, rope: 3 }, becomes: 'boat_sail' },
       { id: 'supplies', cost: { coconut: 4, cooked_fish: 3 }, becomes: 'boat_ready' },
     ],
@@ -55,7 +55,7 @@ export const LEVELS: LevelDef[] = [
     site: 'beacon_site',
     stages: [
       { id: 'base', cost: { stone: 16 }, becomes: 'beacon_base' },
-      { id: 'pyre', cost: { wood: 18, rope: 4 }, becomes: 'beacon_pyre' },
+      { id: 'pyre', cost: { log: 10, wood: 4, rope: 4 }, becomes: 'beacon_pyre' },
       // Resin from the snowy spruces burns well.
       { id: 'tinder', cost: { leaves: 12, wood: 4, resin: 3 }, becomes: 'beacon_ready' },
     ],

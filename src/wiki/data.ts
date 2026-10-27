@@ -57,7 +57,7 @@ export interface ItemSource {
 export function itemSources(id: ItemId): ItemSource {
   const objects = (Object.keys(OBJECTS) as ObjectKind[]).filter((kind) => {
     const g = OBJECTS[kind].gather;
-    return !!g && (g.yields.some((y) => y.item === id) || g.bonus?.item === id);
+    return !!g && g.yields.some((y) => y.item === id);
   });
   const recipes = RECIPE_IDS.filter((r) => 'makes' in RECIPES[r] && (RECIPES[r] as { makes: ItemId }).makes === id);
   return { objects, recipes, fishing: id === 'fish' };

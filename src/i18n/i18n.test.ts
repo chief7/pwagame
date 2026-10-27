@@ -119,6 +119,12 @@ describe('i18n', () => {
     expect(en.message({ key: 'tideHigh', turn: 90 })).toBe('The sandbar is under water. Low tide comes back at 17:00.');
     expect(de.message({ key: 'gather', obj: 'barrel', got: [['tar', 2]] })).toBe('Du schöpfst Teer aus dem alten Fass und bekommst 2 Töpfe Teer.');
     expect(de.message({ key: 'look', obj: 'barrel_empty' })).toBe('Ein leeres Fass.');
+    const byHand = { key: 'gather', obj: 'tree_broadleaf', got: [['wood', 1]], lack: { tool: 'axe', item: 'log' } } satisfies Msg;
+    expect(en.message(byHand)).toBe('You collect fallen branches and get a piece of wood. With a stone axe you could also chop logs.');
+    expect(de.message(byHand)).toBe('Du sammelst heruntergefallene Äste und bekommst ein Stück Holz. Mit einer Steinaxt könntest du auch Holzstämme schlagen.');
+    const chopped = { key: 'gather', obj: 'tree_pine', got: [['wood', 1], ['log', 2]], used: 'axe' } satisfies Msg;
+    expect(en.message(chopped)).toBe('You chop at the pine tree and get a piece of wood and 2 logs.');
+    expect(de.message(chopped)).toBe('Du hackst mit deiner Steinaxt an der Kiefer und bekommst ein Stück Holz und 2 Holzstämme.');
     expect(de.message({ key: 'star', star: 'chests' })).toBe('Du hast einen Stern verdient: Schatzsucher!');
     expect(de.message({ key: 'dogBark', animal: 'monkey' })).toBe('Wuff! Dein Hund bellt, und der Affe rennt weg.');
     expect(de.message({ key: 'dogAdopt', item: 'fish' })).toBe(

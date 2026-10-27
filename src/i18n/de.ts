@@ -69,6 +69,7 @@ const ITEM: ItemWords<CountNoun> = {
   berries: { g: 'f', word: 'Handvoll Beeren', plural: 'Handvoll Beeren', short: ['Beeren', 'Beeren'] },
   mushroom: { g: 'm', word: 'Pilz', plural: 'Pilze', short: ['Pilz', 'Pilze'] },
   wood: { g: 'n', word: 'Stück Holz', plural: 'Stück Holz', short: ['Holz', 'Holz'] },
+  log: { g: 'm', word: 'Holzstamm', plural: 'Holzstämme', short: ['Stamm', 'Stämme'] },
   leaves: { g: 'n', word: 'Blatt', adj: 'groß', plural: 'große Blätter', short: ['Blatt', 'Blätter'] },
   stone: { g: 'm', word: 'Stein', plural: 'Steine', short: ['Stein', 'Steine'] },
   axe: { g: 'f', word: 'Steinaxt', plural: 'Steinäxte', short: ['Axt', 'Äxte'] },
@@ -284,7 +285,7 @@ export const de: Strings = {
     lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf. Hier schläfst du gut und bleibst wärmer.' },
     hut: { name: 'Hütte', description: 'Ein gemütliches Zuhause. Warme Nächte und der beste Schlaf.' },
     rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Für das Inselziel brauchst du Seile.' },
-    axe: { name: 'Steinaxt', description: 'Schlägt dir einen Weg durch Dornengestrüpp und bringt mehr Holz von Bäumen.' },
+    axe: { name: 'Steinaxt', description: 'Schlägt Holzstämme von Bäumen und einen Weg durch Dornengestrüpp.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
     fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
@@ -353,9 +354,12 @@ export const de: Strings = {
       case 'look': return `${cap(obj(msg.obj, 'nom', 'a'))}.`;
       case 'nothingLeft': return `${cap(contract(`an ${obj(msg.obj, 'dat', 'the')}`))} ist nichts mehr. Komm später wieder.`;
       case 'gather': {
-        const verb = OBJECT[msg.obj].gather ?? 'Du suchst';
+        const verb = msg.used
+          ? `Du hackst mit ${phrase(ITEM[msg.used], 'dat', 'your')} ${contract(`an ${obj(msg.obj, 'dat', 'the')}`)}`
+          : OBJECT[msg.obj].gather ?? 'Du suchst';
         const list = msg.got.map(([item, n]) => itemCount(item, n)).join(' und ');
-        return list ? `${verb} und bekommst ${list}.` : `${verb}, findest aber nichts.`;
+        const hint = msg.lack ? ` Mit ${phrase(ITEM[msg.lack.tool], 'dat', 'a')} könntest du auch ${ITEM[msg.lack.item].plural} schlagen.` : '';
+        return (list ? `${verb} und bekommst ${list}.` : `${verb}, findest aber nichts.`) + hint;
       }
       case 'shoo': return ANIMAL[msg.animal].shoo;
       case 'low': return {

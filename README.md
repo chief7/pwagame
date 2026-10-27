@@ -55,14 +55,16 @@ preview folders and branches); the preview checks are in `preview.yml`.
 - **Day and night:** a day is 240 turns. Nights are dark (you see less) and
   cold; a campfire, a shelter or a cave keeps you warm.
 - **Gathering:** bump into things. Palms give coconuts and leaves, trees give
-  wood, berry bushes give berries; these regrow. Logs, pebbles, mushrooms and
+  a little wood by hand (and logs with a stone axe), berry bushes give
+  berries; these regrow. Logs, pebbles, mushrooms and
   chests are used up. Springs and the river are fresh water; the sea is too
   salty.
 - **Building:** campfire, lean-to and hut, placed in front of you. Sleeping
   in a shelter (or a cave) makes it home and rests you faster. A stone axe
-  goes in your bag; a bridge goes across the river in front of you.
+  goes in your bag; a bridge goes across the river in front of you. The
+  hut, the bridge and the big island goals need logs.
 - **Exploring:** you start on the home coast. A wall of brambles closes it
-  off: chop through with a stone axe (which also gets more wood from trees).
+  off: chop through with a stone axe (which also chops logs from trees).
   Behind it is the wild forest, and then a river: build a bridge to reach
   the far side, where most hills and caves are. Further out are more chests.
   On the mountain island, the way up to the peak crosses a ring of rocky

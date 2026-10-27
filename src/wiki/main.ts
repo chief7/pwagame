@@ -225,7 +225,8 @@ function warmthSection(): HTMLElement {
 }
 
 function yieldChip(y: Yield): HTMLElement {
-  return chip(y.item, yieldRange(y), y.chance !== undefined ? W.gather.chance(y.chance * 100) : undefined);
+  const notes = [y.chance !== undefined && W.gather.chance(y.chance * 100), y.tool && W.gather.withTool(W.items[y.tool])].filter(Boolean);
+  return chip(y.item, yieldRange(y), notes.length ? notes.join(', ') : undefined);
 }
 
 function islandsText(islands: number[]): string {
@@ -239,7 +240,6 @@ function gatherSection(): HTMLElement {
     const afterText = 'regrow' in after ? g.regrow(W.hours(turnsToHours(after.regrow))) : 'remove' in after ? g.gone : g.becomes(t().objectName(after.becomes));
     const notes = [
       r.gather.needs && g.needs(W.items[r.gather.needs]),
-      r.gather.bonus && g.bonus(r.gather.bonus.amount, W.items[r.gather.bonus.item], W.items[r.gather.bonus.tool]),
     ].filter(Boolean) as string[];
     return [
       el('span', 'named', [el('span', 'sprites', r.kinds.map((k) => sprite(k, 1.5))), names(r.kinds)]),
