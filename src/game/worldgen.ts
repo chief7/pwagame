@@ -48,6 +48,21 @@ const GOAL_OPEN_SIDES = 5;
  */
 const LEDGE_RING = { from: 6, to: 10, ground: Tile.Scree, kind: 'ledge' } as const;
 const ICE_RING = { from: 3, to: 4, ground: Tile.Snow, kind: 'ice_wall' } as const;
+/** Island 2: at least this many snowy spruces, which give the resin for the beacon. */
+const RESIN_TREES = 4;
+
+/**
+ * Island 1: the tide islet. Its cells are those within this squared radius
+ * of its middle, it goes off a beach in one of these regions (most wanted
+ * first), and a sandbar of this many sea cells joins it to the island.
+ */
+const ISLET_RADIUS2 = [10.5, 6.5];
+const ISLET_REGIONS = [1, 2, 0];
+const SANDBAR = { min: 2, max: 5 };
+/** Sea cells kept round the islet, so it never touches other land. */
+const ISLET_GAP = 2;
+/** What stands on the islet: old tar barrels, a palm for food and drink, a chest. */
+const ISLET_OBJECTS: ObjectKind[] = ['barrel', 'barrel', 'barrel', 'palm_tall', 'chest_closed'];
 
 type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow';
 
@@ -107,6 +122,7 @@ export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIG
     if (!borders) continue;
     const objects = scatterObjects(map, rng, start, borders, site, biome, elevation);
     if (!objects) continue;
+    if (biome === 'tropical' && !addIslet(map, rng, objects, borders.region)) continue;
     return { map, start, objects, region: borders.region };
   }
 }
@@ -649,7 +665,118 @@ function scatterObjects(
     if (Math.abs(x - start.x) + Math.abs(y - start.y) < 10) continue;
     if (place(i, 'chest_closed')) chests[r]++;
   }
+
+  // Island 2: enough snowy spruces for the beacon's resin.
+  if (biome === 'mountain') {
+    let trees = [...objects.values()].filter((o) => o.kind === 'tree_spruce_snow').length;
+    for (const i of cells) {
+      if (trees >= RESIN_TREES) break;
+      if (map.tiles[i] === Tile.Snow && free(i) && place(i, 'tree_spruce_snow')) trees++;
+    }
+    if (trees < RESIN_TREES) return null;
+  }
   return objects;
+}
+
+/**
+ * Island 1: a small islet off a beach, joined to it by a straight sandbar
+ * that is dry at low tide only. The old tar barrels for the boat stand on
+ * it, with a palm and a chest. Returns false when no beach has room for it.
+ */
+function addIslet(map: GameMap, rng: Rng, objects: Map<number, WorldObject>, region: Uint8Array): boolean {
+  const sea = (x: number, y: number) => map.inBounds(x, y) && map.get(x, y) === Tile.Water;
+  // Sea cells within ISLET_GAP of land, or on the sea ring at the edge of the map: no islet there.
+  const crowded = new Uint8Array(map.tiles.length);
+  for (let i = 0; i < map.tiles.length; i++) {
+    const x = i % map.width;
+    const y = (i - x) / map.width;
+    if (x < 2 || y < 2 || x >= map.width - 2 || y >= map.height - 2) crowded[i] = 1;
+    if (map.tiles[i] === Tile.Water) continue;
+    for (let gy = -ISLET_GAP; gy <= ISLET_GAP; gy++) {
+      for (let gx = -ISLET_GAP; gx <= ISLET_GAP; gx++) if (map.inBounds(x + gx, y + gy)) crowded[map.idx(x + gx, y + gy)] = 1;
+    }
+  }
+  for (const radius2 of ISLET_RADIUS2) {
+    const shape: [number, number][] = [];
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (dx * dx + dy * dy <= radius2) shape.push([dx, dy]);
+    const reach = Math.max(...shape.map(([dx]) => dx));
+    for (const r of ISLET_REGIONS) {
+      const spots: { x: number; y: number; dx: number; dy: number; len: number }[] = [];
+      for (let i = 0; i < map.tiles.length; i++) {
+        if (region[i] !== r || map.tiles[i] !== Tile.Sand || objects.has(i)) continue;
+        const x = i % map.width;
+        const y = (i - x) / map.width;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (!sea(x + dx, y + dy)) continue;
+          for (let len = SANDBAR.min; len <= SANDBAR.max; len++) {
+            if (!sea(x + dx * len, y + dy * len)) break;
+            // The islet's middle, `reach` cells past the end of the bar.
+            const cx = x + dx * (len + 1 + reach);
+            const cy = y + dy * (len + 1 + reach);
+            const roomy = shape.every(([sx, sy]) => map.inBounds(cx + sx, cy + sy) && !crowded[map.idx(cx + sx, cy + sy)]);
+            if (roomy) {
+              spots.push({ x, y, dx, dy, len });
+              break;
+            }
+          }
+        }
+      }
+      if (!spots.length) continue;
+      const { x, y, dx, dy, len } = rng.pick(spots);
+      const cx = x + dx * (len + 1 + reach);
+      const cy = y + dy * (len + 1 + reach);
+      const islet = shape.map(([sx, sy]) => map.idx(cx + sx, cy + sy));
+      for (const i of islet) map.tiles[i] = Tile.Sand;
+      for (let k = 1; k <= len; k++) objects.set(map.idx(x + dx * k, y + dy * k), { kind: dx ? 'sandbar_ew' : 'sandbar_ns' });
+      placeOnIslet(map, rng, objects, islet, map.idx(x + dx * (len + 1), y + dy * (len + 1)));
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Put ISLET_OBJECTS on the islet, away from where the sandbar lands, so
+ * that every free cell of the islet stays reachable from the landing.
+ */
+function placeOnIslet(map: GameMap, rng: Rng, objects: Map<number, WorldObject>, islet: number[], landing: number): void {
+  const inIslet = new Set(islet);
+  const lx = landing % map.width;
+  const ly = (landing - lx) / map.width;
+  const connected = (): boolean => {
+    const seen = new Set([landing]);
+    const stack = [landing];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      const x = cur % map.width;
+      const y = (cur - x) / map.width;
+      for (const [ddx, ddy] of DIRS) {
+        const n = map.idx(x + ddx, y + ddy);
+        if (inIslet.has(n) && !objects.has(n) && !seen.has(n)) {
+          seen.add(n);
+          stack.push(n);
+        }
+      }
+    }
+    return islet.every((i) => objects.has(i) || seen.has(i));
+  };
+  const spots = islet.filter((i) => {
+    const x = i % map.width;
+    return Math.max(Math.abs(x - lx), Math.abs((i - x) / map.width - ly)) > 1;
+  });
+  for (let n = spots.length - 1; n > 0; n--) {
+    const j = rng.int(0, n);
+    [spots[n], spots[j]] = [spots[j], spots[n]];
+  }
+  let next = 0;
+  for (const kind of ISLET_OBJECTS) {
+    while (next < spots.length) {
+      const i = spots[next++];
+      objects.set(i, { kind });
+      if (connected()) break;
+      objects.delete(i);
+    }
+  }
 }
 
 /**

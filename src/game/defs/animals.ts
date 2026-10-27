@@ -9,6 +9,7 @@ import { Tile } from '../map';
 //   charger: runs at you when it sees you and knocks you over, then trots off
 //   chaser:  follows you for a while and stings you while it is next to you
 //   stray:   a lost dog that stays put; give it food and it becomes your dog
+// Nocturnal animals (the cave bear) sleep through the day and prowl at night.
 // Wild animals live far from camp. They are the real danger on the island:
 // the Animal friend skill only makes them notice you later.
 
@@ -42,6 +43,11 @@ export interface AnimalDef {
   islands?: number[];
   /** It walks over steep steps (on its habitat) without a ladder. */
   climber?: true;
+  /**
+   * It sleeps from 7:00 to 19:00 and does not notice you then. Awake, it
+   * follows you for a few turns when it notices you (see Game.animalAct).
+   */
+  nocturnal?: true;
   /** Your dog's bark makes it run away. */
   scaredByDog?: true;
 }
@@ -65,8 +71,8 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
     damage: 3, hitChance: 1, fleeAfter: 8, wild: true, minHomeDistance: 25, islands: [1, 2],
   },
   bear: {
-    kind: 'bear', temper: 'grumpy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.05, population: 2,
-    damage: 20, hitChance: 0.5, wild: true, minHomeDistance: 25, islands: [1, 2],
+    kind: 'bear', temper: 'grumpy', habitat: [Tile.CaveFloor], notice: 3, wander: 0.05, population: 2,
+    damage: 20, hitChance: 0.5, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [1, 2], nocturnal: true,
   },
   // Island 2.
   rabbit: { kind: 'rabbit', temper: 'shy', habitat: [Tile.Grass], notice: 3, wander: 0.45, population: 4, islands: [2] },

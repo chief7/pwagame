@@ -36,6 +36,19 @@ export function daylight(turn: number): number {
   return 0;
 }
 
+/** Low tide, when the sandbar to the tide islet is dry: 5:00–11:00 and 17:00–23:00. */
+export function isLowTide(turn: number): boolean {
+  const h = minuteOfDay(turn) / 60;
+  return (h >= 5 && h < 11) || (h >= 17 && h < 23);
+}
+
+/** The first turn of low tide from `turn` on (`turn` itself at low tide). */
+export function nextLowTide(turn: number): number {
+  let t = turn;
+  while (!isLowTide(t)) t++;
+  return t;
+}
+
 /** Turns from `turn` until the next 6:00. */
 export function turnsUntilMorning(turn: number): number {
   const minutes = minuteOfDay(turn);

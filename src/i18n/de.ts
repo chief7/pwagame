@@ -75,6 +75,8 @@ const ITEM: ItemWords<CountNoun> = {
   apple: { g: 'm', word: 'Apfel', plural: 'Äpfel', short: ['Apfel', 'Äpfel'] },
   fishing_rod: { g: 'f', word: 'Angelrute', plural: 'Angelruten', short: ['Angel', 'Angeln'] },
   rope: { g: 'n', word: 'Seil', plural: 'Seile', short: ['Seil', 'Seile'] },
+  tar: { g: 'm', word: 'Topf Teer', plural: 'Töpfe Teer', short: ['Teer', 'Teer'] },
+  resin: { g: 'n', word: 'Stück Harz', plural: 'Stück Harz', short: ['Harz', 'Harz'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -121,6 +123,10 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   ledge_ladder: { g: 'f', word: 'Leiter' },
   ice_wall: { g: 'f', word: 'Eiswand' },
   ice_wall_rope: { g: 'n', word: 'Kletterseil' },
+  barrel: { g: 'n', word: 'Teerfass', adj: 'alt', gather: 'Du schöpfst Teer aus dem alten Fass' },
+  barrel_empty: { g: 'n', word: 'Fass', adj: 'leer' },
+  sandbar_ns: { g: 'f', word: 'Sandbank' },
+  sandbar_ew: { g: 'f', word: 'Sandbank' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -138,7 +144,10 @@ const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }
     g: 'pl', word: 'Wespen', shoo: 'Du schlägst nach den Wespen. Sie summen davon.',
     hurt: 'Autsch! Eine Wespe sticht dich.', alert: 'Bzzz! Wespen fliegen dir nach. Lauf weg vom Gras!',
   },
-  bear: { g: 'm', word: 'Höhlenbär', shoo: 'Der Höhlenbär brummt und tapst davon.', hurt: 'Der Höhlenbär wacht auf und haut nach dir!' },
+  bear: {
+    g: 'm', word: 'Höhlenbär', shoo: 'Der Höhlenbär brummt und tapst davon.',
+    hurt: 'Der Höhlenbär haut nach dir!', alert: 'Ein Höhlenbär brummt und tapst dir nach! Verlass seine Höhle.',
+  },
   rabbit: { g: 'm', word: 'Hase', shoo: 'Der Hase zuckt mit der Nase und hoppelt davon.' },
   squirrel: { g: 'n', word: 'Eichhörnchen', shoo: 'Das Eichhörnchen schimpft und flitzt einen Baum hinauf.' },
   dog: { g: 'm', word: 'Hund', adj: 'streunend', shoo: 'Der Hund wedelt mit dem Schwanz.' },
@@ -168,9 +177,14 @@ function goalName(stage: StageId, c: Case): string {
   return phrase({ g: 'n', word: stageLevel(stage) === 2 ? 'Leuchtfeuer' : 'Boot' }, c, 'the');
 }
 
-function clock(turn: number): string {
+/** "17:00". */
+function time(turn: number): string {
   const m = Math.floor(minuteOfDay(turn));
-  return `Tag ${dayNumber(turn)} · ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+
+function clock(turn: number): string {
+  return `Tag ${dayNumber(turn)} · ${time(turn)}`;
 }
 
 export const de: Strings = {
@@ -201,6 +215,8 @@ export const de: Strings = {
     dawn: 'Morgengrauen',
     dusk: 'Abend',
     night: 'Nacht',
+    lowTide: 'Ebbe',
+    highTide: 'Flut',
     skills: 'Talente',
     learn: 'Lernen',
     learned: 'Gelernt',
@@ -222,6 +238,20 @@ export const de: Strings = {
     yourMap: 'Deine Karte',
     mapSigns: { you: 'Du', hut: 'Hütte', fire: 'Lagerfeuer', spring: 'Quelle', goal: 'Ziel', bear: 'Bären' },
     feedDog: 'Füttern',
+    islandStars: 'Inselsterne',
+    endStars: (n, of) => `Sterne: ${n} von ${of}`,
+    oldIsland: 'Deine Insel ist aus einer älteren Version. Eine neue Insel 1 hat eine kleine Gezeiteninsel mit mehr zu entdecken. Du behältst deine Tasche, EP, Talente und deinen Hund.',
+    keepProgress: 'Neue Insel, Fortschritt behalten',
+  },
+  stars: {
+    chests: { name: 'Schatzsucher', task: 'Öffne jede Truhe auf dieser Insel.' },
+    fish: { name: 'Angler', task: 'Fang 5 Fische auf dieser Insel.' },
+    explore: { name: 'Entdecker', task: 'Erkunde 3/4 dieser Insel.' },
+    safe: { name: 'Gesund und munter', task: 'Halte 3 Tage am Stück durch, ohne ohnmächtig zu werden.' },
+  },
+  rareHints: {
+    tar: 'Teer: Alte Fässer stehen auf einer kleinen Insel vor der Küste. Geh bei Ebbe über die Sandbank (5–11 und 17–23 Uhr).',
+    resin: 'Harz: Schüttle die verschneiten Fichten hoch oben am Berg.',
   },
   levels: {
     1: {
@@ -396,6 +426,11 @@ export const de: Strings = {
       case 'tooSteep': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu steil zum Klettern. Bau ${obj(msg.way, 'acc', 'a')} daran.`;
       case 'noStep': return `Stell dich neben ${obj(msg.obj, 'acc', 'a')}, um das zu bauen.`;
       case 'climb': return `Du kletterst ${contract(`an ${obj(msg.obj, 'dat', 'the')}`)} über die Stufe. ${msg.easy ? 'Ganz leicht!' : 'Puh, das ist anstrengend!'}`;
+      case 'tideOut': return 'Ebbe! Das Wasser geht zurück. Die Sandbank zur kleinen Insel ist jetzt trocken.';
+      case 'tideIn': return 'Flut! Das Wasser steigt, und die Sandbank geht unter.';
+      case 'tideHigh': return `Die Sandbank ist unter Wasser. Um ${time(msg.turn)} Uhr ist wieder Ebbe.`;
+      case 'tideWade': return 'Die Flut kommt! Du watest zurück an Land. Brr, nass und kalt.';
+      case 'star': return `Du hast einen Stern verdient: ${de.stars[msg.star].name}!`;
       case 'legacy': return msg.text;
     }
   },

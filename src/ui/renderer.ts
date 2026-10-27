@@ -199,8 +199,10 @@ export class Renderer {
       if (!map.isVisible(a.x, a.y)) continue;
       const pose = anim.pose(a.id, a.x, a.y, now);
       if (!FLYERS.has(a.kind)) pose.hop = 0;
-      const name = `animal_${a.kind}${a.facing === 'left' ? '_left' : ''}${pose.frame ? `_step${pose.frame}` : ''}`;
-      actors.push({ id: a.id, name, pose, bob: pose.frame ? 0 : anim.idleBob(a.id, now) });
+      // A sleeping bear lies still.
+      const asleep = game.asleep(a);
+      const name = `animal_${a.kind}${asleep ? '_sleep' : ''}${a.facing === 'left' ? '_left' : ''}${!asleep && pose.frame ? `_step${pose.frame}` : ''}`;
+      actors.push({ id: a.id, name, pose, bob: pose.frame || asleep ? 0 : anim.idleBob(a.id, now) });
     }
     const dog = game.dog;
     if (dog && !trip && map.isVisible(dog.x, dog.y)) {

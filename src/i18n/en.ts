@@ -16,6 +16,8 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   apple: { one: 'apple', many: 'apples', short: ['apple', 'apples'] },
   fishing_rod: { one: 'fishing rod', many: 'fishing rods', short: ['rod', 'rods'] },
   rope: { one: 'rope', many: 'ropes', short: ['rope', 'ropes'] },
+  tar: { one: 'pot of tar', many: 'pots of tar', short: ['tar', 'tar'] },
+  resin: { one: 'lump of resin', many: 'lumps of resin', short: ['resin', 'resin'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -62,6 +64,10 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   ledge_ladder: { name: 'ladder' },
   ice_wall: { name: 'wall of ice' },
   ice_wall_rope: { name: 'climbing rope' },
+  barrel: { name: 'old tar barrel', gather: 'You scoop tar out of the old barrel' },
+  barrel_empty: { name: 'empty barrel' },
+  sandbar_ns: { name: 'sandbar' },
+  sandbar_ew: { name: 'sandbar' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -79,7 +85,10 @@ const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: s
     name: 'wasps', shoo: 'You swat at the wasps. They buzz away.',
     hurt: 'Ouch! A wasp stings you.', alert: 'Bzzz! Wasps come after you. Run off the grass!',
   },
-  bear: { name: 'cave bear', shoo: 'The cave bear grumbles and shuffles away.', hurt: 'The cave bear wakes up and swipes at you!' },
+  bear: {
+    name: 'cave bear', shoo: 'The cave bear grumbles and shuffles away.',
+    hurt: 'The cave bear swipes at you!', alert: 'A cave bear growls and lumbers after you! Leave its cave.',
+  },
   rabbit: { name: 'rabbit', shoo: 'The rabbit twitches its nose and hops away.' },
   squirrel: { name: 'squirrel', shoo: 'The squirrel chatters at you and runs up a tree.' },
   dog: { name: 'stray dog', shoo: 'The dog wags its tail.' },
@@ -107,9 +116,14 @@ function itemList(items: [keyof typeof ITEM, number][]): string {
 /** What the goal of a stage's island is called: "boat", "beacon". */
 const goalName = (stage: StageId) => (stageLevel(stage) === 2 ? 'beacon' : 'boat');
 
-function clock(turn: number): string {
+/** "17:00". */
+function time(turn: number): string {
   const m = Math.floor(minuteOfDay(turn));
-  return `Day ${dayNumber(turn)} · ${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+
+function clock(turn: number): string {
+  return `Day ${dayNumber(turn)} · ${time(turn)}`;
 }
 
 export const en: Strings = {
@@ -140,6 +154,8 @@ export const en: Strings = {
     dawn: 'dawn',
     dusk: 'dusk',
     night: 'night',
+    lowTide: 'low tide',
+    highTide: 'high tide',
     skills: 'Skills',
     learn: 'Learn',
     learned: 'Learned',
@@ -161,6 +177,20 @@ export const en: Strings = {
     yourMap: 'Your map',
     mapSigns: { you: 'You', hut: 'Hut', fire: 'Campfire', spring: 'Spring', goal: 'Goal', bear: 'Bears' },
     feedDog: 'Feed dog',
+    islandStars: 'Island stars',
+    endStars: (n, of) => `Stars: ${n} of ${of}`,
+    oldIsland: 'Your island is from an older version. A new island 1 has a little tide island with more to find. You keep your bag, XP, skills and dog.',
+    keepProgress: 'New island, keep progress',
+  },
+  stars: {
+    chests: { name: 'Treasure hunter', task: 'Open every chest on this island.' },
+    fish: { name: 'Angler', task: 'Catch 5 fish on this island.' },
+    explore: { name: 'Explorer', task: 'Explore 3/4 of this island.' },
+    safe: { name: 'Safe and sound', task: 'Go 3 days in a row without fainting.' },
+  },
+  rareHints: {
+    tar: 'Tar: old barrels stand on a little island off the coast. Walk over the sandbar at low tide (5–11 and 17–23 o’clock).',
+    resin: 'Resin: shake the snowy spruces high up on the mountain.',
   },
   levels: {
     1: {
@@ -331,6 +361,11 @@ export const en: Strings = {
       case 'climb': return msg.easy
         ? `You climb over the step with the ${obj(msg.obj)}. Easy!`
         : `You climb over the step with the ${obj(msg.obj)}. Phew, hard work!`;
+      case 'tideOut': return 'The tide goes out. The sandbar to the little island is dry now.';
+      case 'tideIn': return 'The tide comes in. The sandbar goes under water.';
+      case 'tideHigh': return `The sandbar is under water. Low tide comes back at ${time(msg.turn)}.`;
+      case 'tideWade': return 'The tide comes in! You wade back to dry land. Brr, wet and cold.';
+      case 'star': return `You earned a star: ${en.stars[msg.star].name}!`;
       case 'legacy': return msg.text;
     }
   },

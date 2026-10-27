@@ -15,7 +15,8 @@ export type ObjectKind =
   | 'boat_wreck' | 'boat_hull' | 'boat_mast' | 'boat_sail' | 'boat_ready'
   | 'tree_spruce' | 'tree_spruce_snow' | 'tree_birch' | 'tree_apple' | 'fern'
   | 'beacon_site' | 'beacon_base' | 'beacon_pyre' | 'beacon_ready'
-  | 'ledge' | 'ledge_ladder' | 'ice_wall' | 'ice_wall_rope';
+  | 'ledge' | 'ledge_ladder' | 'ice_wall' | 'ice_wall_rope'
+  | 'barrel' | 'barrel_empty' | 'sandbar_ns' | 'sandbar_ew';
 
 export interface Yield {
   item: ItemId;
@@ -61,6 +62,11 @@ export interface ObjectDef {
   climb?: true;
   /** The island's goal (see levels.ts): walking into it hands over materials. */
   goal?: true;
+  /**
+   * A sandbar on sea cells: walkable at low tide only (see clock.ts). At
+   * high tide it shows its `<kind>_wet` sprite.
+   */
+  tidal?: true;
   /** A finished goal after the explorer used it (the lit beacon): its frames and how far its light reaches. */
   done?: { frames: string[]; lightRadius: number };
 }
@@ -149,7 +155,10 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   }),
   tree_spruce_snow: def({
     kind: 'tree_spruce_snow', blocksSight: true,
-    gather: { yields: [{ item: 'wood', min: 1, max: 2 }], bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 } },
+    gather: {
+      yields: [{ item: 'wood', min: 1, max: 2 }, { item: 'resin', min: 1, max: 1, chance: 0.5 }],
+      bonus: { tool: 'axe', item: 'wood', amount: 1 }, after: { regrow: 70 },
+    },
   }),
   tree_birch: def({
     kind: 'tree_birch', blocksSight: true,
@@ -178,11 +187,19 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   ledge_ladder: def({ kind: 'ledge_ladder', walkable: true, climb: true }),
   ice_wall: def({ kind: 'ice_wall', steep: true }),
   ice_wall_rope: def({ kind: 'ice_wall_rope', walkable: true, climb: true }),
+  // Island 1: the tide islet, its sandbar and the old tar barrels on it.
+  barrel: def({
+    kind: 'barrel',
+    gather: { yields: [{ item: 'tar', min: 2, max: 2 }], after: { becomes: 'barrel_empty' } },
+  }),
+  barrel_empty: def({ kind: 'barrel_empty' }),
+  sandbar_ns: def({ kind: 'sandbar_ns', walkable: true, tidal: true }),
+  sandbar_ew: def({ kind: 'sandbar_ew', walkable: true, tidal: true }),
 };
 
-/** Objects the explorer can get past by building or clearing: brambles and steep steps. */
+/** Objects the explorer can get past by building, clearing or waiting for low tide: brambles, steep steps, sandbars. */
 export function canBeOpened(kind: ObjectKind): boolean {
-  return kind === 'bramble' || !!OBJECTS[kind].steep;
+  return kind === 'bramble' || !!OBJECTS[kind].steep || !!OBJECTS[kind].tidal;
 }
 
 export interface WorldObject {

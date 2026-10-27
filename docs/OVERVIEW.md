@@ -183,9 +183,11 @@ What `move` does when the target cell is not free:
      player does not carry (bramble: axe), say so. No turn passes.
    - Other object: show its name. No turn passes.
 3. **River** (with no bridge): drink, +35 Water.
-4. **Sea:** with a fishing rod in the bag, fish (see 4.11). Else show "too
+4. **Sandbar under water** (high tide): say when the next low tide starts
+   (`tideHigh`, see 4.16). No turn passes.
+5. **Sea:** with a fishing rod in the bag, fish (see 4.11). Else show "too
    salty". No turn passes.
-5. **Rock:** nothing happens. No turn passes.
+6. **Rock:** nothing happens. No turn passes.
 
 ---
 
@@ -234,6 +236,8 @@ When Health is 0 at the end of a turn:
 5. All items stay in the bag.
 6. The log gives a hint (`faintWhy`): which needs ran out, with a tip for
    each. If no need was empty, wild animals did it.
+7. The count for the star "Safe and sound" starts again (`safeSince`, see
+   4.17).
 
 **Home** is the last shelter or cave where the player slept. At the start,
 home is the start point on the beach.
@@ -290,6 +294,10 @@ The UI does not animate each turn of sleep. It shows one `fade` event.
 - The view distance is 4 + 4 × daylight cells (8 by day, 4 at night).
 - The renderer darkens cells at night. Campfires light 5 cells around them.
   The player always lights a small area around themselves.
+- **Tide** (`isLowTide()` in `clock.ts`): low tide from 5:00 to 11:00 and
+  from 17:00 to 23:00, high tide the rest of the time. Only the sandbar to
+  the tide islet cares (see 4.16).
+- **Cave bears** sleep from 7:00 to 19:00 (the `day` phase, see 4.9).
 
 ### 4.6 Gathering
 
@@ -362,11 +370,27 @@ Animals have a **temper**. They only react when the player is within their
 |---|---|---|
 | `calm` | Ignores the player. | turtle |
 | `shy` | Moves away from the player. | piglet, bat, rabbit |
-| `grumpy` | If next to the player: `hitChance` (default 50%) per turn to hurt (−`damage` Health), then runs away for `fleeAfter` turns (default 4). | crab (−4), snake (70%, −8), cave bear (50%, −20) |
+| `grumpy` | If next to the player: `hitChance` (default 50%) per turn to hurt (−`damage` Health), then runs away for `fleeAfter` turns (default 4). A `nocturnal` one also follows the player (see below). | crab (−4), snake (70%, −8), cave bear (50%, −20, runs off for 10 turns) |
 | `cheeky` | If the player carries food: comes near and takes one food item, then runs away for 12 turns. It does not take food that the goal's current stage still needs (for example the coconuts and cooked fish for the boat supplies), only the extra food. | monkey, squirrel |
 | `stray` | Stays near its place (`notice` 0). Walking into it with food adopts it (see 4.13). | stray dog |
 | `charger` | Runs at the player, 2 cells per turn (`CHARGE_STEPS`), with the message `alert`. When it starts a turn next to the player, it knocks them over (−`damage` Health), then trots off for 10 turns. | wild boar (−12), mountain goat (−10) |
 | `chaser` | Follows the player for 6 turns (`CHASE_TURNS`, stored as `chase` on the animal) and stings each turn it is next to them (−3 Health). It gives up at once when the player stands off its habitat (sand, cave, shelter). Then it flies off for 8 turns. | wasps |
+
+**Sleeping cave bears.** The cave bear is `nocturnal`. `game.asleep(a)` is
+true from 7:00 to 19:00 (the `day` phase), unless the bear runs away (`flee`)
+or follows the player (`chase`). A sleeping bear does not move, notice the
+player or hurt them, Wild sense marks nothing round it, and the renderer
+draws `animal_bear_sleep` (with a "z", no idle bob). Walking into it shoos
+it as usual: it wakes, runs off for 8 turns, then sleeps again.
+
+Awake (19:00 to 7:00), a bear notices the player from 3 cells. When it is
+not next to the player, it logs `alert` and **prowls**: it follows the
+player for 5 turns (`PROWL_TURNS`, stored in `chase`), one cell a turn,
+with the wasps' chase rules. It stops at once when the player is off cave
+floor or in a shelter. When it is next to the player, it swipes with its
+`hitChance`; one swipe ends the prowl. After a prowl it runs off for 10
+turns (`fleeAfter`). The player walks as fast as a bear, so walking away
+always works. Wild sense marks its full notice range while it is awake.
 
 **Islands.** `islands` lists the islands (levels) where an animal lives
 (default `[1]`). `islandAnimals(level)` gives the list. Island 1: crab,
@@ -467,14 +491,25 @@ Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
 
 | Stage | Cost | The boat becomes |
 |---|---|---|
-| Hull | 20 wood, 6 stone | `boat_hull` |
+| Hull | 20 wood, 6 stone, 4 tar | `boat_hull` |
 | Mast | 10 wood, 6 rope | `boat_mast` |
 | Sail | 12 leaves, 3 rope | `boat_sail` |
 | Supplies | 4 coconuts, 3 cooked fish | `boat_ready` |
 
 Rope is a recipe: 2 leaves make 1 rope. All stages together need 30 wood,
-6 stone, 30 leaves, 4 coconuts and 3 cooked fish (about three huts, and
-fishing).
+6 stone, 30 leaves, 4 tar, 4 coconuts and 3 cooked fish (about three huts,
+fishing, and a trip to the tide islet).
+
+**Rare materials.** Tar (island 1) and resin (island 2) are items with
+`rareFrom`: only these objects give them. Tar comes from the 3 old barrels
+on the tide islet (`barrel`: 2 tar, then `barrel_empty`), 6 tar in all.
+Resin comes from snowy spruces (50% chance of 1 with each gather); island 2
+has at least 4 of them (`RESIN_TREES`). `game.stageCost(stage)` leaves a
+rare material out when no object of its `rareFrom` is on the island: an
+island 1 from before the tide islet does not need tar, an old island 2
+without snowy spruces does not need resin. Always use `stageCost()`, not
+`stage.cost`. The goal card shows a hint where to find a rare material
+the stage still needs (`Strings.rareHints`).
 
 How it works:
 
@@ -519,10 +554,10 @@ highest snow of the mountain. The player builds a signal beacon on it.
 |---|---|---|
 | Stone base | 16 stone | `beacon_base` |
 | Wood pile | 18 wood, 4 rope | `beacon_pyre` |
-| Tinder | 12 leaves, 4 wood | `beacon_ready` |
+| Tinder | 12 leaves, 4 wood, 3 resin | `beacon_ready` |
 
-All stages together need 22 wood, 16 stone and 20 leaves (8 of them for
-rope). There are no coconuts on island 2: apples, berries, mushrooms and
+All stages together need 22 wood, 16 stone, 20 leaves (8 of them for
+rope) and 3 resin. There are no coconuts on island 2: apples, berries, mushrooms and
 fish are the food there.
 
 ### 4.13 The dog
@@ -617,6 +652,63 @@ keeps a map on the wall of every hut. There is no map anywhere else.
 
 ---
 
+### 4.16 The tide islet (island 1)
+
+A new island 1 has a small islet off a beach of the wild forest (else the far
+side, else the home coast), joined to it by a straight **sandbar** of 2 to 5
+sea cells (see §5).
+
+- The sandbar is objects on sea cells (`sandbar_ns`, `sandbar_ew`, with
+  `tidal` and `walkable`). `isPassable()` is true on them only at low tide
+  (see 4.5). At high tide `objectSprite()` gives `<kind>_wet`: a light strip
+  of shallow water.
+- Walking into the sandbar at high tide logs `tideHigh` with the turn the
+  next low tide starts (`nextLowTide()`). No turn passes, also with a
+  fishing rod.
+- When the tide turns, the log says so (`tideOut`, `tideIn`), but only
+  once the explorer has seen a sandbar cell (`game.tideKnown()`) and is
+  awake. The HUD clock line then also shows "low tide" or "high tide".
+- **The water comes in.** When high tide starts while the explorer stands
+  on the sandbar, they move to the nearest dry cell along it (a `move`
+  event), lose 15 Warmth (`WADE_CHILL`) and the log says `tideWade`. A dog
+  on the sandbar comes next to the explorer. On the islet, the explorer
+  waits for the next low tide (at most 6 hours); its palm gives coconuts.
+- On the islet: 3 old tar barrels, a palm and a chest.
+- Every "does this cut off the island" check counts the sandbar as open
+  (`canBeOpened()`). Animals never go on it (their habitats have no sea).
+- **Old islands.** An island 1 without a sandbar (`game.oldIsland`, from a
+  save before version 8) works as before: its hull needs no tar. The goal
+  card says that a new island 1 has the tide islet, with the button "New
+  island, keep progress" (tap two times). `Game.newIslandKeeping(old)`
+  makes a new island 1 and keeps the bag, XP, skills, stars and the dog
+  (with a new id, next to the explorer, and no stray dog on the island).
+  Needs, goal progress and the clock start again.
+
+### 4.17 Island stars
+
+Each island has three optional tasks (`stars` in `LEVELS`). They never block
+the goal.
+
+| Star | Islands | Task | Progress |
+|---|---|---|---|
+| `chests` (Treasure hunter) | 1, 2 | Open every chest on the island (also the islet chest) | open / all chests |
+| `fish` (Angler) | 1 | Catch 5 fish on this island (`STAR_FISH`) | `fishHere` |
+| `explore` (Explorer) | 2 | Explore 75% of the floor (`STAR_EXPLORE`) | percent |
+| `safe` (Safe and sound) | 1, 2 | 3 days in a row without fainting (`STAR_SAFE_DAYS`) | whole days since `safeSince` |
+
+- `checkStars()` runs at the end of every turn and when the player sails. A
+  new star is stored in `game.stars` as `[level, star]`, logs `star`, makes
+  the explorer sparkle and gives 5 XP (`STAR_XP`).
+- Fainting sets `safeSince` to the morning after. Landing on a new island
+  sets it to the landing turn and `fishHere` to 0. So every star can still
+  be earned after a setback.
+- `game.starStates()` gives each star of the island with `done`, `have` and
+  `need`. The Build panel shows them in a card under the goal card: a gold
+  `ui_star` when earned, else a grey `ui_star_empty` and the progress. The
+  end screen shows all stars earned ("Stars: 4 of 6").
+
+---
+
 ## 5. The world
 
 `generateWorld(rng)` makes one island, 104 × 80 cells. The same seed always
@@ -671,7 +763,19 @@ Steps:
    a sand cell next to the sea, in the far side if possible
    (`GOAL_REGIONS`: far side, then forest, then home coast). Its 8
    neighbour cells stay free, so the big sprite is not hidden by trees.
-8. **Animals.** `Game` adds each animal kind of the island
+8. **The tide islet** (island 1 only, `addIslet`). After the objects, the
+   generator looks for a sand cell (with no object) in the wild forest,
+   then the far side, then the home coast, with 2 to 5 sea cells straight
+   out from it (`SANDBAR`) and room for the islet after them. The islet is
+   the cells within a squared radius of 10.5 of its middle (37 cells; 6.5
+   if nothing has room). All its cells must be at least 2 sea cells
+   (`ISLET_GAP`) from other land and from the sea ring at the map edge.
+   The cells become sand and the sea cells between become the sandbar.
+   `placeOnIslet` puts the barrels, the palm and the chest
+   (`ISLET_OBJECTS`) on it, not next to where the sandbar lands, so every
+   free islet cell stays reachable. If no beach has room, the island is
+   made again (this has not happened in tests).
+9. **Animals.** `Game` adds each animal kind of the island
    (`islandAnimals`) up to its population, on its habitat, 8 or more cells
    from the start. Animals in other regions stay there.
 
@@ -707,6 +811,9 @@ changes (`biome: 'mountain'`):
   its ring has a river cell or an object on it. The start must be further
   out. If no distance works, the island is made again. A typical ring has
   20–45 rocky steps and 10–25 ice walls.
+- **Resin trees.** After the chests, more snowy spruces go on free snow
+  until there are 4 (`RESIN_TREES`); else the island is made again.
+- **No tide islet.**
 - **Scatter** uses the `mountain` table of `SCATTER`: driftwood and pebbles
   on the beach; spruce, birch, apple tree, broadleaf tree, fern, bushes and
   mushrooms in the forest; pebbles, boulders and some spruces on scree;
@@ -717,8 +824,8 @@ A typical island 2 has about 1,700 forest, 450 scree, 250 rock and 100 snow
 cells. Generation takes 0.1 to 0.3 seconds.
 
 A typical island has about 3,100 floor cells (about 1,150 home, 1,000 forest,
-850 far side), 50 to 200 river cells and 50 to 80 brambles. Generation
-takes 0.1 to 0.3 seconds.
+850 far side), 50 to 200 river cells and 50 to 80 brambles, plus the islet.
+Generation takes 0.1 to 0.35 seconds.
 
 ---
 
@@ -748,6 +855,9 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 - `eat` is optional. With `eat`, the item is food and shows an Eat button.
 - `tool: true` marks a tool: it is kept in the bag, and only one can be made.
 - `raw: true` marks food that must be cooked first. The Bag panel says so.
+- `rareFrom: [kinds]` marks a rare goal material: only these objects give
+  it, and a goal stage asks for it only on an island that has one of them
+  (see 4.12).
 - Also add the id to the `ItemId` type.
 
 ### World objects
@@ -767,6 +877,7 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `steep` | A steep step: blocks the way until a recipe with `onto` builds on it (see 4.14). Counts as open for placement checks. |
 | `climb` | A way up a step: stepping onto it costs Energy (see 4.14). |
 | `goal` | The island goal: walking into it gives it materials (see 4.12). |
+| `tidal` | A sandbar on sea cells: walkable at low tide only, `<kind>_wet` sprite at high tide (see 4.16). Counts as open for placement checks. |
 | `done` | A finished goal after `sail()` (the lit beacon): `frames` to show instead and its `lightRadius`. |
 
 Also add the kind to the `ObjectKind` type.
@@ -802,18 +913,21 @@ crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander:
 
 Also add the kind to the `AnimalKind` type. A new temper needs new code in
 `Game.animalAct()`. `climber: true` lets an animal walk over steep steps.
+`nocturnal: true` makes it sleep by day and prowl at night (see 4.9); it
+needs an `animal_<kind>_sleep` sprite (and `_left`).
 
 ### Current content
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope |
+| Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); tar, resin (rare goal materials); stone axe, fishing rod (tools) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%) |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
+| Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound (see 4.17) |
 | Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
-| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps) |
+| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves; sleeps by day). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps) |
 
 ---
 
@@ -934,11 +1048,17 @@ Auto-walk (travel and hold) stops when:
 - The save holds: seed, random number state, turn, tiles, explored cells,
   objects, animals, player, home, needs, inventory, XP, learned skills,
   level, what the goal's stage already got (`goalGiven`), `sailed`, the dog,
-  where cave bears were seen (`bearSpots`), warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
+  where cave bears were seen (`bearSpots`), the stars (`stars`), the fish
+  caught on this island (`fishHere`), the turn of the last faint or landing
+  (`safeSince`), warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 7. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 7 added
+- `SAVE_VERSION` is 8. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 8 added
+  `stars`, `fishHere` and `safeSince`; version 7 saves load with no stars,
+  0 fish and `safeSince` at their turn. Their island 1 has no tide islet, so
+  its hull needs no tar, and the goal card offers "New island, keep
+  progress" (see 4.16). Version 7 added
   `bearSpots`; version 6 saves load with an empty list. Version 6 added
   `dog` (null before you adopt one); version 5 saves load without a dog.
   Version 4 saves load
@@ -983,7 +1103,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching |
@@ -1041,6 +1161,13 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Grill button frame time, lift above the fire | `main.ts` → `GRILL_FRAME_MS`, `GRILL_LIFT` | 220 ms, 6 px |
 | Map roughness, bear area | `mapview.ts` → `MAP_BLOCK`, `BEAR_AREA` | 2 × 2 cells per patch, 5 cells |
 | Gap between bear places | `game.ts` → `BEAR_SPOT_GAP` | 6 cells |
+| Low tide | `clock.ts` → `isLowTide()` | 5:00–11:00 and 17:00–23:00 |
+| Sandbar, islet size and gap | `worldgen.ts` → `SANDBAR`, `ISLET_RADIUS2`, `ISLET_GAP`, `ISLET_REGIONS` | 2–5 cells; 10.5 (or 6.5); 2 cells; forest, far side, home |
+| What stands on the islet | `worldgen.ts` → `ISLET_OBJECTS` | 3 barrels, palm, chest |
+| Wading back at high tide | `game.ts` → `WADE_CHILL` | 15 Warmth |
+| Snowy spruces on island 2 | `worldgen.ts` → `RESIN_TREES` | at least 4 |
+| Bear sleep, prowl | `animals.ts` → `nocturnal`, `notice`, `fleeAfter`; `game.ts` → `PROWL_TURNS` | 7:00–19:00; 3 cells; 10 turns; 5 turns |
+| Island stars | `game.ts` → `STAR_FISH`, `STAR_EXPLORE`, `STAR_SAFE_DAYS`, `STAR_XP` | 5 fish, 75%, 3 days, 5 XP |
 
 ---
 
@@ -1059,7 +1186,8 @@ Also run `npm run build` (typecheck and build) before you commit.
   island yet: the player stays on the island or starts a new one.
 - Island 1 cannot be visited again after sailing. "New island" always
   starts again on island 1.
-- Islands from saves before version 4 have no boat, so they have no goal.
+- Islands from saves before version 4 have no boat, so they have no goal. The
+  goal card offers a new island 1 that keeps the bag, XP, skills and dog.
 - During the boat trip, the boat faces right also when it sails up or down.
 - The rings of steep steps follow the walking distance, not the ground. Some
   rocky steps stand on grass or snow, and some ice walls on scree. The step
@@ -1067,6 +1195,11 @@ Also run `npm run build` (typecheck and build) before you commit.
 - The explorer stands in front of a ladder or rope and hides most of it.
 - The map is drawn again each time the panel opens; it is not stored. A bear
   that wanders far after it was seen makes a second bear area.
+- The tide times are fixed for every day. The game does not show them
+  before the explorer sees the sandbar; the goal card hint for tar does.
+- The islet has no shore drawing of its own: the sandbar sprite meets the
+  normal shore tiles, so a few pixels of shallow water show at each end.
+- Animals can appear on the islet (crabs, monkeys, also snakes).
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
 - The game has not been tested on a real phone.

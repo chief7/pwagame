@@ -1,6 +1,6 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
-import type { LevelId, StageId } from './defs/levels';
+import type { LevelId, StageId, StarId } from './defs/levels';
 import type { ObjectKind } from './defs/objects';
 import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
@@ -93,6 +93,15 @@ export type Msg =
   | { key: 'dogTired' }
   /** Fed and watered again after being tired. */
   | { key: 'dogBack' }
+  /** The tide turns: the sandbar comes out of the sea, or goes under. */
+  | { key: 'tideOut' }
+  | { key: 'tideIn' }
+  /** Walked into the sandbar at high tide; `turn` is when the next low tide starts. */
+  | { key: 'tideHigh'; turn: number }
+  /** The tide came in while the explorer stood on the sandbar. */
+  | { key: 'tideWade' }
+  /** Earned one of the island's stars. */
+  | { key: 'star'; star: StarId }
   /** A line from a save made before messages were data; shown as it is. */
   | { key: 'legacy'; text: string };
 

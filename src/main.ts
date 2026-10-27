@@ -1,6 +1,6 @@
 import './style.css';
 import { ITEMS, type ItemId } from './game/defs/items';
-import { levelDef, nextLevel } from './game/defs/levels';
+import { LEVELS, levelDef, nextLevel } from './game/defs/levels';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
@@ -196,7 +196,8 @@ function updateHud(): void {
   const words = t();
   const { x, y } = game.player;
   const phase = game.phase;
-  ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}`;
+  const tide = game.tideKnown() ? ` · ${game.lowTide ? words.ui.lowTide : words.ui.highTide}` : '';
+  ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}${tide}`;
   const obj = game.objectAt(x, y);
   ui.shelter.textContent = game.nearFire(x, y)
     ? words.ui.byFire
@@ -339,7 +340,7 @@ function placeGrill(now: number): void {
 type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'sail' | 'end';
 let sheetKind: SheetKind = 'bag';
 /** The footer button that waits for a second tap before it starts over. */
-let confirming: 'island' | 'reset' | null = null;
+let confirming: 'island' | 'reset' | 'keep' | null = null;
 const icons = new Map<string, string>();
 
 function icon(name: string): string {
@@ -422,7 +423,7 @@ function renderSheet(): void {
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), actions.childElementCount ? actions : undefined));
     }
   } else {
-    rows.append(goalCard());
+    rows.append(goalCard(), starsCard());
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
       const problem = game.buildProblem(id);
@@ -454,7 +455,7 @@ function renderSheet(): void {
       closeSheet();
       ui.picker.hidden = false;
     });
-    const fresh = confirmButton('island', words.ui.newIsland, startNewIsland);
+    const fresh = confirmButton('island', words.ui.newIsland, () => startNewIsland());
     const lang = el('button', { type: 'button', className: 'wide lang-switch' }, langButtonLabel());
     lang.addEventListener('click', switchLang);
     const reset = confirmButton('reset', words.ui.resetProgress, resetProgress);
@@ -465,7 +466,7 @@ function renderSheet(): void {
 }
 
 /** A button that asks for a second tap before it does something that can't be undone. */
-function confirmButton(kind: 'island' | 'reset', label: string, action: () => void): HTMLButtonElement {
+function confirmButton(kind: 'island' | 'reset' | 'keep', label: string, action: () => void): HTMLButtonElement {
   const button = el('button', { type: 'button', textContent: confirming === kind ? t().ui.confirmNewIsland : label });
   button.addEventListener('click', () => {
     if (confirming === kind) return action();
@@ -482,8 +483,9 @@ function resetProgress(): void {
   ui.picker.hidden = false;
 }
 
-function startNewIsland(): void {
-  game = new Game();
+/** A new island; `make` can carry things over from the old one. */
+function startNewIsland(make: () => Game = () => new Game()): void {
+  game = make();
   anim.consume([{ type: 'fade', late: false }], performance.now(), game.player.id);
   closeSheet();
   afterTurn();
@@ -522,12 +524,46 @@ function goalCard(): HTMLElement {
       note.append(el('span', { className: 'row-note goal-step', textContent: words.ui.goalStep(goal.index, goal.count, goal.stage.id) }));
       note.append(costList(goal.left));
       say(level.goalHint);
+      // Where to find a rare material the stage still needs.
+      for (const item of Object.keys(goal.left) as ItemId[]) {
+        const hint = words.rareHints[item];
+        if (hint) note.append(el('span', { className: 'row-note goal-hint', textContent: hint }));
+      }
       break;
     case 'ready': sprite = goalDone(); say(level.goalReady); break;
     case 'sailed': sprite = goalDone(); say(level.goalSailed); break;
   }
+  if (game.oldIsland) {
+    // An island from before the tide islet: offer the new island 1, keeping what the explorer has.
+    note.append(el('span', { className: 'row-note goal-hint', textContent: words.ui.oldIsland }));
+    const keep = confirmButton('keep', words.ui.keepProgress, () => startNewIsland(() => Game.newIslandKeeping(game)));
+    keep.classList.add('keep-progress');
+    note.append(keep);
+  }
   const card = row(icon(sprite), level.goalTitle, note);
   card.classList.add('goal');
+  return card;
+}
+
+/** The island's three optional stars, with how far along each one is. */
+function starsCard(): HTMLElement {
+  const words = t();
+  const list = el('ul', { className: 'stars' });
+  for (const star of game.starStates()) {
+    const progress = star.id === 'explore' ? `${star.have}% / ${star.need}%` : `${star.have}/${star.need}`;
+    list.append(
+      el('li', { className: star.done ? 'done' : '' }, [
+        el('img', { src: icon(star.done ? 'ui_star' : 'ui_star_empty'), alt: '' }),
+        el('span', {}, [
+          el('b', { textContent: words.stars[star.id].name }),
+          ` ${words.stars[star.id].task}`,
+          star.done ? '' : el('span', { className: 'star-progress', textContent: ` ${progress}` }),
+        ]),
+      ]),
+    );
+  }
+  const card = row(icon('ui_star'), words.ui.islandStars, list);
+  card.classList.add('stars-card');
   return card;
 }
 
@@ -585,6 +621,7 @@ function renderVoyage(rows: HTMLElement): void {
     el('div', { className: 'voyage' }, [
       el('img', { src: icon(goalDone()), alt: '' }),
       el('p', { textContent: leaving ? words.levels[game.level].sailText : words.ui.endText }),
+      leaving ? '' : el('p', { className: 'end-stars', textContent: words.ui.endStars(game.stars.length, LEVELS.reduce((n, l) => n + l.stars.length, 0)) }),
     ]),
   );
   const foot = el('div', { className: 'sheet-foot' });
@@ -598,7 +635,7 @@ function renderVoyage(rows: HTMLElement): void {
     const stay = el('button', { type: 'button', textContent: words.ui.stay });
     stay.addEventListener('click', closeSheet);
     const fresh = el('button', { type: 'button', className: 'primary', textContent: words.ui.newIsland });
-    fresh.addEventListener('click', startNewIsland);
+    fresh.addEventListener('click', () => startNewIsland());
     foot.append(stay, fresh);
   }
   rows.append(foot);

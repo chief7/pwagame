@@ -1,3 +1,5 @@
+import type { ObjectKind } from './objects';
+
 // Everything the explorer can carry. Add an item here (plus an `item_<id>`
 // sprite and its words in src/i18n/) and it can be gathered, stored, eaten
 // or used in recipes.
@@ -5,7 +7,8 @@
 export type ItemId =
   | 'coconut' | 'berries' | 'mushroom' | 'cooked_fish' | 'apple'
   | 'wood' | 'leaves' | 'stone' | 'fish' | 'rope'
-  | 'axe' | 'fishing_rod';
+  | 'axe' | 'fishing_rod'
+  | 'tar' | 'resin';
 
 export interface Food {
   food?: number;
@@ -21,6 +24,11 @@ export interface ItemDef {
   tool?: true;
   /** Not edible yet: it has to be cooked at a campfire first. */
   raw?: true;
+  /**
+   * A rare material for the island goal that only these objects give. An
+   * island without any of them (an old save) does not ask the goal for it.
+   */
+  rareFrom?: ObjectKind[];
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
@@ -36,6 +44,9 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   rope: { id: 'rope' },
   axe: { id: 'axe', tool: true },
   fishing_rod: { id: 'fishing_rod', tool: true },
+  // Rare goal materials: tar from the old barrels on the tide islet, resin from snowy spruces.
+  tar: { id: 'tar', rareFrom: ['barrel', 'barrel_empty'] },
+  resin: { id: 'resin', rareFrom: ['tree_spruce_snow'] },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];

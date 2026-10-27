@@ -48,7 +48,8 @@ npm run preview   # serve the build (service worker is only active here)
   bats keep their distance, turtles don't mind you. Far from camp live wild
   animals that hurt: wild boars charge at you, snakes bite, wasps chase you
   until you leave the grass, and cave bears swipe. They are why explorers
-  faint and wake up back at camp.
+  faint and wake up back at camp. Cave bears sleep from 7:00 to 19:00; at
+  night they follow you for a few steps, until you leave their cave.
 - **Food matters:** food runs down fast, and fruit, berries and mushrooms
   fill you up only a little. Cooked fish is by far the best food. Health
   only comes back while Food and Water are both above 50.
@@ -68,6 +69,10 @@ npm run preview   # serve the build (service worker is only active here)
 - **Island goal:** an old boat wreck lies on a beach on the far side.
   Repair it in four steps (hull, mast, sail, supplies) by walking into it
   with what it needs; you can bring things in as many trips as you like.
+  The hull needs tar from the old barrels on a little tide islet off the
+  coast. A sandbar leads there, but it is dry only at low tide (5–11 and
+  17–23 o'clock); if the water comes in while you are on it, you wade back,
+  wet and cold.
   Rope for the mast and sail is twisted from leaves (Build panel). The Build
   panel shows the next step. When the boat is ready, walk into it to set
   sail to the second island. You keep your bag, XP, skills and needs.
@@ -75,8 +80,12 @@ npm run preview   # serve the build (service worker is only active here)
   birches, apple trees, ferns) and a mountain of cliffs and scree with snow
   on the peak. Snow is cold even in the day: bring wood for a fire. Build a
   signal beacon on the peak in three steps (stone base, wood pile, tinder),
-  then light it so a passing ship takes you on board. The next island is not
+  then light it so a passing ship takes you on board. The tinder needs resin
+  from the snowy spruces. The next island is not
   built yet, so you can stay or start a new one.
+- **Island stars:** each island has three optional tasks (open every
+  chest, catch 5 fish or explore most of the island, go 3 days without
+  fainting). The Build panel shows them; each star gives 5 XP.
 - **The dog:** a stray dog lives far from camp on each island. Walk into it
   with food to adopt it. Your dog follows you and barks crabs, monkeys,
   squirrels and snakes away. It needs food (Feed dog in the Bag, raw fish
@@ -84,6 +93,9 @@ npm run preview   # serve the build (service worker is only active here)
   If its food or water runs out it is too tired to help until you look
   after it.
 - **Saving:** the game saves itself to the browser after every action.
+  Saves from before the tide islet still work. Their island 1 has no islet,
+  so the hull needs no tar, and the Build panel offers a new island 1 that
+  keeps your bag, XP, skills and dog.
 
 ## Controls
 

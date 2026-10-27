@@ -1,8 +1,8 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Dog, type Player } from './actors';
-import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
+import { daylight, isLowTide, isNight, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
-import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId } from './defs/levels';
+import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId, type StarId } from './defs/levels';
 import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPE_IDS, RECIPES, type RecipeId } from './defs/recipes';
 import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
@@ -74,7 +74,16 @@ const DOG_BARK_RANGE = 3;
 const DOG_LOST = 12;
 /** A cave bear seen this close to a place already on the map adds no new place. */
 const BEAR_SPOT_GAP = 6;
-export const SAVE_VERSION = 7;
+/** Turns a prowling bear follows you before it gives up (it stops at once when you leave its cave). */
+const PROWL_TURNS = 5;
+/** Warmth lost when the tide comes in and you have to wade back to dry land. */
+const WADE_CHILL = 15;
+/** Island stars: fish to catch, share of the ground to explore, days in a row without fainting, and the XP a star gives. */
+const STAR_FISH = 5;
+const STAR_EXPLORE = 0.75;
+const STAR_SAFE_DAYS = 3;
+const STAR_XP = 5;
+export const SAVE_VERSION = 8;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -96,6 +105,14 @@ export type GoalState =
   | { state: 'build'; obj: ObjectKind; stage: GoalStage; index: number; count: number; left: Items }
   | { state: 'ready' }
   | { state: 'sailed' };
+
+/** One of the island's stars: earned, and how far along it is (`have` of `need`). */
+export interface StarState {
+  id: StarId;
+  done: boolean;
+  have: number;
+  need: number;
+}
 
 /**
  * What happened during a turn, in order, for the UI to animate. `late`
@@ -142,6 +159,12 @@ export interface SaveData {
   dog: Dog | null;
   /** Cells of this island where the explorer saw a cave bear (for the Cartographer's map). */
   bearSpots: number[];
+  /** Island stars earned, on this island and the ones before. */
+  stars: [LevelId, StarId][];
+  /** Fish caught on this island (for its fish star). */
+  fishHere: number;
+  /** The turn the explorer last fainted, or landed on this island (for the star for days without fainting). */
+  safeSince: number;
   warned: NeedId[];
   log: LogEntry[];
 }
@@ -169,6 +192,9 @@ export class Game {
   dog: Dog | null = null;
   /** Cells where the explorer saw a cave bear on this island, at least BEAR_SPOT_GAP apart. */
   bearSpots: number[] = [];
+  stars: [LevelId, StarId][] = [];
+  fishHere = 0;
+  safeSince = 0;
   turn = 0;
   log: LogEntry[] = [];
   sleeping = false;
@@ -205,6 +231,9 @@ export class Game {
       this.sailed = save.sailed;
       this.dog = save.dog;
       this.bearSpots = save.bearSpots;
+      this.stars = save.stars;
+      this.fishHere = save.fishHere;
+      this.safeSince = save.safeSince;
       this.turn = save.turn;
       this.nextId = save.nextId;
       this.warned = new Set(save.warned);
@@ -222,6 +251,39 @@ export class Game {
     this.updateFov();
   }
 
+  /**
+   * A new island 1 that keeps what the explorer carries, their XP, skills,
+   * stars and dog. For players whose island is from before the tide islet.
+   */
+  static newIslandKeeping(old: Game): Game {
+    const game = new Game();
+    game.inventory = Inventory.from(old.inventory.toJSON());
+    game.xp = old.xp;
+    game.skills = new Set(old.skills);
+    game.stars = old.stars.map(([level, star]) => [level, star]);
+    if (old.dog) {
+      game.animals = game.animals.filter((a) => ANIMALS[a.kind].temper !== 'stray');
+      game.dog = { ...old.dog, id: game.nextId++, napping: false };
+      game.dogToPlayer();
+    }
+    return game;
+  }
+
+  /** The sandbar cells of this island (none on island 2 and on islands from before the tide islet). */
+  private sandbarCells(): number[] {
+    const cells: number[] = [];
+    for (const [i, obj] of this.objects) if (OBJECTS[obj.kind].tidal) cells.push(i);
+    return cells;
+  }
+
+  /** Whether this island has something that gives a rare goal material (tar, resin). */
+  private hasSource(item: ItemId): boolean {
+    const from = ITEMS[item].rareFrom;
+    if (!from) return true;
+    for (const obj of this.objects.values()) if (from.includes(obj.kind)) return true;
+    return false;
+  }
+
   // ---- Queries -------------------------------------------------------------
 
   objectAt(x: number, y: number): WorldObject | undefined {
@@ -231,6 +293,7 @@ export class Game {
   /** Sprite name to draw for the object at a cell (regrowing plants look bare). */
   objectSprite(obj: WorldObject): string {
     const def = OBJECTS[obj.kind];
+    if (def.tidal && !this.lowTide) return `${obj.kind}_wet`;
     if (obj.readyAt !== undefined && obj.readyAt > this.turn && def.depletedSprite) return def.depletedSprite;
     return obj.kind;
   }
@@ -261,6 +324,7 @@ export class Game {
   isPassable(x: number, y: number): boolean {
     const obj = this.objectAt(x, y);
     if (this.map.get(x, y) === Tile.River) return !!obj && !!OBJECTS[obj.kind].bridge;
+    if (this.map.get(x, y) === Tile.Water) return !!obj && !!OBJECTS[obj.kind].tidal && this.lowTide;
     if (!this.map.isFloor(x, y)) return false;
     return !obj || !!OBJECTS[obj.kind].walkable;
   }
@@ -312,6 +376,26 @@ export class Game {
       }
     }
     return best;
+  }
+
+  /** Low tide: the sandbar to the tide islet is dry. */
+  get lowTide(): boolean {
+    return isLowTide(this.turn);
+  }
+
+  /** The explorer has seen the sandbar, so the HUD and the log talk about the tide. */
+  tideKnown(): boolean {
+    return this.sandbarCells().some((i) => this.map.explored[i]);
+  }
+
+  /** An island 1 from before the tide islet: a new island 1 has more to find. */
+  get oldIsland(): boolean {
+    return this.level === 1 && !this.sandbarCells().length;
+  }
+
+  /** A nocturnal animal (the cave bear) sleeps through the day, unless something woke it. */
+  asleep(a: Animal): boolean {
+    return !!ANIMALS[a.kind].nocturnal && this.phase === 'day' && !a.flee && !a.chase;
   }
 
   get daylight(): number {
@@ -396,9 +480,21 @@ export class Game {
     return { state: 'build', obj, stage, index: done, count: def.stages.length, left: this.goalLeft(stage) };
   }
 
+  /**
+   * What a stage costs on this island. A rare material (tar, resin) is left
+   * out on an island with nothing that gives it: an island from an old save.
+   */
+  stageCost(stage: GoalStage): Items {
+    const cost: Items = {};
+    for (const [item, n] of Object.entries(stage.cost) as [ItemId, number][]) {
+      if (this.hasSource(item)) cost[item] = n;
+    }
+    return cost;
+  }
+
   private goalLeft(stage: GoalStage): Items {
     const left: Items = {};
-    for (const [item, n] of Object.entries(stage.cost) as [ItemId, number][]) {
+    for (const [item, n] of Object.entries(this.stageCost(stage)) as [ItemId, number][]) {
       const still = n - (this.goalGiven[item] ?? 0);
       if (still > 0) left[item] = still;
     }
@@ -468,6 +564,11 @@ export class Game {
         if (!this.drink(RIVER_DRINK, { key: 'drinkRiver' })) return false;
         this.endTurn();
         return true;
+      }
+      if (obj && OBJECTS[obj.kind].tidal) {
+        // High tide: the sandbar is under water until the next low tide.
+        this.message({ key: 'tideHigh', turn: nextLowTide(this.turn) }, 'info');
+        return false;
       }
       if (this.map.get(nx, ny) === Tile.Water) {
         if (this.inventory.count('fishing_rod') > 0) {
@@ -622,6 +723,7 @@ export class Game {
     if (!this.sailed && this.goal().state !== 'ready') return false;
     this.emit({ type: 'fade' });
     if (this.sailed) return true;
+    this.checkStars();
     this.message({ key: 'sailAway', level: this.level }, 'good');
     const next = nextLevel(this.level);
     if (next) this.landOn(next);
@@ -647,6 +749,8 @@ export class Game {
     this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
     this.animals = [];
     this.bearSpots = [];
+    this.fishHere = 0;
+    this.safeSince = this.turn;
     this.dogToPlayer();
     this.populate();
     this.warned.clear();
@@ -828,6 +932,7 @@ export class Game {
       return;
     }
     this.inventory.add('fish');
+    this.fishHere++;
     this.emit({ type: 'float', x, y, amount: 1, what: { item: 'fish' }, tone: 'loot' });
     this.message({ key: 'catch' }, 'loot');
     this.gainXp(CATCH_XP, x, y);
@@ -977,6 +1082,7 @@ export class Game {
   private endTurn(): void {
     this.turn++;
     const p = this.player;
+    this.tide();
     tickNeeds(this.needs, {
       sleeping: this.sleeping,
       shelter: this.shelterAt(p.x, p.y),
@@ -1001,6 +1107,114 @@ export class Game {
     const known = goal >= 0 && this.map.explored[goal] === 1;
     this.updateFov();
     if (goal >= 0 && !known && this.map.explored[goal]) this.message({ key: 'goalFound', obj: this.objects.get(goal)!.kind }, 'good');
+    this.checkStars();
+  }
+
+  /**
+   * The tide turns: say so once the explorer knows the sandbar. When the
+   * water comes in over the sandbar, the explorer wades to the nearest dry
+   * land, wet and colder. Nothing worse happens.
+   */
+  private tide(): void {
+    const low = this.lowTide;
+    if (low === isLowTide(this.turn - 1)) return;
+    if (!this.sleeping && this.tideKnown()) this.message({ key: low ? 'tideOut' : 'tideIn' }, 'info');
+    if (low) return;
+    const p = this.player;
+    const bar = new Set(this.sandbarCells());
+    const onBar = (x: number, y: number) => bar.has(this.map.idx(x, y));
+    if (onBar(p.x, p.y)) {
+      const shore = this.nearestShore(p.x, p.y, bar);
+      if (shore) {
+        this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: shore.x, toY: shore.y });
+        p.x = shore.x;
+        p.y = shore.y;
+      }
+      this.needs.warmth = Math.max(0, this.needs.warmth - WADE_CHILL);
+      this.emit({ type: 'float', x: p.x, y: p.y, amount: -WADE_CHILL, what: { need: 'warmth' }, tone: 'warn' });
+      this.message({ key: 'tideWade' }, 'warn');
+    }
+    if (this.dog && onBar(this.dog.x, this.dog.y)) this.dogToPlayer();
+  }
+
+  /** The nearest dry cell along the sandbar from (x, y). */
+  private nearestShore(x: number, y: number, bar: Set<number>): { x: number; y: number } | null {
+    const start = this.map.idx(x, y);
+    const seen = new Set([start]);
+    const queue = [start];
+    for (let head = 0; head < queue.length; head++) {
+      const cur = queue[head];
+      const cx = cur % this.map.width;
+      const cy = (cur - cx) / this.map.width;
+      for (const [dx, dy] of DIRS) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (!this.map.inBounds(nx, ny)) continue;
+        const n = this.map.idx(nx, ny);
+        if (seen.has(n)) continue;
+        seen.add(n);
+        if (bar.has(n)) queue.push(n);
+        else if (this.isPassable(nx, ny) && !this.animalAt(nx, ny)) return { x: nx, y: ny };
+      }
+    }
+    return null;
+  }
+
+  // ---- Island stars -----------------------------------------------------------------
+
+  hasStar(id: StarId, level: LevelId = this.level): boolean {
+    return this.stars.some(([l, s]) => l === level && s === id);
+  }
+
+  /** The stars of this island, with how far along each one is. */
+  starStates(): StarState[] {
+    return levelDef(this.level).stars.map((id) => {
+      const { have, need } = this.starProgress(id);
+      return { id, done: this.hasStar(id), have, need };
+    });
+  }
+
+  private starProgress(id: StarId): { have: number; need: number } {
+    switch (id) {
+      case 'chests': {
+        let open = 0;
+        let all = 0;
+        for (const obj of this.objects.values()) {
+          if (obj.kind === 'chest_open') open++;
+          if (obj.kind === 'chest_open' || obj.kind === 'chest_closed') all++;
+        }
+        return { have: open, need: all };
+      }
+      case 'fish':
+        return { have: Math.min(this.fishHere, STAR_FISH), need: STAR_FISH };
+      case 'explore': {
+        let floor = 0;
+        let seen = 0;
+        for (let i = 0; i < this.map.tiles.length; i++) {
+          const x = i % this.map.width;
+          if (!this.map.isFloor(x, (i - x) / this.map.width)) continue;
+          floor++;
+          if (this.map.explored[i]) seen++;
+        }
+        const need = Math.round(STAR_EXPLORE * 100);
+        return { have: Math.min(need, Math.floor((seen / Math.max(1, floor)) * 100)), need };
+      }
+      case 'safe':
+        return { have: Math.min(STAR_SAFE_DAYS, Math.floor((this.turn - this.safeSince) / TURNS_PER_DAY)), need: STAR_SAFE_DAYS };
+    }
+  }
+
+  /** Award every star of this island whose task is done: a sparkle, a log line and some XP. */
+  private checkStars(): void {
+    for (const id of levelDef(this.level).stars) {
+      if (this.hasStar(id)) continue;
+      const { have, need } = this.starProgress(id);
+      if (need <= 0 || have < need) continue;
+      this.stars.push([this.level, id]);
+      this.emit({ type: 'sparkle', x: this.player.x, y: this.player.y });
+      this.message({ key: 'star', star: id }, 'good');
+      this.gainXp(STAR_XP, this.player.x, this.player.y);
+    }
   }
 
   private warnAboutNeeds(): void {
@@ -1031,6 +1245,7 @@ export class Game {
     this.animals = this.animals.filter((a) => a.x !== this.home.x || a.y !== this.home.y);
     this.player.x = this.home.x;
     this.player.y = this.home.y;
+    this.safeSince = this.turn;
     this.dogToPlayer();
     this.warned.clear();
     this.emit({ type: 'fade' });
@@ -1152,9 +1367,11 @@ export class Game {
     const friendly = this.has('animal_friend');
     for (const a of this.visibleAnimals()) {
       const def = ANIMALS[a.kind];
-      if (friendly && !def.wild) continue;
+      if ((friendly && !def.wild) || this.asleep(a)) continue;
       const notice = this.noticeRange(a.kind);
-      const r = def.temper === 'grumpy' ? Math.min(1, notice) : def.temper === 'charger' || def.temper === 'chaser' ? notice : -1;
+      // A prowling bear comes after you as far as it notices you.
+      const comes = def.temper === 'charger' || def.temper === 'chaser' || !!def.nocturnal;
+      const r = comes ? notice : def.temper === 'grumpy' ? Math.min(1, notice) : -1;
       for (let y = a.y - r; y <= a.y + r; y++) {
         for (let x = a.x - r; x <= a.x + r; x++) {
           if (this.map.isFloor(x, y)) cells.add(this.map.idx(x, y));
@@ -1173,6 +1390,7 @@ export class Game {
       this.stepAway(a);
       return;
     }
+    if (this.asleep(a)) return;
     const notice = this.noticeRange(a.kind);
     const noticed = notice > 0 && dist() <= notice && this.map.isVisible(a.x, a.y);
     // Animal friends get no trouble from crabs and monkeys. Wild animals
@@ -1180,11 +1398,16 @@ export class Game {
     const friendly = this.has('animal_friend') && !def.wild;
     if (this.sleeping) a.chase = 0;
     if (a.chase && !this.sleeping) {
-      // Wasps keep following, as long as the explorer stays on their ground.
+      // Wasps and prowling bears keep following, as long as the explorer stays on their ground.
       a.chase--;
       if (def.habitat.includes(this.map.get(p.x, p.y)) && this.isPassable(p.x, p.y) && !this.objectAt(p.x, p.y)) {
         if (dist() > 1) this.stepToward(a, playerDist);
-        if (dist() <= 1) this.hurt(a);
+        const chance = def.hitChance ?? HIT_CHANCE;
+        if (dist() <= 1 && (chance >= 1 || this.rng.chance(chance))) {
+          this.hurt(a);
+          // A bear swipes once and then leaves you be; wasps keep stinging.
+          if (def.temper !== 'chaser') a.chase = 0;
+        }
         if (!a.chase) a.flee = def.fleeAfter ?? FLEE_AFTER_HIT;
       } else {
         a.chase = 0;
@@ -1201,6 +1424,13 @@ export class Game {
           if (!friendly && dist() <= 1 && this.rng.chance(def.hitChance ?? HIT_CHANCE)) {
             this.hurt(a);
             a.flee = def.fleeAfter ?? FLEE_AFTER_HIT;
+            return;
+          }
+          if (def.nocturnal && dist() > 1) {
+            // Awake at night, a cave bear lumbers after you for a few turns.
+            this.message({ key: 'alert', animal: a.kind }, 'warn');
+            a.chase = PROWL_TURNS;
+            this.stepToward(a, playerDist);
             return;
           }
           break;
@@ -1416,6 +1646,9 @@ export class Game {
       sailed: this.sailed,
       dog: this.dog && { ...this.dog },
       bearSpots: [...this.bearSpots],
+      stars: this.stars.map(([level, star]) => [level, star]),
+      fishHere: this.fishHere,
+      safeSince: this.safeSince,
       warned: [...this.warned],
       log: this.log.slice(-30),
     };
@@ -1446,7 +1679,11 @@ export class Game {
     }
     if (data.v === 6) {
       // Version 6 did not remember where the explorer saw cave bears.
-      data = { ...data, v: SAVE_VERSION, bearSpots: [] };
+      data = { ...data, v: 7, bearSpots: [] };
+    }
+    if (data.v === 7) {
+      // Version 7 had no island stars. The days without fainting count from now.
+      data = { ...data, v: SAVE_VERSION, stars: [], fishHere: 0, safeSince: data.turn };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

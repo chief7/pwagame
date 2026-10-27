@@ -1,6 +1,6 @@
 import type { AnimalKind } from '../game/defs/animals';
 import type { ItemId } from '../game/defs/items';
-import type { LevelId, StageId } from '../game/defs/levels';
+import type { LevelId, StageId, StarId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
 import type { PathId, SkillId } from '../game/defs/skills';
@@ -46,6 +46,9 @@ export interface Strings {
     dawn: string;
     dusk: string;
     night: string;
+    /** HUD, once the explorer has seen the sandbar. */
+    lowTide: string;
+    highTide: string;
     skills: string;
     learn: string;
     learned: string;
@@ -77,7 +80,17 @@ export interface Strings {
     yourMap: string;
     /** What each sign on the map means. */
     mapSigns: Record<MapSign, string>;
+    /** The island stars on the goal card, and on the end screen: "Stars: 4 of 6". */
+    islandStars: string;
+    endStars(n: number, of: number): string;
+    /** On an island from before the tide islet: start a new island 1 and keep bag, XP, skills and dog. */
+    oldIsland: string;
+    keepProgress: string;
   };
+  /** Each island star: its name, and what to do for it. */
+  stars: Record<StarId, { name: string; task: string }>;
+  /** Goal card hints for the rare materials: where to find them. */
+  rareHints: Partial<Record<ItemId, string>>;
   /** Each island's goal: the goal card, and the question before leaving. */
   levels: Record<LevelId, {
     goalTitle: string;

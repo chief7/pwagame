@@ -657,6 +657,56 @@ button.primary {
   font-weight: bold;
 }
 
+.row-note.goal-hint {
+  display: block;
+  margin-top: 4px;
+}
+
+.keep-progress {
+  margin-top: 8px;
+  justify-self: start;
+}
+
+.row.stars-card {
+  grid-template-columns: 40px minmax(0, 1fr);
+}
+
+.stars {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stars li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+
+.stars img {
+  width: 20px;
+  height: 20px;
+  image-rendering: pixelated;
+}
+
+.stars b {
+  color: var(--text);
+}
+
+.star-progress {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.end-stars {
+  font-weight: bold;
+}
+
 .map {
   display: grid;
   justify-items: center;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildSprites, grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName } from '../sprites';
-import { daylight, isNight, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
+import { daylight, isLowTide, isNight, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
 import { ANIMALS } from './defs/animals';
 import { canBeOpened, OBJECTS, type ObjectKind } from './defs/objects';
@@ -30,8 +30,10 @@ describe('generateWorld', () => {
 
   it('makes one island where every bit of ground can be reached by clearing brambles and bridging the river', () => {
     for (const { map, start, objects } of worlds) {
+      // The sandbar to the tide islet counts as a way: it is dry at low tide.
       const passable = (x: number, y: number) => {
         const o = objects.get(map.idx(x, y));
+        if (o && OBJECTS[o.kind].tidal) return true;
         return map.isFloor(x, y) && (!o || o.kind === 'lean_to' || o.kind === 'hut' || o.kind === 'bramble');
       };
       const reach = reachWithBridges(map, start.x, start.y, passable, (x, y) => map.get(x, y) === Tile.River);
@@ -752,7 +754,7 @@ describe('Game: the island goal (the boat)', () => {
   it('takes what it needs from the bag in as many trips as you like', () => {
     const game = boatNextTo(sandbox(32));
     expect(game.move(1, 0)).toBe(false);
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalNeeds', stage: 'hull', left: [['wood', 20], ['stone', 6]] });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalNeeds', stage: 'hull', left: [['wood', 20], ['stone', 6], ['tar', 4]] });
 
     game.inventory.add('wood', 12);
     game.inventory.add('coconut', 3);
@@ -764,10 +766,11 @@ describe('Game: the island goal (the boat)', () => {
     expect(game.goalGiven).toEqual({ wood: 12 });
     expect(game.xp).toBe(xp + 12);
     expect(game.takeEvents()).toContainEqual(expect.objectContaining({ type: 'float', amount: -12, what: { item: 'wood' } }));
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', stage: 'hull', given: [['wood', 12]], left: [['wood', 8], ['stone', 6]] });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalGive', stage: 'hull', given: [['wood', 12]], left: [['wood', 8], ['stone', 6], ['tar', 4]] });
 
     game.inventory.add('wood', 30);
     game.inventory.add('stone', 6);
+    game.inventory.add('tar', 4);
     game.move(1, 0);
     expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('boat_hull');
     expect(game.inventory.count('wood')).toBe(22);
@@ -1325,8 +1328,9 @@ describe('Game: wild animals', () => {
     expect(again.animals[0].flee).toBeGreaterThan(0);
   });
 
-  it('a cave bear swipes hard if you stay next to it', () => {
+  it('a cave bear swipes hard if you stay next to it at night', () => {
     const game = sandbox(44);
+    game.turn = nightTurn();
     for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) game.map.set(game.player.x + dx, game.player.y + dy, Tile.CaveFloor);
     game.animals = [{ id: 99, kind: 'bear', x: game.player.x + 1, y: game.player.y, facing: 'down', flee: 0 }];
     for (let i = 0; i < 20 && game.needs.health > 85; i++) game.wait();
@@ -1475,6 +1479,331 @@ describe('computeFov', () => {
 });
 
 /** A game with a clear 7×7 patch of sand round the explorer and no animals. */
+describe('generateWorld: the tide islet', () => {
+  const worlds = [1, 2, 3, 4, 5, 6].map((seed) => generateWorld(new Rng(seed)));
+
+  it('puts an islet off the coast, joined by a short straight sandbar, with 3 tar barrels on it', () => {
+    for (const { map, start, objects } of worlds) {
+      const bar = [...objects].filter(([, o]) => OBJECTS[o.kind].tidal).map(([i]) => i);
+      expect(bar.length).toBeGreaterThanOrEqual(2);
+      expect(bar.length).toBeLessThanOrEqual(5);
+      for (const i of bar) expect(map.tiles[i]).toBe(Tile.Water);
+      const xs = new Set(bar.map((i) => i % map.width));
+      const ys = new Set(bar.map((i) => Math.floor(i / map.width)));
+      expect(xs.size === 1 || ys.size === 1).toBe(true);
+
+      // Only the sandbar leads to the islet.
+      const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
+      const way = (withBar: boolean) => (x: number, y: number) => {
+        const o = objects.get(map.idx(x, y));
+        if (o && OBJECTS[o.kind].tidal) return withBar;
+        return map.isFloor(x, y) && (!o || o.kind === 'bramble');
+      };
+      const dry = reachWithBridges(map, start.x, start.y, way(true), isRiver);
+      const wet = reachWithBridges(map, start.x, start.y, way(false), isRiver);
+      const islet = [...dry.keys()].filter((i) => dry[i] && !wet[i] && map.tiles[i] !== Tile.Water);
+      expect(islet.length).toBeGreaterThan(10);
+      const nextToIslet = (i: number) => {
+        const x = i % map.width;
+        const y = (i - x) / map.width;
+        return islet.some((j) => Math.max(Math.abs((j % map.width) - x), Math.abs(Math.floor(j / map.width) - y)) === 1);
+      };
+      const barrels = [...objects].filter(([, o]) => o.kind === 'barrel').map(([i]) => i);
+      expect(barrels).toHaveLength(3);
+      for (const i of barrels) expect(nextToIslet(i)).toBe(true);
+    }
+  });
+
+  it('gives island 2 snowy spruces for resin, and no islet', () => {
+    for (const seed of [1, 2, 3]) {
+      const { objects } = generateWorld(new Rng(seed), WORLD_WIDTH, WORLD_HEIGHT, 2);
+      const kinds = [...objects.values()].map((o) => o.kind);
+      expect(kinds.filter((k) => k === 'tree_spruce_snow').length).toBeGreaterThanOrEqual(4);
+      expect(kinds.some((k) => OBJECTS[k].tidal || k === 'barrel')).toBe(false);
+    }
+  });
+});
+
+describe('Game: the tide and the sandbar', () => {
+  /** A sandbar of 3 cells east of the explorer over open sea, with dry sand after it. */
+  function sandbar(seed: number): Game {
+    const game = sandbox(seed);
+    const { x, y } = game.player;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = 1; dx <= 3; dx++) {
+        game.map.set(x + dx, y + dy, Tile.Water);
+        game.objects.delete(game.map.idx(x + dx, y + dy));
+      }
+      game.map.set(x + 4, y + dy, Tile.Sand);
+      game.objects.delete(game.map.idx(x + 4, y + dy));
+    }
+    for (let dx = 1; dx <= 3; dx++) place(game, dx, 0, 'sandbar_ew');
+    return game;
+  }
+  const at = (hour: number) => (hour - 8) * 10 + (hour < 8 ? TURNS_PER_DAY : 0);
+
+  it('has low tide from 5 to 11 and from 17 to 23', () => {
+    expect([4, 5, 10, 11, 16, 17, 22, 23].map((h) => isLowTide(at(h)))).toEqual([false, true, true, false, false, true, true, false]);
+    expect(nextLowTide(at(11))).toBe(at(17));
+    expect(nextLowTide(at(6))).toBe(at(6));
+  });
+
+  it('lets you walk over the sandbar at low tide only', () => {
+    const game = sandbar(80);
+    const { x, y } = game.player;
+    game.turn = at(8);
+    expect(game.isPassable(x + 1, y)).toBe(true);
+    expect(game.objectSprite(game.objectAt(x + 1, y)!)).toBe('sandbar_ew');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.player.x).toBe(x + 1);
+    game.turn = at(12);
+    expect(game.isPassable(x + 2, y)).toBe(false);
+    expect(game.objectSprite(game.objectAt(x + 2, y)!)).toBe('sandbar_ew_wet');
+  });
+
+  it('says when low tide comes back if you walk into the flooded sandbar, and no time passes', () => {
+    const game = sandbar(81);
+    game.inventory.add('fishing_rod');
+    game.turn = at(12);
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(at(12));
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tideHigh', turn: at(17) });
+  });
+
+  it('sends you back to dry land, wet and cold, when the tide comes in over the sandbar', () => {
+    const game = sandbar(82);
+    const { x } = game.player;
+    game.player.x = x + 3;
+    game.turn = at(11) - 1;
+    const warmth = game.needs.warmth;
+    game.wait();
+    expect(game.player.x).toBe(x + 4);
+    expect(game.map.isFloor(game.player.x, game.player.y)).toBe(true);
+    expect(game.needs.warmth).toBeLessThan(warmth - 13);
+    expect(game.log.some((m) => m.msg.key === 'tideWade')).toBe(true);
+  });
+
+  it('tells you when the tide turns, once you have seen the sandbar', () => {
+    const game = sandbar(83);
+    game.turn = at(11) - 1;
+    for (const [i, o] of game.objects) if (OBJECTS[o.kind].tidal) game.map.explored[i] = 0;
+    // Far from the sandbar: nothing to say.
+    const away = { ...game.player };
+    game.player.x -= 30;
+    game.wait();
+    expect(game.tideKnown()).toBe(false);
+    expect(game.log.some((m) => m.msg.key === 'tideIn')).toBe(false);
+    Object.assign(game.player, away);
+    game.wait();
+    expect(game.tideKnown()).toBe(true);
+    game.turn = at(17) - 1;
+    game.wait();
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tideOut' });
+  });
+});
+
+describe('Game: sleeping cave bears', () => {
+  function cave(seed: number, bearDx: number): { game: Game; bear: Game['animals'][number] } {
+    const game = sandbox(seed);
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -16; dx <= 6; dx++) {
+        game.map.set(game.player.x + dx, game.player.y + dy, Tile.CaveFloor);
+        game.objects.delete(game.map.idx(game.player.x + dx, game.player.y + dy));
+      }
+    }
+    const bear = { id: 99, kind: 'bear' as const, x: game.player.x + bearDx, y: game.player.y, facing: 'down' as const, flee: 0 };
+    game.animals = [bear];
+    // Look round the cave in the day, while the bear sleeps.
+    game.turn = 10;
+    game.wait();
+    return { game, bear };
+  }
+
+  it('sleep through the day: they do not move, notice you or hurt you', () => {
+    const { game, bear } = cave(90, 1);
+    game.turn = 10;
+    game.skills.add('wild_sense');
+    for (let i = 0; i < 30; i++) game.wait();
+    expect(game.asleep(bear)).toBe(true);
+    expect(bear.x - game.player.x).toBe(1);
+    expect(game.needs.health).toBe(100);
+    expect(game.dangerCells().size).toBe(0);
+  });
+
+  it('wake up when you shoo them, and lie down again later', () => {
+    const { game, bear } = cave(91, 1);
+    game.turn = 10;
+    game.move(1, 0);
+    expect(game.asleep(bear)).toBe(false);
+    for (let i = 0; i < 12; i++) game.wait();
+    expect(game.asleep(bear)).toBe(true);
+  });
+
+  it('prowl after you at night, but give up after a few turns', () => {
+    const { game, bear } = cave(92, 3);
+    game.turn = nightTurn();
+    game.wait();
+    expect(game.log.some((m) => m.msg.key === 'alert' && m.msg.animal === 'bear')).toBe(true);
+    expect(bear.x - game.player.x).toBe(2);
+    // Walk away: the bear follows for a while, then stops.
+    let gaveUp = false;
+    for (let i = 0; i < 10; i++) {
+      game.move(-1, 0);
+      if (bear.flee > 0) gaveUp = true;
+    }
+    expect(gaveUp).toBe(true);
+    expect(game.needs.health).toBe(100);
+    expect(game.log.filter((m) => m.msg.key === 'alert').length).toBe(1);
+  });
+
+  it('stop following you when you leave their cave', () => {
+    const { game, bear } = cave(93, 3);
+    game.turn = nightTurn();
+    game.wait();
+    expect(bear.chase).toBeGreaterThan(0);
+    game.map.set(game.player.x - 1, game.player.y, Tile.Sand);
+    game.move(-1, 0);
+    expect(bear.chase).toBe(0);
+    expect(bear.flee).toBeGreaterThan(0);
+  });
+});
+
+describe('Game: rare materials for the goal', () => {
+  const [hull] = LEVELS[0].stages;
+  const tinder = LEVELS[1].stages[2];
+
+  it('old tar barrels give tar one time', () => {
+    const game = sandbox(100);
+    place(game, 1, 0, 'barrel');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('tar')).toBe(2);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('barrel_empty');
+    expect(game.move(1, 0)).toBe(false);
+  });
+
+  it('the hull needs tar, except on an island without tar barrels (from an old save)', () => {
+    const game = boatNextTo(sandbox(101));
+    expect(game.goal()).toMatchObject({ left: { wood: 20, stone: 6, tar: 4 } });
+    // Empty barrels still count: the tar went into your bag.
+    for (const [i, o] of game.objects) if (o.kind === 'barrel') game.objects.set(i, { kind: 'barrel_empty' });
+    expect(game.stageCost(hull)).toEqual(hull.cost);
+    for (const [i, o] of game.objects) if (o.kind.startsWith('barrel')) game.objects.delete(i);
+    expect(game.goal()).toMatchObject({ left: { wood: 20, stone: 6 } });
+  });
+
+  it('the beacon tinder needs resin, which snowy spruces sometimes give', () => {
+    const game = sandbox(102);
+    place(game, 1, 0, 'tree_spruce_snow');
+    expect(game.stageCost(tinder)).toEqual({ leaves: 12, wood: 4, resin: 3 });
+    for (let i = 0; i < 30 && !game.inventory.count('resin'); i++) {
+      game.objectAt(game.player.x + 1, game.player.y)!.readyAt = undefined;
+      game.move(1, 0);
+    }
+    expect(game.inventory.count('resin')).toBe(1);
+    for (const [i, o] of game.objects) if (o.kind === 'tree_spruce_snow') game.objects.delete(i);
+    expect(game.stageCost(tinder)).toEqual({ leaves: 12, wood: 4 });
+  });
+});
+
+describe('Game: island stars', () => {
+  it('lists three stars for each island, none earned at the start', () => {
+    const game = sandbox(110);
+    expect(game.starStates().map((s) => [s.id, s.done])).toEqual([['chests', false], ['fish', false], ['safe', false]]);
+    expect(LEVELS[1].stars).toEqual(['chests', 'explore', 'safe']);
+  });
+
+  it('gives the Angler star and 5 XP for 5 fish caught on this island', () => {
+    const game = sandbox(111);
+    game.map.set(game.player.x + 1, game.player.y, Tile.Water);
+    game.inventory.add('fishing_rod');
+    for (let i = 0; i < 200 && game.fishHere < 5; i++) game.move(1, 0);
+    expect(game.fishHere).toBe(5);
+    expect(game.hasStar('fish')).toBe(true);
+    expect(game.log.some((m) => m.msg.key === 'star' && m.msg.star === 'fish')).toBe(true);
+    // Nothing more for more fish.
+    const stars = game.stars.length;
+    for (let i = 0; i < 20; i++) game.move(1, 0);
+    expect(game.stars.length).toBe(stars);
+  });
+
+  it('gives the Treasure hunter star for opening every chest', () => {
+    const game = sandbox(112);
+    for (const [i, o] of game.objects) if (o.kind === 'chest_closed') game.objects.set(i, { kind: 'chest_open' });
+    place(game, 1, 0, 'chest_closed');
+    game.wait();
+    expect(game.hasStar('chests')).toBe(false);
+    const xp = game.xp;
+    game.move(1, 0);
+    expect(game.hasStar('chests')).toBe(true);
+    expect(game.xp).toBe(xp + 1 + 5);
+  });
+
+  it('gives Safe and sound after 3 days in a row without fainting; fainting starts the count again', () => {
+    const game = sandbox(113);
+    game.turn = 2 * TURNS_PER_DAY;
+    game.wait();
+    expect(game.starStates().find((s) => s.id === 'safe')).toMatchObject({ have: 2, need: 3, done: false });
+    Object.assign(game.needs, { health: 0, food: 0 });
+    game.wait();
+    expect(game.log.some((m) => m.msg.key === 'faint')).toBe(true);
+    expect(game.starStates().find((s) => s.id === 'safe')).toMatchObject({ have: 0 });
+    game.turn += 3 * TURNS_PER_DAY;
+    game.wait();
+    expect(game.hasStar('safe')).toBe(true);
+  });
+
+  it('counts how much of the island you explored', () => {
+    const game = sandbox(114);
+    const progress = () => (game as unknown as { starProgress(id: string): { have: number; need: number } }).starProgress('explore');
+    expect(progress()).toMatchObject({ need: 75 });
+    expect(progress().have).toBeLessThan(10);
+    game.map.explored.fill(1);
+    expect(progress().have).toBe(75);
+  });
+
+  it('keeps stars in the save, and loads version 7 saves with none', () => {
+    const game = sandbox(115);
+    game.stars.push([1, 'chests']);
+    game.fishHere = 3;
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.stars).toEqual([[1, 'chests']]);
+    expect(copy.fishHere).toBe(3);
+    const { stars: _s, fishHere: _f, safeSince: _a, ...v7 } = { ...game.toSave(), v: 7 };
+    const old = Game.fromSave(JSON.parse(JSON.stringify(v7)));
+    expect(old.stars).toEqual([]);
+    expect(old.safeSince).toBe(game.turn);
+  });
+});
+
+describe('Game: islands from before the tide islet', () => {
+  it('can start a new island 1 and keep the bag, XP, skills, stars and dog', () => {
+    const game = sandbox(120);
+    expect(game.oldIsland).toBe(false);
+    for (const [i, o] of game.objects) if (OBJECTS[o.kind].tidal || o.kind.startsWith('barrel')) game.objects.delete(i);
+    expect(game.oldIsland).toBe(true);
+    game.inventory.add('wood', 7);
+    game.inventory.add('axe');
+    game.xp = 40;
+    game.learn('small_sips');
+    game.stars.push([1, 'fish']);
+    game.dog = { id: 5, x: game.player.x + 1, y: game.player.y, facing: 'left', food: 50, water: 50, tired: false };
+
+    const fresh = Game.newIslandKeeping(game);
+    expect(fresh.oldIsland).toBe(false);
+    expect(fresh.seed).not.toBe(game.seed);
+    expect(fresh.inventory.count('wood')).toBe(game.inventory.count('wood'));
+    expect(fresh.inventory.count('axe')).toBe(1);
+    expect(fresh.xp).toBe(40);
+    expect(fresh.has('small_sips')).toBe(true);
+    expect(fresh.stars).toEqual([[1, 'fish']]);
+    expect(fresh.dog).toMatchObject({ food: 50, water: 50 });
+    expect(Math.max(Math.abs(fresh.dog!.x - fresh.player.x), Math.abs(fresh.dog!.y - fresh.player.y))).toBe(1);
+    expect(fresh.animals.some((a) => a.kind === 'dog')).toBe(false);
+    expect(fresh.animals.some((a) => a.id === fresh.dog!.id)).toBe(false);
+    expect(fresh.goal()).toEqual({ state: 'find' });
+  });
+});
+
 function sandbox(seed: number): Game {
   const game = new Game(seed);
   const { map } = game;

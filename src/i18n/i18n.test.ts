@@ -28,7 +28,9 @@ function everyMessage(): Msg[] {
     { key: 'climb', obj: 'ledge_ladder' }, { key: 'climb', obj: 'ice_wall_rope' },
     { key: 'climb', obj: 'ledge_ladder', easy: true }, { key: 'climb', obj: 'ice_wall_rope', easy: true },
     { key: 'make', item: 'rope', count: 2 }, { key: 'mapHint' },
+    { key: 'tideOut' }, { key: 'tideIn' }, { key: 'tideHigh', turn: 90 }, { key: 'tideWade' },
   ];
+  for (const star of ['chests', 'fish', 'explore', 'safe'] as const) msgs.push({ key: 'star', star });
   for (const level of [1, 2] as const) {
     msgs.push({ key: 'goalReady', level }, { key: 'sailAway', level }, { key: 'landIsland', level });
   }
@@ -113,6 +115,11 @@ describe('i18n', () => {
     expect(de.message({ key: 'goalNeeds', stage: 'hull', left: [['stone', 6]] })).toBe('Das Boot braucht 6 Steine für den Rumpf.');
     expect(de.message({ key: 'gather', obj: 'tree_apple', got: [['apple', 2]] })).toBe('Du pflückst Äpfel und bekommst 2 Äpfel.');
     expect(de.message({ key: 'look', obj: 'beacon_site' })).toBe('Ein alter Steinkreis.');
+    expect(de.message({ key: 'tideHigh', turn: 90 })).toBe('Die Sandbank ist unter Wasser. Um 17:00 Uhr ist wieder Ebbe.');
+    expect(en.message({ key: 'tideHigh', turn: 90 })).toBe('The sandbar is under water. Low tide comes back at 17:00.');
+    expect(de.message({ key: 'gather', obj: 'barrel', got: [['tar', 2]] })).toBe('Du schöpfst Teer aus dem alten Fass und bekommst 2 Töpfe Teer.');
+    expect(de.message({ key: 'look', obj: 'barrel_empty' })).toBe('Ein leeres Fass.');
+    expect(de.message({ key: 'star', star: 'chests' })).toBe('Du hast einen Stern verdient: Schatzsucher!');
     expect(de.message({ key: 'dogBark', animal: 'monkey' })).toBe('Wuff! Dein Hund bellt, und der Affe rennt weg.');
     expect(de.message({ key: 'dogAdopt', item: 'fish' })).toBe(
       'Du gibst dem Hund einen Fisch. Er wedelt mit dem Schwanz und folgt dir. Du hast einen Hund!',
