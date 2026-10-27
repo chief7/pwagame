@@ -102,6 +102,7 @@ const NEEDS = { health: 'Health', food: 'Food', water: 'Water', energy: 'Energy'
 
 const a = (word: string) => (/^[aeiou]/.test(word) ? `an ${word}` : `a ${word}`);
 const obj = (kind: ObjectKind) => OBJECT[kind].name;
+const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
 
 function itemCount(id: keyof typeof ITEM, count: number): string {
   return count === 1 ? a(ITEM[id].one) : `${count} ${ITEM[id].many}`;
@@ -249,6 +250,8 @@ export const en: Strings = {
     climbing_rope: { name: 'Climbing rope', description: 'Gets you up a wall of ice near the peak. Stand next to the wall to build it.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
+  objectName: (kind) => cap(OBJECT[kind].name),
+  animalName: (kind) => cap(ANIMAL[kind].name),
   stages: { hull: 'Hull', mast: 'Mast', sail: 'Sail', supplies: 'Supplies', base: 'Stone base', pyre: 'Wood pile', tinder: 'Tinder' },
   skills: {
     small_sips: { name: 'Small sips', description: 'Your water goes down 20% slower.' },

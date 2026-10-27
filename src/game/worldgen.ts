@@ -62,12 +62,12 @@ const SANDBAR = { min: 2, max: 5 };
 /** Sea cells kept round the islet, so it never touches other land. */
 const ISLET_GAP = 2;
 /** What stands on the islet: old tar barrels, a palm for food and drink, a chest. */
-const ISLET_OBJECTS: ObjectKind[] = ['barrel', 'barrel', 'barrel', 'palm_tall', 'chest_closed'];
+export const ISLET_OBJECTS: ObjectKind[] = ['barrel', 'barrel', 'barrel', 'palm_tall', 'chest_closed'];
 
-type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow';
+export type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow';
 
 /** What grows where, as chance per free cell, for each kind of island. */
-const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
+export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
   tropical: {
     sand: [
       ['palm_tall', 0.03], ['palm_leaning', 0.025], ['palm_young', 0.015],

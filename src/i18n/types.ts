@@ -130,6 +130,9 @@ export interface Strings {
   recipes: Record<RecipeId, { name: string; description: string }>;
   paths: Record<PathId, string>;
   skills: Record<SkillId, { name: string; description: string }>;
+  /** Names as a heading or list entry, with no article: "Young palm", "Junge Palme". */
+  objectName(kind: ObjectKind): string;
+  animalName(kind: AnimalKind): string;
   /** Names of the goal's stages: "Hull". */
   stages: Record<StageId, string>;
   /** Bag line: "3 × coconuts". */
