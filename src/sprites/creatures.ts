@@ -475,6 +475,32 @@ export function itemIcons(): Sprite[] {
         s.set(x0 + 11, y0 + 2, P.woodDark);
       }
     }),
+    icon('log', (s) => {
+      // Two thick chopped logs, one on the other, with round cut ends to the right.
+      for (const [x0, x1, cy] of [[1, 10, 11], [3, 9, 5.5]]) {
+        for (let y = Math.floor(cy - 3); y < Math.ceil(cy + 3); y++) {
+          const dy = y + 0.5 - cy;
+          if (Math.abs(dy) > 2.8) continue;
+          for (let x = x0; x <= x1; x++) {
+            const bark = dy < -1.6 ? P.woodLight : dy > 1.4 ? P.woodDeep : hash2(x, y, 31) < 0.25 ? P.woodDark : P.wood;
+            s.set(x, y, bark);
+          }
+        }
+        // The cut end: pale wood in a bark rim, with a ring round the pith.
+        const end = [
+          '.dd..',
+          'dccd.',
+          'dcrcd',
+          'drcrd',
+          'dcrcd',
+          '.dcd.',
+        ];
+        const top = Math.round(cy - 3);
+        end.forEach((row, r) => [...row].forEach((ch, c) => {
+          if (ch !== '.') s.set(x1 - 1 + c, top + r, ch === 'd' ? P.woodDark : ch === 'r' ? P.woodRing : P.woodCut);
+        }));
+      }
+    }),
     icon('leaves', (s) => {
       // A frond: midrib on a diagonal with leaflets either side.
       for (let i = 0; i <= 10; i++) {
