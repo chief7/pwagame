@@ -1,0 +1,693 @@
+@import '../fonts.css';
+
+/* The Island Compendium. Same colours as the game, plus a light theme. */
+
+:root {
+  color-scheme: dark;
+  --bg: #0b0d10;
+  --panel: #14181d;
+  --raised: #1d232a;
+  --border: #262c33;
+  --text: #e2dccd;
+  --muted: #8b8577;
+  --accent: #f2c14e;
+  --link: #f2c14e;
+  --good: #8fd18b;
+  --warn: #ff9a7a;
+  --health: #ef6f6c;
+  --food: #f2a541;
+  --water: #4fb3d9;
+  --energy: #b39ddb;
+  --warmth: #ff7f50;
+  --track: #2a2f36;
+  --night: #1b2440;
+  --dawn: #b77a6a;
+  --day: #f2d27a;
+  --dusk: #8a5a8c;
+  --low: #e6d3a3;
+  --high: #3a7fb0;
+  --bear: #6b4b34;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f4efe3;
+    --panel: #fffaf0;
+    --raised: #f0e8d6;
+    --border: #ddd2bb;
+    --text: #2b2620;
+    --muted: #6f6656;
+    --accent: #a8741a;
+    --link: #8a5a10;
+    --good: #3f8a3a;
+    --warn: #b9472a;
+    --track: #e4dac5;
+    --night: #34406a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.55 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.toc,
+.play,
+.lang {
+  font-family: 'Pixelify Sans', ui-monospace, Menlo, Consolas, monospace;
+  /* The font's fi and fl ligatures draw as a wrong glyph. */
+  font-variant-ligatures: none;
+}
+
+h1 {
+  font-size: clamp(28px, 6vw, 44px);
+  line-height: 1.1;
+  margin: 0 0 8px;
+  color: var(--accent);
+}
+
+h2 {
+  font-size: 26px;
+  margin: 0 0 12px;
+  scroll-margin-top: 16px;
+}
+
+h3 {
+  font-size: 19px;
+  margin: 22px 0 8px;
+}
+
+h4 {
+  font-size: 17px;
+  margin: 0;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+a {
+  color: var(--link);
+}
+
+strong {
+  font-weight: 650;
+}
+
+small {
+  color: var(--muted);
+}
+
+.sprite,
+.hero-sprite {
+  image-rendering: pixelated;
+  flex: none;
+  vertical-align: middle;
+}
+
+#wiki {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 16px max(16px, env(safe-area-inset-left)) 40px max(16px, env(safe-area-inset-right));
+}
+
+/* ---- Header ----------------------------------------------------------------------- */
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.play,
+.lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 16px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.play {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1408;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--panel), var(--raised));
+  border: 1px solid var(--border);
+}
+
+.hero > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.tagline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+}
+
+@media (max-width: 600px) {
+  .hero-sprite:last-child {
+    display: none;
+  }
+  .hero-sprite {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ---- Layout ----------------------------------------------------------------------- */
+
+main {
+  display: grid;
+  gap: 20px;
+}
+
+.card {
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.toc {
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.toc h2 {
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.toc ol {
+  margin: 0;
+  padding-left: 22px;
+  columns: 3 180px;
+  column-gap: 24px;
+}
+
+.toc li {
+  padding: 3px 0;
+  break-inside: avoid;
+}
+
+.tip {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--raised);
+  border-left: 4px solid var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.note {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+footer {
+  margin-top: 28px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+ol,
+ul {
+  padding-left: 22px;
+  margin: 0 0 12px;
+}
+
+li {
+  margin: 4px 0;
+}
+
+/* ---- Tables ----------------------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 0 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+th,
+td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  background: var(--raised);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+.named {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.sprites {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.chip small {
+  margin-left: 2px;
+}
+
+.bar-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-track {
+  display: inline-block;
+  width: 60px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.mini-bar {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.mini-bar.need-food { background: var(--food); }
+.mini-bar.need-warmth { background: var(--warmth); }
+
+/* ---- Needs ------------------------------------------------------------------------ */
+
+.needs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.need {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--raised);
+  border-top: 5px solid var(--need, var(--accent));
+  font-size: 15px;
+}
+
+.need h3 {
+  margin: 0 0 8px;
+  color: var(--need);
+}
+
+.need p {
+  margin: 0 0 6px;
+}
+
+.need .up { color: var(--good); }
+.need .down { color: var(--warn); }
+
+.need-health { --need: var(--health); }
+.need-food { --need: var(--food); }
+.need-water { --need: var(--water); }
+.need-energy { --need: var(--energy); }
+.need-warmth { --need: var(--warmth); }
+
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--raised);
+  border: 1px solid var(--need, var(--border));
+  color: var(--need, var(--text));
+  white-space: nowrap;
+}
+
+/* ---- Timeline --------------------------------------------------------------------- */
+
+.timeline {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 10px;
+}
+
+.tl-row {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.tl-cells {
+  display: grid;
+  grid-template-columns: repeat(24, 1fr);
+  gap: 1px;
+}
+
+.tl-cell {
+  display: block;
+  height: 22px;
+  border-radius: 2px;
+}
+
+.tl-hours span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ph-night { background: var(--night); }
+.ph-dawn { background: var(--dawn); }
+.ph-day { background: var(--day); }
+.ph-dusk { background: var(--dusk); }
+.low { background: var(--low); }
+.high { background: var(--high); }
+.bear-sleep { background: var(--bear); }
+.bear-awake { background: var(--track); }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend i {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 600px) {
+  .tl-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .tl-label:empty {
+    display: none;
+  }
+}
+
+/* ---- Items ------------------------------------------------------------------------ */
+
+.item-grid,
+.animal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.item,
+.animal {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  font-size: 15px;
+}
+
+.item p {
+  margin: 6px 0 0;
+}
+
+.item-head,
+.animal-head,
+.path-head,
+.island-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.island-head h3,
+.path-head h3 {
+  margin: 0;
+}
+
+.eat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.item-rare {
+  border-color: var(--accent);
+}
+
+/* ---- Skills ----------------------------------------------------------------------- */
+
+.points {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.point {
+  display: grid;
+  text-align: center;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.point strong {
+  color: var(--energy);
+  font-size: 18px;
+}
+
+.paths {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.path {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--raised);
+}
+
+.skill-list {
+  padding-left: 22px;
+}
+
+.skill-list li {
+  margin: 0 0 12px;
+}
+
+.skill-list p {
+  margin: 2px 0 0;
+  font-size: 15px;
+}
+
+.skill-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.combo {
+  color: var(--muted);
+}
+
+/* ---- Animals ---------------------------------------------------------------------- */
+
+.animal.wild {
+  border-color: var(--warn);
+}
+
+.animal ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.animal li {
+  margin: 2px 0;
+}
+
+.dog-sprites {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.arrow {
+  font-size: 24px;
+  color: var(--muted);
+  align-self: center;
+}
+
+/* ---- Islands ---------------------------------------------------------------------- */
+
+.island {
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: 12px;
+  background: var(--raised);
+}
+
+.island h4 {
+  margin: 14px 0 8px;
+}
+
+.island .table-wrap {
+  background: var(--panel);
+}
+
+.stars {
+  list-style: none;
+  padding: 0;
+}
+
+.stars li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---- How it fits together --------------------------------------------------------- */
+
+.chains {
+  display: grid;
+  gap: 14px;
+}
+
+.chain h3 {
+  margin: 0 0 8px;
+}
+
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: step;
+}
+
+.flow li {
+  position: relative;
+  margin: 0;
+  padding: 8px 12px 8px 34px;
+  border-radius: 10px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  font-size: 15px;
+  counter-increment: step;
+}
+
+.flow li::before {
+  content: counter(step);
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #1a1408;
+  font: 12px/20px 'Pixelify Sans', monospace;
+  text-align: center;
+}
+
+.flow li:not(:last-child)::after {
+  content: '→';
+  margin-left: 8px;
+  color: var(--muted);
+}

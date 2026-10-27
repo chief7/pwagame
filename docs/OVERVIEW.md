@@ -1234,6 +1234,15 @@ also have a plural (`große Blätter`) and short forms for floating numbers.
 add it to `LANGUAGES` in `src/i18n/index.ts`, and add it to the `Lang`
 type. The language button then needs a menu instead of a toggle.
 
+**The Island Compendium** (`wiki/index.html`, served at `<site>/wiki/`) is a
+guide for players in both languages. Its explanations are in
+`src/wiki/text.ts`. Names of objects and animals come from `objectName()` and
+`animalName()` in `Strings`. Its tables (food, gathering, items, recipes,
+skills, animals, goal stages, warmth and sleep) are read from the registries
+and from `needs.ts`, so they follow the game. When you add content, check
+that the compendium text still fits (for example the chains in
+`together`). It uses the language of the game (`pwagame.lang`) or `?lang=`.
+
 **Not translated:** the sprite gallery and preview pages (developer tools)
 and the app name in the web manifest.
 

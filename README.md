@@ -7,6 +7,9 @@ is our own TypeScript on a 2D canvas.
 
 Play it at https://chief7.github.io/pwagame/.
 
+The **Island Compendium** (English and German) explains the mechanics, items,
+skills and animals for players: https://chief7.github.io/pwagame/wiki/.
+
 For architecture and mechanics in detail, see [docs/OVERVIEW.md](docs/OVERVIEW.md).
 
 ## Run
@@ -23,7 +26,8 @@ npm run preview   # serve the build (service worker is only active here)
 
 - `main` is the published game: GitHub Pages serves it at the site root.
 - `preview` is for testing. Push (or merge) updates there. The checks run,
-  and then Pages also serves the preview at `<site>/preview/`. It keeps its
+  and then Pages also serves the preview at `<site>/preview/` (its
+  compendium at `<site>/preview/wiki/`). It keeps its
   own save, so it does not touch the save of the main game.
 - To publish everything that is on `preview` at once, merge it into `main`:
 
@@ -178,6 +182,9 @@ src/
     animator.ts  turns game events into tweens, lunges, flashes, floating text, fades
     input.ts     keyboard mapping and tap/hold direction helper
   main.ts      HUD, Bag/Build/Skills panels, input, render loop, autosave
+  wiki/        the Island Compendium page (wiki/index.html): player guide in English and German
+    text.ts      its explanations; names come from src/i18n/, numbers from the game data
+    data.ts      tables read from the registries (gathering, items, animals)
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art

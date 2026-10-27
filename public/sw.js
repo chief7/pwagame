@@ -19,6 +19,17 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
+  // Other pages next to the game (the compendium in wiki/) must not replace
+  // the game's cached index.html.
+  const scope = new URL(self.registration.scope).pathname;
+  const path = new URL(request.url).pathname;
+  const isGame = path === scope || path === `${scope}index.html`;
+
+  if (request.mode === 'navigate' && !isGame) {
+    event.respondWith(fetch(request).catch(() => caches.match(request)));
+    return;
+  }
+
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

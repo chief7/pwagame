@@ -59,6 +59,8 @@ function phrase(noun: Noun, c: Case, det: Det, adj = noun.adj): string {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+/** A noun with no article, as a heading: "Junge Palme", "Streunender Hund". */
+const name = (noun: Noun) => cap(phrase(noun, 'nom', 'a').replace(/^(ein|eine) /, ''));
 /** "in dem" → "im", "in das" → "ins", "an dem" → "am". */
 const contract = (s: string) => s.replace(/^(in|an) dem /, (_, p: string) => (p === 'in' ? 'im ' : 'am ')).replace(/^in das /, 'ins ');
 
@@ -290,6 +292,8 @@ export const de: Strings = {
     climbing_rope: { name: 'Kletterseil', description: 'Bringt dich über eine Eiswand nahe am Gipfel. Stell dich neben die Wand, um es zu bauen.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
+  objectName: (kind) => name(OBJECT[kind]),
+  animalName: (kind) => name(ANIMAL[kind]),
   stages: { hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte', base: 'Steinsockel', pyre: 'Holzstoß', tinder: 'Zunder' },
   skills: {
     small_sips: { name: 'Kleine Schlucke', description: 'Dein Wasser sinkt 20 % langsamer.' },
