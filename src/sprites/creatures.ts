@@ -256,6 +256,29 @@ export function bear(): Sprite[] {
   ], { b: P.bear, L: P.bearLight, d: P.bearDark, m: P.bearMuzzle, n: P.outline, e: P.outline }, 7);
 }
 
+/** A cave bear asleep in the day: curled up, head on its paws, snoring. */
+export function bearAsleep(): Sprite[] {
+  const sprite = creature('animal_bear_sleep', [
+    '..........zzz...',
+    '............z...',
+    '...........z....',
+    '..........zzz...',
+    '................',
+    '................',
+    '....bb....bb....',
+    '...bLLbbbbLLb...',
+    '..bbLbbbbbbLbb..',
+    '.bLLbbbbbbbbbbb.',
+    '.bLbeebbbbeebbb.',
+    '.bLbbbbmmmbbbbd.',
+    '.bbbbbmmnmmbbbd.',
+    '.bbddmmmmmmmddd.',
+    '..dLLLddddLLLdd.',
+    '................',
+  ], { b: P.bear, L: P.bearLight, d: P.bearDark, m: P.bearMuzzle, n: P.outline, e: P.outline, z: P.snowShade }, 7);
+  return [sprite, sprite.mirrored('animal_bear_sleep_left')];
+}
+
 export function rabbit(): Sprite[] {
   return animal('animal_rabbit', [
     '................',
@@ -386,7 +409,7 @@ export function dogFacings(): Sprite[] {
 }
 
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), rabbit(), squirrel(), goat(), strayDog(), dogFacings()].flat();
+  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), bearAsleep(), rabbit(), squirrel(), goat(), strayDog(), dogFacings()].flat();
 }
 
 // ---- Item icons -------------------------------------------------------------------
@@ -507,6 +530,37 @@ export function itemIcons(): Sprite[] {
       }
       for (const [x, y] of [[10, 5], [11, 4], [11, 6], [12, 5]]) s.set(x, y, P.leafDark);
       s.set(10, 4, P.leaf);
+    }),
+    icon('tar', (s) => {
+      // A little wooden pail of black, shiny tar, with a drip over the rim.
+      for (let y = 5; y <= 13; y++) {
+        const [x0, x1] = y <= 6 ? [3, 12] : y <= 11 ? [4, 11] : [5, 10];
+        for (let x = x0; x <= x1; x++) {
+          let c: string;
+          if (y === 5) c = x === x0 || x === x1 ? P.woodLight : x === 5 || x === 6 ? P.tarShine : P.tar;
+          else if (y === 6) c = x === x0 || x === x1 ? P.wood : P.tarLight;
+          else if (y === 8 || y === 12) c = x <= 5 ? P.hoopLight : P.hoop;
+          else c = x <= 5 ? P.woodLight : x >= 10 ? P.woodDark : (x - 4) % 3 === 2 ? P.woodDark : P.wood;
+          s.set(x, y, c);
+        }
+      }
+      for (let y = 6; y <= 9; y++) s.set(9, y, y === 9 ? P.tarLight : P.tar);
+    }),
+    icon('resin', (s) => {
+      // A drop of golden resin, round at the bottom, pointed at the top.
+      for (let y = 2; y <= 14; y++) {
+        for (let x = 2; x <= 13; x++) {
+          const dx = x + 0.5 - 8;
+          const dy = y + 0.5 - 10;
+          // Round below the middle, then narrowing to a point at the top.
+          const r = dy >= 0 ? 4.4 : 4.4 * (1 + dy / 8);
+          if (Math.abs(dx) > r || dy < -8 || Math.hypot(dx, Math.max(dy, 0)) > 4.4) continue;
+          const l = (-dx * 0.7 - dy * 0.5) / 4.4;
+          s.set(x, y, l > 0.45 ? P.resinLight : l > -0.35 ? P.resin : P.resinDark);
+        }
+      }
+      s.set(6, 9, P.goldLight);
+      s.set(6, 10, P.goldLight);
     }),
   ];
 }

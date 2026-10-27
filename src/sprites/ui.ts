@@ -78,10 +78,10 @@ export function appIcon(size = 32): Sprite {
   return s;
 }
 
-/** Skill point star and one badge for each skill path. */
-export function skillIcons(): Sprite[] {
-  const star = new Sprite('ui_star');
-  // Five points around (8, 8.5); the top-left half catches the light.
+/** A five-pointed star; the top-left half catches the light. */
+function starShape(name: string, light: string, mid: string): Sprite {
+  const star = new Sprite(name);
+  // Five points around (8, 8.5).
   const corners = Array.from({ length: 10 }, (_, k) => {
     const r = k % 2 ? 3 : 7.5;
     const t = -Math.PI / 2 + (k * Math.PI) / 5;
@@ -97,10 +97,20 @@ export function skillIcons(): Sprite[] {
         const [xj, yj] = corners[j];
         if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
       }
-      if (inside) star.set(x, y, px - 8 + (py - 8.8) * 0.6 < 0 ? P.goldLight : P.gold);
+      if (inside) star.set(x, y, px - 8 + (py - 8.8) * 0.6 < 0 ? light : mid);
     }
   }
-  star.outline();
+  return star.outline();
+}
+
+/** An island star still to earn: grey. An earned one is the gold `ui_star`. */
+export function starEmpty(): Sprite {
+  return starShape('ui_star_empty', P.stoneLight, P.stone);
+}
+
+/** Skill point star and one badge for each skill path. */
+export function skillIcons(): Sprite[] {
+  const star = starShape('ui_star', P.goldLight, P.gold);
   const arrow = fromRows('ui_path_improve', [
     '................',
     '.......LG.......',

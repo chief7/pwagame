@@ -292,3 +292,88 @@ export function ledge(aid: 'none' | 'ladder' = 'none'): Sprite {
 export function iceWall(aid: 'none' | 'rope' = 'none'): Sprite {
   return stepSprite(aid === 'none' ? 'ice_wall' : 'ice_wall_rope', ICE_COLORS, 62, aid);
 }
+
+/**
+ * An old barrel washed up on the tide islet, standing up, with sticky tar
+ * under its lid and running down its side.
+ */
+export function barrel(): Sprite {
+  const s = new Sprite('barrel');
+  const span = (y: number): [number, number] => (y === 3 || y === 14 ? [5, 10] : y === 4 || y === 13 ? [4, 11] : [3, 12]);
+  for (let y = 3; y <= 14; y++) {
+    const [x0, x1] = span(y);
+    for (let x = x0; x <= x1; x++) {
+      let c: string;
+      if (y <= 4) {
+        const rim = x === x0 || x === x1 || (y === 3 && (x === x0 + 1 || x === x1 - 1));
+        c = rim ? P.woodLight : y === 4 && (x === 6 || x === 7) ? P.tarShine : P.tar;
+      } else if (y === 6 || y === 12) {
+        c = x <= 5 ? P.hoopLight : P.hoop;
+      } else {
+        const seam = (x - 3) % 3 === 2;
+        c = x <= 4 ? P.woodLight : x >= 11 ? P.woodDark : seam ? P.woodDark : hash2(x, y, 63) < 0.12 ? P.woodDeep : P.wood;
+      }
+      s.set(x, y, c);
+    }
+  }
+  // Thick runs of tar down the front, from under the lid.
+  for (const [x, y0, y1] of [[7, 5, 9], [8, 5, 11], [9, 5, 7], [10, 5, 8]]) {
+    for (let y = y0; y <= y1; y++) s.set(x, y, y === y1 ? P.tarLight : P.tar);
+  }
+  s.set(7, 5, P.tarShine);
+  return s.outline().shadow(8, 15, 6.5, 1.2);
+}
+
+/** An empty barrel: tipped over on its side, the open end dark and bare. */
+export function barrelEmpty(): Sprite {
+  const s = new Sprite('barrel_empty');
+  for (let y = 7; y <= 14; y++) {
+    // A little bulge in the middle, like a barrel.
+    const [x0, x1] = y === 7 || y === 14 ? [3, 10] : [2, 11];
+    for (let x = x0; x <= x1; x++) {
+      const seam = (y - 7) % 3 === 2;
+      const hoop = x === 4 || x === 9;
+      s.set(x, y, hoop ? (y <= 9 ? P.hoopLight : P.hoop) : y <= 8 ? P.woodLight : y >= 13 ? P.woodDark : seam ? P.woodDark : P.wood);
+    }
+  }
+  // The open end, facing right: a rim of wood round the dark inside.
+  for (let y = 7; y <= 14; y++) {
+    for (let x = 11; x <= 14; x++) {
+      const d = Math.hypot((x + 0.5 - 12.5) / 2.2, (y + 0.5 - 11) / 4.1);
+      if (d > 1) continue;
+      s.set(x, y, d > 0.62 ? (y <= 9 ? P.woodCut : P.woodRing) : y <= 9 ? P.woodDeep : P.interior);
+    }
+  }
+  return s.outline().shadow(8, 15, 7, 1.2);
+}
+
+/**
+ * A sandbar between the tide islet and the island, along its walking way
+ * (`ns` north–south, `ew` east–west), 16×16 over a sea tile. Dry at low
+ * tide: wet sand with a line of foam. Under water at high tide (`wet`):
+ * only a lighter strip of shallow water shows where it is.
+ */
+export function sandbar(dir: 'ns' | 'ew', wet = false): Sprite {
+  const s = new Sprite(`sandbar_${dir}${wet ? '_wet' : ''}`);
+  for (let a = 0; a < 16; a++) {
+    // Period 16, so neighbouring cells of the bar line up.
+    const half = 4 + Math.sin((a / 16) * Math.PI * 2) * 0.9;
+    for (let b = 0; b < 16; b++) {
+      const [x, y] = dir === 'ns' ? [b, a] : [a, b];
+      const d = Math.abs(b + 0.5 - 8);
+      const n = hash2(x, y, wet ? 65 : 64);
+      let c: string | null = null;
+      if (wet) {
+        if (d < half - 0.5) c = n < 0.12 ? P.waterGlint : P.waterShallow;
+        else if (d < half + 0.8 && n < 0.55) c = P.waterShallow;
+      } else if (d < half - 0.6) {
+        // Wet sand, lighter where it dries in the middle.
+        c = n < 0.1 ? P.sandDark : n < 0.3 ? P.sandMid : d < 1.5 && n > 0.75 ? P.sand : P.sandWet;
+        if (n > 0.985) c = P.shell;
+      } else if (d < half + 0.4) c = P.foam;
+      else if (d < half + 1.8) c = n < 0.15 ? P.waterGlint : P.waterShallow;
+      s.set(x, y, c);
+    }
+  }
+  return s;
+}

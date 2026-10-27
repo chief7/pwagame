@@ -195,6 +195,16 @@ export const PALETTE = {
   collar: '#d6334a',
   collarTag: '#f2c14e',
 
+  // Rare goal materials: tar from old barrels (island 1), resin from snowy spruces (island 2).
+  tar: '#2b2620',
+  tarLight: '#4a4238',
+  tarShine: '#9a948a',
+  resin: '#e09a2c',
+  resinLight: '#ffd27a',
+  resinDark: '#a8621a',
+  hoop: '#5a5650',
+  hoopLight: '#8a857c',
+
   // The Cartographer's map: ink and washes on old paper.
   paper: '#ead8ae',
   paperLight: '#f5e8c6',

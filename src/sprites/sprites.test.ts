@@ -22,7 +22,7 @@ describe('sprites', () => {
 
   it('terrain tiles are opaque', () => {
     for (const [name, s] of buildSprites()) {
-      if (/^(water|sand|shore|grass|rock_|cave_|scree|snow|bank|river|mouth)/.test(name)) {
+      if (/^(water|sand(?!bar)|shore|grass|rock_|cave_|scree|snow|bank|river|mouth)/.test(name)) {
         expect(s.pixels.every((p) => p !== null)).toBe(true);
       }
     }

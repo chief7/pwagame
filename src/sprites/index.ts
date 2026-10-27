@@ -5,8 +5,8 @@ import {
   treeSpruce, treeSpruceSnow,
 } from './forest';
 import { beacon, boat, boatAway, bridge, campfire, hut, leanTo } from './structures';
-import { boulder, chestClosed, chestOpen, driftwood, iceWall, ledge, log, logPile, mossyStone, pebbles, spring, stalagmite } from './objects';
-import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons } from './ui';
+import { barrel, barrelEmpty, boulder, chestClosed, chestOpen, driftwood, iceWall, ledge, log, logPile, mossyStone, pebbles, sandbar, spring, stalagmite } from './objects';
+import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons, starEmpty } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
@@ -37,6 +37,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
+    { title: 'Tide islet', sprites: [sandbar('ns'), sandbar('ew'), sandbar('ns', true), sandbar('ew', true), barrel(), barrelEmpty()] },
     { title: 'River', sprites: [...river(), ...riverBankSet(), ...bankSets(), ...riverMouthSet(), bridge('ns'), bridge('ew')] },
     { title: 'Stones', sprites: [boulder(), pebbles(), mossyStone()] },
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
@@ -45,7 +46,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
     { title: 'Boat', sprites: [...boat(), ...boatAway()] },
     { title: 'Beacon', sprites: beacon() },
-    { title: 'Interface', sprites: [globe(), ...skillIcons(), ...grillButton(), appIcon()] },
+    { title: 'Interface', sprites: [globe(), ...skillIcons(), starEmpty(), ...grillButton(), appIcon()] },
     { title: 'Map', sprites: [mapIcon(), ...mapMarkers()] },
   ];
 }
