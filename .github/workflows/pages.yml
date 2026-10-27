@@ -3,10 +3,12 @@ name: Deploy to GitHub Pages
 # The site root is always the game on main. Branches in PREVIEWS are built
 # next to it, each in its own folder (<site>/<folder>/), so a change can be
 # played before it is merged. A preview keeps its own save (VITE_PREVIEW).
+# Only main may deploy: after a push to a preview branch, run this workflow
+# by hand (Actions → Deploy to GitHub Pages → Run workflow) to update it.
 
 on:
   push:
-    branches: [main, claude/camp-hut-improvements-xjv7ou]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
