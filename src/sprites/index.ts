@@ -1,11 +1,11 @@
 import { characterSet } from './characters';
-import { animalSet, itemIcons, skillItemIcons } from './creatures';
+import { animalSet, caveItemIcons, itemIcons, skillItemIcons } from './creatures';
 import {
   berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
   treeSpruce, treeSpruceSnow,
 } from './forest';
 import { beacon, boat, boatAway, bridge, campfire, hut, leanTo } from './structures';
-import { barrel, barrelEmpty, boulder, chestClosed, chestOpen, driftwood, iceWall, ledge, log, logPile, mossyStone, pebbles, sandbar, spring, stalagmite } from './objects';
+import { barrel, barrelEmpty, boulder, chestClosed, chestOpen, crystalCluster, driftwood, glowcap, glowcapPicked, iceWall, ledge, log, logPile, mossyStone, pebbles, sandbar, spring, stalagmite } from './objects';
 import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons, starEmpty } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
@@ -34,6 +34,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Mountains', sprites: [scree(), screeStones(), snow(), snowTracks(), ...snowEdgeSet()] },
     { title: 'Steep steps', sprites: [ledge(), ledge('ladder'), iceWall(), iceWall('rope')] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },
+    { title: 'Deep caves', sprites: [...glowcap(), glowcapPicked(), crystalCluster()] },
     { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
@@ -43,7 +44,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
     { title: 'Animals', sprites: animalSet() },
-    { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons()] },
+    { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons(), ...caveItemIcons()] },
     { title: 'Boat', sprites: [...boat(), ...boatAway()] },
     { title: 'Beacon', sprites: beacon() },
     { title: 'Interface', sprites: [globe(), ...skillIcons(), starEmpty(), ...grillButton(), appIcon()] },

@@ -296,5 +296,14 @@ export function mapMarkers(): Sprite[] {
     '.iiiii.',
     '..iii..',
   ], key);
-  return [you, hut, fire, spring, goal, bear].map(halo);
+  // A cave: a hill with a dark way in.
+  const cave = fromRows('map_cave', [
+    '...iii...',
+    '..i...i..',
+    '.i.....i.',
+    'i..iii..i',
+    'i.iiiii.i',
+    'iiiiiiiii',
+  ], key);
+  return [you, hut, fire, spring, goal, bear, cave].map(halo);
 }

@@ -205,6 +205,19 @@ export const PALETTE = {
   hoop: '#5a5650',
   hoopLight: '#8a857c',
 
+  // Deep caves: glowcaps (glowing mushrooms) and crystals.
+  glowcap: '#5fc8a8',
+  glowcapLight: '#a8f0d0',
+  glowcapDark: '#2f8a78',
+  glowcapGlow: '#e4fff2',
+  glowcapStem: '#c8d8c8',
+  glowcapStemShade: '#98aaa0',
+  crystal: '#9a8ae0',
+  crystalLight: '#d4ccff',
+  crystalDark: '#6a58b8',
+  crystalDeep: '#463a88',
+  crystalShine: '#f6f2ff',
+
   // The Cartographer's map: ink and washes on old paper.
   paper: '#ead8ae',
   paperLight: '#f5e8c6',

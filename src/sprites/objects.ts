@@ -377,3 +377,80 @@ export function sandbar(dir: 'ns' | 'ew', wet = false): Sprite {
   }
   return s;
 }
+
+// ---- Deep caves --------------------------------------------------------------------
+
+/** One glowcap: a pale stem under a round, glowing cap with bright spots. */
+function drawGlowcap(s: Sprite, cx: number, base: number, size: number, bright: boolean): void {
+  for (let y = base - size; y <= base; y++) {
+    s.set(cx, y, P.glowcapStem);
+    s.set(cx + 1, y, P.glowcapStemShade);
+  }
+  const top = base - size - 3;
+  for (let y = top; y <= top + 3; y++) {
+    const w = y === top ? size - 1 : y === top + 3 ? size + 1 : size;
+    for (let x = cx - w + 1; x <= cx + w; x++) {
+      const lit = x <= cx && y <= top + 1;
+      s.set(x, y, y === top + 3 ? P.glowcapDark : lit ? P.glowcapLight : P.glowcap);
+    }
+  }
+  s.set(cx - 1, top + 1, bright ? P.glowcapGlow : P.glowcapLight);
+  s.set(cx + 2, top + 2, bright ? P.glowcapLight : P.glowcapGlow);
+}
+
+/** A clump of glowing mushrooms; frame 2 lets the spots twinkle. */
+function glowcapShape(name: string, bright: boolean): Sprite {
+  const s = new Sprite(name);
+  drawGlowcap(s, 5, 13, 3, bright);
+  drawGlowcap(s, 11, 13, 2, !bright);
+  drawGlowcap(s, 8, 14, 1, bright);
+  return s.outline().shadow(8, 14.8, 6.5, 1);
+}
+
+export function glowcap(): Sprite[] {
+  return [glowcapShape('glowcap', false), glowcapShape('glowcap_2', true)];
+}
+
+/** Picked glowcaps: only the stubs of the stems are left. */
+export function glowcapPicked(): Sprite {
+  const s = new Sprite('glowcap_picked');
+  for (const [x, y0] of [[5, 11], [11, 12], [8, 13]]) {
+    for (let y = y0; y <= 14; y++) {
+      s.set(x, y, P.glowcapStem);
+      s.set(x + 1, y, P.glowcapStemShade);
+    }
+    s.set(x, y0, P.glowcapDark);
+  }
+  return s.outline().shadow(8, 14.8, 6, 1);
+}
+
+/** Crystals grow from a lump of cave rock: three six-sided shards, lit from the left. */
+export function crystalCluster(): Sprite {
+  const s = new Sprite('crystal_cluster');
+  // The rock they grow from.
+  for (let y = 11; y <= 14; y++) {
+    for (let x = 2; x <= 13; x++) {
+      const d = Math.hypot((x + 0.5 - 8) / 6, (y + 0.5 - 14) / 3.4);
+      if (d > 1) continue;
+      s.set(x, y, y === 11 || x < 5 ? P.rockLight : x > 10 ? P.rockFaceDark : hash2(x, y, 81) < 0.25 ? P.rockDark : P.rock);
+    }
+  }
+  // Shards: [base x, base y, top x, top y, half width].
+  const shards: [number, number, number, number, number][] = [[5, 12, 2.5, 6, 1.1], [11, 12, 13, 5, 1.1], [8, 12, 7.5, 1, 1.6]];
+  for (const [bx, by, tx, ty, hw] of shards) {
+    const len = by - ty;
+    for (let y = Math.floor(ty); y <= by; y++) {
+      const t = (y - ty) / len;
+      const cx = tx + (bx - tx) * t;
+      const w = t < 0.25 ? hw * (t / 0.25) : hw;
+      for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
+        const side = (x + 0.5 - cx) / (w + 0.5);
+        if (Math.abs(side) > 1) continue;
+        const c = side < -0.35 ? P.crystalLight : side > 0.4 ? P.crystalDark : P.crystal;
+        s.set(x, y, t < 0.25 && side > 0 ? P.crystalDark : c);
+      }
+    }
+  }
+  for (const [x, y] of [[7, 3], [7, 4], [3, 8], [12, 7]]) s.set(x, y, P.crystalShine);
+  return s.outline().shadow(8, 14.8, 6.5, 1.2);
+}

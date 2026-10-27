@@ -637,3 +637,58 @@ function fish(name: string, colors: Record<'L' | 'm' | 'b' | 'f', string>, grill
   }
   return sprite.outline();
 }
+
+/** Items from the deep caves: glowcaps, crystals and the crystal lantern made from them. */
+export function caveItemIcons(): Sprite[] {
+  const glowcap = icon('glowcap', (s) => {
+    for (let y = 9; y <= 13; y++) {
+      s.set(7, y, P.glowcapStem);
+      s.set(8, y, P.glowcapStemShade);
+    }
+    for (let y = 3; y <= 9; y++) {
+      const half = Math.min(5.5, 1.5 + (y - 3) * 1.4);
+      for (let x = Math.floor(7.5 - half); x <= Math.ceil(7.5 + half) - 1; x++) {
+        s.set(x, y, y === 9 ? P.glowcapDark : x < 8 && y < 7 ? P.glowcapLight : P.glowcap);
+      }
+    }
+    for (const [x, y] of [[5, 6], [9, 5], [11, 8], [7, 4]]) s.set(x, y, P.glowcapGlow);
+  });
+  const crystal = icon('crystal', (s) => {
+    // One six-sided shard, standing a little to the right.
+    for (let y = 1; y <= 14; y++) {
+      const cx = 7 + (y - 1) * 0.12;
+      const w = y < 4 ? (y - 1) * 0.9 : 2.8;
+      for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
+        const side = (x + 0.5 - cx) / (w + 0.5);
+        if (Math.abs(side) > 1) continue;
+        s.set(x, y, side < -0.35 ? P.crystalLight : side > 0.4 ? P.crystalDark : y === 14 ? P.crystalDark : P.crystal);
+      }
+    }
+    for (const [x, y] of [[6, 3], [5, 5], [5, 6]]) s.set(x, y, P.crystalShine);
+  });
+  const lantern = fromRows('item_lantern', [
+    '......hhh.......',
+    '.....h...h......',
+    '......wWw.......',
+    '.....wWWWd......',
+    '....wddddDd.....',
+    '....W.lLc.D.....',
+    '....W.Lcc.D.....',
+    '....WlLccdD.....',
+    '....W.Lcd.D.....',
+    '....W.lcd.D.....',
+    '....WdddddD.....',
+    '....wWWWWDd.....',
+    '................',
+    '................',
+    '................',
+    '................',
+  ], {
+    '.': null, h: P.strawDark, w: P.woodLight, W: P.wood, d: P.woodDark, D: P.woodDeep,
+    l: P.crystalShine, L: P.crystalLight, c: P.crystal,
+  });
+  // Bottom-heavy: move it down so it sits in the middle of the icon box.
+  const moved = new Sprite('item_lantern');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) moved.set(x + 1, y + 2, lantern.get(x, y));
+  return [glowcap, crystal, moved.outline()];
+}
