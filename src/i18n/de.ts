@@ -1,6 +1,7 @@
 import { dayNumber, minuteOfDay } from '../game/clock';
 import { stageLevel, type StageId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
+import type { RoomId } from '../game/defs/rooms';
 import type { AnimalWords, ItemWords, ObjectWords, Strings } from './types';
 
 // German needs the gender and case of each noun. A noun is stored once
@@ -161,6 +162,12 @@ const NEEDS = { health: 'Leben', food: 'Essen', water: 'Wasser', energy: 'Energi
 
 const obj = (kind: ObjectKind, c: Case, det: Det) => phrase(OBJECT[kind], c, det);
 
+const ROOM: Record<RoomId, Noun> = {
+  workshop: { g: 'f', word: 'Werkstatt' },
+  hearth: { g: 'm', word: 'Kamin' },
+  barrel: { g: 'f', word: 'Regentonne' },
+};
+
 /** In the accusative, as items always are in messages: "eine Kokosnuss", "3 große Blätter". */
 function itemCount(id: keyof typeof ITEM, count: number): string {
   return count === 1 ? phrase(ITEM[id], 'acc', 'a') : `${count} ${ITEM[id].plural}`;
@@ -242,6 +249,26 @@ export const de: Strings = {
     endStars: (n, of) => `Sterne: ${n} von ${of}`,
     oldIsland: 'Deine Insel ist aus einer älteren Version. Eine neue Insel 1 hat eine kleine Gezeiteninsel mit mehr zu entdecken. Du behältst deine Tasche, EP, Talente und deinen Hund.',
     keepProgress: 'Neue Insel, Fortschritt behalten',
+    hut: 'Hütte',
+    yourHut: 'Deine Hütte',
+    bed: 'Bett',
+    bedNote: 'Hier erholst du dich ganz. Gesundheit kommt schneller zurück.',
+    lookAtMap: 'Ansehen',
+    mapNote: 'Deine Karte von allem, was du erkundet hast.',
+    noMap: 'Ein leerer Nagel. Lerne das Talent Kartograf, dann hängt hier eine Karte der Insel.',
+    hutMapRemark: 'Lerne das Talent Kartograf, dann hängt an ihrer Wand eine Karte der Insel.',
+    workbenchNote: (n) => `Hier drehst du ${n} ${n === 1 ? 'Seil' : 'Seile'} aus 2 großen Blättern.`,
+    makeRope: 'Seil drehen',
+    hearthNote: 'Hier brätst du Fisch. Im Schlaf kommt Gesundheit schneller zurück.',
+    cook: 'Braten',
+    barrelNote: 'Frisches Regenwasser vom Dach. +35 Wasser.',
+    drink: 'Trinken',
+    addRoom: 'Raum anbauen',
+  },
+  rooms: {
+    workshop: { name: 'Werkstatt', description: 'Eine Werkbank. Seile, die du in der Hütte drehst, geben 1 mehr.' },
+    hearth: { name: 'Kamin', description: 'Ein Feuer drinnen. Brate Fisch zu Hause und werde im Schlaf schneller gesund.' },
+    barrel: { name: 'Regentonne', description: 'Fängt Regen vom Dach auf. So kannst du zu Hause trinken.' },
   },
   stars: {
     chests: { name: 'Schatzsucher', task: 'Öffne jede Truhe auf dieser Insel.' },
@@ -279,8 +306,8 @@ export const de: Strings = {
   needs: NEEDS,
   recipes: {
     campfire: { name: 'Lagerfeuer', description: 'Hält dich warm und macht die Nacht hell.' },
-    lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf. Hier schläfst du gut und bleibst wärmer.' },
-    hut: { name: 'Hütte', description: 'Ein gemütliches Zuhause. Warme Nächte und der beste Schlaf.' },
+    lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf für unterwegs. Wärmere Nächte, aber nur das Bett in einer Hütte gibt volle Erholung.' },
+    hut: { name: 'Hütte', description: 'Dein Lager. Ein Bett für volle Erholung, und drinnen baust du neue Räume an. Eine pro Insel.' },
     rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Für das Inselziel brauchst du Seile.' },
     axe: { name: 'Steinaxt', description: 'Schlägt dir einen Weg durch Dornengestrüpp und bringt mehr Holz von Bäumen.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
@@ -318,6 +345,12 @@ export const de: Strings = {
       case 'seaSalty': return 'Das Meerwasser ist zu salzig zum Trinken. Such nach frischem Wasser.';
       case 'mapHint': return 'An der Hüttenwand hängt deine Karte. Tippe auf Karte, um sie anzusehen.';
       case 'stepInto': return `Du gehst ${contract(`in ${obj(msg.obj, 'acc', 'the')}`)}. Ein guter Platz zum Schlafen.`;
+      case 'enterHut': return 'Du gehst in deine Hütte.';
+      case 'oneHut': return 'Du hast schon eine Hütte auf dieser Insel. Drinnen baust du neue Räume an.';
+      case 'roomBuilt': return `Du baust ${phrase(ROOM[msg.room], 'acc', 'a')} an deine Hütte an.`;
+      case 'notInHut': return 'Das geht nur in deiner Hütte.';
+      case 'drinkBarrel': return 'Du trinkst frisches Regenwasser aus der Tonne. Herrlich!';
+      case 'restLimit': return `Hier kannst du dich nicht mehr erholen (Energie ${msg.cap}). Nur das Bett in deiner Hütte gibt dir volle Erholung.`;
       case 'tooFull': return 'Du bist zu satt, um das zu essen.';
       case 'eat': return `Du isst ${itemCount(msg.item, 1)}. Lecker!`;
       case 'build': return `Du baust ${obj(msg.obj, 'acc', 'a')}.`;
@@ -329,6 +362,7 @@ export const de: Strings = {
       case 'needTool': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu dornig für deine Hände. Du brauchst ${itemCount(msg.item, 1)}.`;
       case 'notSleepy': return 'Du bist gerade nicht müde.';
       case 'fallAsleep': {
+        if (msg.obj === 'hut') return 'Du kuschelst dich in dein Bett und schläfst ein.';
         const place = msg.obj ? contract(`in ${obj(msg.obj, 'dat', 'the')}`) : 'in der Höhle';
         return `Du rollst dich ${place} zusammen und schläfst ein.`;
       }
@@ -336,6 +370,7 @@ export const de: Strings = {
       case 'wake': {
         const text = {
           rested: 'Du wachst gut erholt auf.',
+          restless: 'Du wachst auf, aber nicht ganz erholt. Nur das Bett in deiner Hütte gibt dir volle Erholung.',
           cold: 'Brr! Zu kalt zum Schlafen. Ein Feuer oder ein Unterschlupf würde helfen.',
           hungry: 'Dein knurrender Magen weckt dich auf.',
           thirsty: 'Du wachst durstig auf.',

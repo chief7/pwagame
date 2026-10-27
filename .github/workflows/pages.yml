@@ -1,8 +1,12 @@
 name: Deploy to GitHub Pages
 
+# The site root is always the game on main. Branches in PREVIEWS are built
+# next to it, each in its own folder (<site>/<folder>/), so a change can be
+# played before it is merged. A preview keeps its own save (VITE_PREVIEW).
+
 on:
   push:
-    branches: [main]
+    branches: [main, claude/camp-hut-improvements-xjv7ou]
   workflow_dispatch:
 
 permissions:
@@ -14,11 +18,17 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  # Space-separated <folder>=<branch> pairs.
+  PREVIEWS: camp=claude/camp-hut-improvements-xjv7ou
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: main
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -26,6 +36,25 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Build previews
+        run: |
+          for entry in $PREVIEWS; do
+            folder="${entry%%=*}"
+            branch="${entry#*=}"
+            if ! git fetch --depth 1 origin "$branch"; then
+              echo "::warning::Preview branch $branch not found, skipping $folder/"
+              continue
+            fi
+            git worktree add --detach "$RUNNER_TEMP/preview-$folder" FETCH_HEAD
+            (
+              cd "$RUNNER_TEMP/preview-$folder"
+              npm ci
+              npm test
+              VITE_PREVIEW="$folder" npm run build
+            )
+            mkdir -p "dist/$folder"
+            cp -r "$RUNNER_TEMP/preview-$folder/dist/." "dist/$folder/"
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

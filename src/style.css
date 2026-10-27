@@ -239,7 +239,7 @@ footer {
   gap: 8px;
 }
 
-/* Five buttons (with Map, in a hut) on a narrow phone: tighter, and no icon. */
+/* Five buttons (with Hut, in a hut) on a narrow phone: tighter, and no icon. */
 @media (max-width: 480px) {
   #actions {
     gap: 6px;
@@ -249,37 +249,37 @@ footer {
     padding-inline: 2px;
   }
 
-  #btn-map img {
+  #btn-hut img {
     display: none;
   }
 }
 
 @media (max-width: 380px) {
-  #actions:has(#btn-map:not([hidden])) button {
+  #actions:has(#btn-hut:not([hidden])) button {
     font-size: 13px;
   }
 }
 
 @media (max-width: 340px) {
-  #actions:has(#btn-map:not([hidden])) button {
+  #actions:has(#btn-hut:not([hidden])) button {
     font-size: 11px;
   }
 }
 
 #btn-skills,
-#btn-map {
+#btn-hut {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
 }
 
-#btn-map[hidden] {
+#btn-hut[hidden] {
   display: none;
 }
 
-#btn-map img {
-  width: 24px;
+#btn-hut img {
+  width: auto;
   height: 24px;
   margin: -6px 0;
   image-rendering: pixelated;
@@ -387,6 +387,7 @@ button.primary {
 .row img {
   width: 40px;
   height: 40px;
+  object-fit: contain;
   image-rendering: pixelated;
 }
 
@@ -705,6 +706,17 @@ button.primary {
 
 .end-stars {
   font-weight: bold;
+}
+
+.hut-scene {
+  display: grid;
+  justify-items: center;
+}
+
+.hut-scene canvas {
+  image-rendering: pixelated;
+  max-width: 100%;
+  border-radius: 6px;
 }
 
 .map {

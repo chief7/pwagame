@@ -29,6 +29,8 @@ function everyMessage(): Msg[] {
     { key: 'climb', obj: 'ledge_ladder', easy: true }, { key: 'climb', obj: 'ice_wall_rope', easy: true },
     { key: 'make', item: 'rope', count: 2 }, { key: 'mapHint' },
     { key: 'tideOut' }, { key: 'tideIn' }, { key: 'tideHigh', turn: 90 }, { key: 'tideWade' },
+    { key: 'enterHut' }, { key: 'oneHut' }, { key: 'notInHut' }, { key: 'drinkBarrel' }, { key: 'restLimit', cap: 75 },
+    { key: 'roomBuilt', room: 'workshop' }, { key: 'roomBuilt', room: 'hearth' }, { key: 'roomBuilt', room: 'barrel' },
   ];
   for (const star of ['chests', 'fish', 'explore', 'safe'] as const) msgs.push({ key: 'star', star });
   for (const level of [1, 2] as const) {
@@ -40,7 +42,7 @@ function everyMessage(): Msg[] {
     msgs.push({ key: 'goalGive', stage, given: [['rope', 2], ['wood', 3]], left: [['rope', 1]] });
   }
   for (const skill of SKILL_IDS) msgs.push({ key: 'needSkill', skill }, { key: 'learn', skill });
-  for (const reason of ['rested', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
+  for (const reason of ['rested', 'restless', 'cold', 'hungry', 'thirsty', 'none'] as const) msgs.push({ key: 'wake', reason, turn: 0 });
   for (const need of ['food', 'water', 'energy', 'warmth'] as const) msgs.push({ key: 'low', need }, { key: 'low', need, level: 2 }, { key: 'faintWhy', empty: [need] });
   for (const obj of OBJECT_KINDS) {
     msgs.push({ key: 'stepInto', obj }, { key: 'build', obj }, { key: 'fallAsleep', obj }, { key: 'look', obj }, { key: 'nothingLeft', obj });

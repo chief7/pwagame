@@ -230,7 +230,7 @@ export class Renderer {
         if (!obj || (trip && trip.x === x && trip.y === y)) continue;
         const def = OBJECTS[obj.kind];
         const frames = game.sailed && def.done ? def.done.frames : def.frames;
-        const name = frames ? frames[fireFrame % frames.length] : game.objectSprite(obj);
+        const name = frames ? frames[fireFrame % frames.length] : game.objectSprite(obj, fireFrame);
         this.drawStanding(name, o.x + x * cell, o.y + y * cell);
       }
       for (const a of actors) {

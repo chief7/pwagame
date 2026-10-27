@@ -19,6 +19,12 @@ npm run build     # typecheck + production build into dist/
 npm run preview   # serve the build (service worker is only active here)
 ```
 
+GitHub Pages serves the game on `main` at the site root. The deploy workflow
+(`.github/workflows/pages.yml`) can also build other branches into their own
+folders (`PREVIEWS`, for example `camp=<branch>` → `<site>/camp/`). A
+preview build (`VITE_PREVIEW=<folder>`) keeps its own save and has no service
+worker, so it does not touch the main game's save.
+
 ## How it plays
 
 - **Needs:** Health, Food, Water, Energy and Warmth (0–100). Food and Water
@@ -37,6 +43,13 @@ npm run preview   # serve the build (service worker is only active here)
 - **Building:** campfire, lean-to and hut, placed in front of you. Sleeping
   in a shelter (or a cave) makes it home and rests you faster. A stone axe
   goes in your bag; a bridge goes across the river in front of you.
+- **The camp:** the hut is big work (40 wood, 30 leaves, 20 stone, 8 rope),
+  and each island has only one. Walk into it to go inside. Its bed is the
+  only place for a full rest: sleep elsewhere stops at 50 Energy in the
+  open, 60 in a cave and 75 in a lean-to. In the bed, Health also comes back
+  faster. From inside, add rooms: a workshop (rope made there gives one
+  more), a hearth (cook fish at home, heal even faster) and a rain barrel
+  (drink at home). Each room shows on the hut outside.
 - **Exploring:** you start on the home coast. A wall of brambles closes it
   off: chop through with a stone axe (which also gets more wood from trees).
   Behind it is the wild forest, and then a river: build a bridge to reach
@@ -61,7 +74,7 @@ npm run preview   # serve the build (service worker is only active here)
   better catches, animal friend, wild sense). Each path is learned in order.
   Wild sense marks in red the ground where an animal would come after you.
   A cartographer can look at a rough map of the explored island, but only
-  in a hut (the Map button). It shows huts, campfires, springs, the island
+  in a hut (on its wall, in the Hut panel). It shows huts, campfires, springs, the island
   goal and where you saw cave bears.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
@@ -104,10 +117,11 @@ npm run preview   # serve the build (service worker is only active here)
   hold to keep walking towards your finger. Walking stops when something new
   comes into view. Tap your explorer to wait a turn. Buttons: Bag (eat, change
   explorer, new island, reset all progress), Build, Skills (a star shows when you have points to
-  spend), Sleep. With raw fish next to a campfire, tap the grill button above
-  the fire to cook a fish.
+  spend), Hut (while you stand in your hut), Sleep. With raw fish next to a
+  campfire, tap the grill button above the fire to cook a fish.
 - **Keyboard:** arrows / WASD / `hjkl` / numpad to move, `.` or `5` wait,
-  `i` bag, `b` build, `p` skills, `g` grill a fish at the fire, `z` sleep, `Esc` closes panels.
+  `i` bag, `b` build, `p` skills, `g` grill a fish at the fire, `e` go inside
+  the hut you stand in, `m` map (in a hut, with Cartographer), `z` sleep, `Esc` closes panels.
 
 ## Adding things
 
@@ -142,7 +156,7 @@ matching sprite (see below); the sprite test fails if one is missing.
 ```
 src/
   game/        pure game logic, no DOM — unit-testable
-    defs/        data registries: items, objects, recipes, animals, skills
+    defs/        data registries: items, objects, recipes, hut rooms, animals, skills, levels
     game.ts      actions, turn loop, needs, animals, fainting, sleep, save/load
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
@@ -157,7 +171,7 @@ src/
     renderer.ts  sprite renderer (integer scaling), night lighting, camera
     animator.ts  turns game events into tweens, lunges, flashes, floating text, fades
     input.ts     keyboard mapping and tap/hold direction helper
-  main.ts      HUD, Bag/Build/Skills panels, input, render loop, autosave
+  main.ts      HUD, Bag/Build/Skills/Hut/Map panels, input, render loop, autosave
   sprites/     pixel-art sprites, generated in code (no image files)
     palette.ts   the shared colour palette
     pixel.ts     Sprite grid, outline/shadow helpers, fromRows() for hand-drawn art
@@ -165,7 +179,8 @@ src/
     forest.ts    trees, bushes, berry bushes, mushrooms, brambles
     objects.ts   stones, logs, chests, stalagmite, spring, steep steps (rocky step, ice wall) with ladder and rope
     palms.ts     palm trees (24×32), with bare versions
-    structures.ts campfire (animated), lean-to, hut, bridges, boat (also sailing away), beacon (also lit)
+    structures.ts campfire (animated), lean-to, hut (with each set of rooms), bridges, boat (also sailing away), beacon (also lit)
+    interiors.ts the rooms inside the hut (32×24 each), for the Hut panel
     creatures.ts animals (with step frames and left facing), item icons
     ui.ts        interface icons (globe) and the app icon
     characters.ts  male and female explorer, 4 facings × idle + 2 walk frames, fishing poses

@@ -1,4 +1,5 @@
 import type { ItemId } from './items';
+import type { RoomId } from './rooms';
 
 // Things standing in the world: plants, rocks, chests, springs and whatever
 // the player builds. Kinds double as sprite names. Names and gather texts
@@ -48,6 +49,8 @@ export interface ObjectDef {
   drink?: number;
   /** Standing here counts as shelter (0..1): warmer nights, better sleep. */
   shelter?: number;
+  /** The most Energy a sleep here gives (only the hut bed gives a full 100). */
+  rest?: number;
   /** Warms everyone within this many cells. */
   warmthRadius?: number;
   /** Lights up this many cells at night. */
@@ -135,8 +138,8 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   chest_open: def({ kind: 'chest_open' }),
   spring: def({ kind: 'spring', drink: 35 }),
   campfire: def({ kind: 'campfire', warmthRadius: 2, lightRadius: 5, frames: ['campfire', 'campfire_2'] }),
-  lean_to: def({ kind: 'lean_to', walkable: true, shelter: 0.6 }),
-  hut: def({ kind: 'hut', walkable: true, shelter: 1 }),
+  lean_to: def({ kind: 'lean_to', walkable: true, shelter: 0.6, rest: 75 }),
+  hut: def({ kind: 'hut', walkable: true, shelter: 1, rest: 100 }),
   bramble: def({
     kind: 'bramble',
     gather: { yields: [{ item: 'wood', min: 1, max: 1 }, { item: 'leaves', min: 1, max: 1 }], needs: 'axe', after: { remove: true } },
@@ -206,4 +209,6 @@ export interface WorldObject {
   kind: ObjectKind;
   /** Turn when a regrowing object can be gathered again. */
   readyAt?: number;
+  /** The rooms added to a hut (see rooms.ts). */
+  rooms?: RoomId[];
 }
