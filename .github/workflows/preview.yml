@@ -1,0 +1,24 @@
+name: Preview checks
+
+# Tests and builds the preview branch. When this passes, "Deploy to GitHub
+# Pages" (pages.yml) runs from main and puts the preview in <site>/preview/.
+
+on:
+  push:
+    branches: [preview]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build

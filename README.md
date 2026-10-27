@@ -19,6 +19,26 @@ npm run build     # typecheck + production build into dist/
 npm run preview   # serve the build (service worker is only active here)
 ```
 
+## Testing and publishing
+
+- `main` is the published game: GitHub Pages serves it at the site root.
+- `preview` is for testing. Push (or merge) updates there. The checks run,
+  and then Pages also serves the preview at `<site>/preview/`. It keeps its
+  own save, so it does not touch the save of the main game.
+- To publish everything that is on `preview` at once, merge it into `main`:
+
+  ```sh
+  git checkout main && git pull
+  git merge preview
+  git push
+  ```
+
+- Do not change `main` directly. If it changes, merge `main` into `preview`
+  so the two stay in step.
+
+The deploy workflow is `.github/workflows/pages.yml` (`PREVIEWS` lists the
+preview folders and branches); the preview checks are in `preview.yml`.
+
 ## How it plays
 
 - **Needs:** Health, Food, Water, Energy and Warmth (0–100). Food and Water

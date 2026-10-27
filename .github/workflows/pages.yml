@@ -1,14 +1,19 @@
 name: Deploy to GitHub Pages
 
 # The site root is always the game on main. Branches in PREVIEWS are built
-# next to it, each in its own folder (<site>/<folder>/), so a change can be
-# played before it is merged. A preview keeps its own save (VITE_PREVIEW).
-# Only main may deploy: after a push to a preview branch, run this workflow
-# by hand (Actions → Deploy to GitHub Pages → Run workflow) to update it.
+# next to it, each in its own folder (<site>/<folder>/), so changes can be
+# played before they go to main. A preview keeps its own save (VITE_PREVIEW).
+#
+# Only main may deploy to Pages. So a push to the preview branch runs
+# "Preview checks" (preview.yml), and when those pass, this workflow runs
+# from main and deploys both.
 
 on:
   push:
     branches: [main]
+  workflow_run:
+    workflows: [Preview checks]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -22,10 +27,12 @@ concurrency:
 
 env:
   # Space-separated <folder>=<branch> pairs.
-  PREVIEWS: camp=claude/camp-hut-improvements-xjv7ou
+  PREVIEWS: preview=preview
 
 jobs:
   build:
+    # After a preview push, deploy only when its checks passed.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
