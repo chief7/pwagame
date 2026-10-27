@@ -55,10 +55,13 @@ npm run preview   # serve the build (service worker is only active here)
 - **Skills:** gathering, building and fishing give XP. XP earns skill points
   (the first at 10 XP, each next one 5 XP more), which you spend in the
   Skills panel on three paths: Building (fishing rod, cheaper building,
-  rope maker), Explorer (needs drop slower, night eyes, sure foot for
+  rope maker, cartographer), Explorer (needs drop slower, night eyes, sure foot for
   climbing) and Improving (faster regrowth,
   better catches, animal friend, wild sense). Each path is learned in order.
   Wild sense marks in red the ground where an animal would come after you.
+  A cartographer can look at a rough map of the explored island, but only
+  in a hut (the Map button). It shows huts, campfires, springs, the island
+  goal and where you saw cave bears.
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
   campfire (tap the grill button above the fire, or use the Build panel).

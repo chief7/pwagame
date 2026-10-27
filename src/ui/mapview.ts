@@ -1,5 +1,6 @@
 import { OBJECTS, type ObjectKind, type WorldObject } from '../game/defs/objects';
 import { Tile, type GameMap } from '../game/map';
+import type { MapSign } from '../i18n/types';
 import { PALETTE as P } from '../sprites/palette';
 import { hash2, Sprite } from '../sprites/pixel';
 
@@ -41,11 +42,11 @@ const WASH: Record<Ground, [string, string]> = {
 };
 
 /** Objects that get a sign on the map (besides the island goal). */
-const SIGNS: Partial<Record<ObjectKind, string>> = { hut: 'map_hut', campfire: 'map_fire', spring: 'map_spring' };
+const SIGNS: Partial<Record<ObjectKind, MapSign>> = { hut: 'hut', campfire: 'fire', spring: 'spring' };
 
 export interface MapMarker {
-  /** Sprite name: map_you, map_hut, map_fire, map_spring, map_goal or map_bear. */
-  sprite: string;
+  /** Drawn with the sprite `map_<sign>`. */
+  sign: MapSign;
   x: number;
   y: number;
 }
@@ -54,6 +55,24 @@ export interface MapPicture {
   paper: Sprite;
   /** Signs to draw on top, centred on these pixels of the paper. */
   markers: MapMarker[];
+}
+
+/** The paper with its signs stamped on, ready to bake. `sprite` finds a sign's sprite by name. */
+export function stampSigns(picture: MapPicture, sprite: (name: string) => Sprite | undefined): Sprite {
+  const out = picture.paper;
+  for (const m of picture.markers) {
+    const s = sprite(`map_${m.sign}`);
+    if (!s) continue;
+    const x0 = m.x - (s.width >> 1);
+    const y0 = m.y - (s.height >> 1);
+    for (let y = 0; y < s.height; y++) {
+      for (let x = 0; x < s.width; x++) {
+        const c = s.get(x, y);
+        if (c) out.set(x0 + x, y0 + y, c);
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -151,10 +170,10 @@ export function drawMap(
     const x = i % map.width;
     const y = Math.floor(i / map.width);
     if (!map.isExplored(x, y) || (x === player.x && y === player.y)) continue;
-    const sprite = SIGNS[o.kind] ?? (OBJECTS[o.kind].goal ? 'map_goal' : null);
-    if (sprite) markers.push({ sprite, ...at(x, y) });
+    const sign = SIGNS[o.kind] ?? (OBJECTS[o.kind].goal ? 'goal' : null);
+    if (sign) markers.push({ sign, ...at(x, y) });
   }
-  for (const spot of bearSpots) markers.push({ sprite: 'map_bear', ...at(spot % map.width, Math.floor(spot / map.width)) });
-  markers.push({ sprite: 'map_you', ...at(player.x, player.y) });
+  for (const spot of bearSpots) markers.push({ sign: 'bear', ...at(spot % map.width, Math.floor(spot / map.width)) });
+  markers.push({ sign: 'you', ...at(player.x, player.y) });
   return { paper, markers };
 }

@@ -9,6 +9,9 @@ import type { NeedId } from '../game/needs';
 
 export type Lang = 'en' | 'de';
 
+/** The signs on the Cartographer's map; each is drawn by the sprite `map_<sign>`. */
+export type MapSign = 'you' | 'hut' | 'fire' | 'spring' | 'goal' | 'bear';
+
 /** Every word the player can see, in one language. */
 export interface Strings {
   lang: Lang;
@@ -69,6 +72,11 @@ export interface Strings {
     dogNeeds(food: number, water: number): string;
     dogTired: string;
     feedDog: string;
+    /** The Map button and panel (Cartographer, in a hut). */
+    map: string;
+    yourMap: string;
+    /** What each sign on the map means. */
+    mapSigns: Record<MapSign, string>;
   };
   /** Each island's goal: the goal card, and the question before leaving. */
   levels: Record<LevelId, {

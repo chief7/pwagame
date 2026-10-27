@@ -234,15 +234,55 @@ footer {
 
 #actions {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
-#btn-skills {
+/* Five buttons (with Map, in a hut) on a narrow phone: tighter, and no icon. */
+@media (max-width: 480px) {
+  #actions {
+    gap: 6px;
+  }
+
+  #actions button {
+    padding-inline: 2px;
+  }
+
+  #btn-map img {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  #actions:has(#btn-map:not([hidden])) button {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 340px) {
+  #actions:has(#btn-map:not([hidden])) button {
+    font-size: 11px;
+  }
+}
+
+#btn-skills,
+#btn-map {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
+}
+
+#btn-map[hidden] {
+  display: none;
+}
+
+#btn-map img {
+  width: 24px;
+  height: 24px;
+  margin: -6px 0;
+  image-rendering: pixelated;
 }
 
 #btn-skills .star {
@@ -583,6 +623,7 @@ button.primary {
   }
 
   #actions {
+    grid-auto-flow: row;
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -614,6 +655,42 @@ button.primary {
   display: block;
   color: var(--text);
   font-weight: bold;
+}
+
+.map {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.map canvas {
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+
+.map-signs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.map-signs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.map-signs img {
+  width: 21px;
+  height: 21px;
+  object-fit: none;
+  image-rendering: pixelated;
 }
 
 .voyage {

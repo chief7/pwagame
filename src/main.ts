@@ -10,7 +10,10 @@ import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
 import { Animator, STEP_MS } from './ui/animator';
 import { commandForKey, directionFrom, type Command } from './ui/input';
+import { drawMap, stampSigns } from './ui/mapview';
 import { DEPART_MS, Renderer, type Body, type Departure } from './ui/renderer';
+import { bake } from './sprites';
+import type { MapSign } from './i18n/types';
 
 const LOG_LINES = 3;
 /** Finger travel (CSS px) beyond which a touch is no longer a tap. */
@@ -50,6 +53,7 @@ const ui = {
   build: $<HTMLButtonElement>('btn-build'),
   skills: $<HTMLButtonElement>('btn-skills'),
   sleep: $<HTMLButtonElement>('btn-sleep'),
+  map: $<HTMLButtonElement>('btn-map'),
   grill: $<HTMLButtonElement>('btn-grill'),
   sheet: $('sheet'),
   sheetTitle: $('sheet-title'),
@@ -212,6 +216,7 @@ function updateHud(): void {
     }),
   );
   updateSkillsButton();
+  updateMapButton();
   if (!ui.sheet.hidden) renderSheet();
 }
 
@@ -223,6 +228,15 @@ function updateSkillsButton(): void {
   if (points > 0) ui.skills.append(skillStar);
   else skillStar.remove();
   ui.skills.setAttribute('aria-label', points > 0 ? `${t().ui.skills}: ${t().ui.skillPoints(points)}` : t().ui.skills);
+}
+
+/** The Map button shows only in a hut, once you are a Cartographer. */
+const mapIcon = ui.map.querySelector('img')!;
+function updateMapButton(): void {
+  ui.map.hidden = !game.canReadMap();
+  if (ui.map.hidden) return;
+  const src = icon('ui_map');
+  if (mapIcon.getAttribute('src') !== src) mapIcon.src = src;
 }
 
 // ---- Render loop ------------------------------------------------------------------
@@ -266,6 +280,7 @@ function run(cmd: Command): void {
     case 'bag': openSheet('bag'); return;
     case 'build': openSheet('build'); return;
     case 'skills': openSheet('skills'); return;
+    case 'map': if (game.canReadMap()) openSheet('map'); return;
     case 'grill': grill(); return;
   }
   afterTurn();
@@ -321,7 +336,7 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'sail' | 'end';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'sail' | 'end';
 let sheetKind: SheetKind = 'bag';
 /** The footer button that waits for a second tap before it starts over. */
 let confirming: 'island' | 'reset' | null = null;
@@ -362,13 +377,15 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
   if (sheetKind === 'sail' || sheetKind === 'end') {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
     renderSkills(rows);
+  } else if (sheetKind === 'map') {
+    renderMap(rows);
   } else if (sheetKind === 'bag') {
     const entries = game.inventory.entries();
     const dog = game.dog;
@@ -587,6 +604,28 @@ function renderVoyage(rows: HTMLElement): void {
   rows.append(foot);
 }
 
+/** The Cartographer's map of the explored island, at the largest whole scale that fits. */
+function renderMap(rows: HTMLElement): void {
+  const words = t();
+  const picture = drawMap(game.map, game.objects, game.player, game.bearSpots);
+  const paper = bake(stampSigns(picture, (name) => renderer.sprite(name)));
+  const dpr = window.devicePixelRatio || 1;
+  const room = Math.max(ui.sheetBody.clientWidth, 200) * dpr;
+  const scale = Math.max(1, Math.floor(room / paper.width));
+  const view = el('canvas', { width: paper.width * scale, height: paper.height * scale });
+  view.style.width = `${view.width / dpr}px`;
+  const ctx = view.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(paper, 0, 0, view.width, view.height);
+  view.setAttribute('role', 'img');
+  view.setAttribute('aria-label', words.ui.yourMap);
+  const shown = new Set(picture.markers.map((m) => m.sign));
+  const signs = (['you', 'hut', 'fire', 'spring', 'goal', 'bear'] as MapSign[])
+    .filter((sign) => shown.has(sign))
+    .map((sign) => el('li', {}, [el('img', { src: icon(`map_${sign}`), alt: '' }), words.ui.mapSigns[sign]]));
+  rows.append(el('div', { className: 'map' }, [view, el('ul', { className: 'map-signs' }, signs)]));
+}
+
 /** XP bar, points to spend, and each path's skills in the order they're learned. */
 function renderSkills(rows: HTMLElement): void {
   const words = t();
@@ -774,6 +813,7 @@ function tap(x: number, y: number): void {
 ui.bag.addEventListener('click', () => run({ type: 'bag' }));
 ui.build.addEventListener('click', () => run({ type: 'build' }));
 ui.skills.addEventListener('click', () => run({ type: 'skills' }));
+ui.map.addEventListener('click', () => run({ type: 'map' }));
 ui.grill.addEventListener('click', grill);
 ui.sleep.addEventListener('click', () => {
   stopAuto();

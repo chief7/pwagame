@@ -157,6 +157,9 @@ export const en: Strings = {
     yourDog: 'Your dog',
     dogNeeds: (food, water) => `Food ${food} · Water ${water}`,
     dogTired: 'Tired. Give it food, and walk past water so it can drink.',
+    map: 'Map',
+    yourMap: 'Your map',
+    mapSigns: { you: 'You', hut: 'Hut', fire: 'Campfire', spring: 'Spring', goal: 'Goal', bear: 'Bears' },
     feedDog: 'Feed dog',
   },
   levels: {
@@ -209,6 +212,7 @@ export const en: Strings = {
     animal_friend: { name: 'Animal friend', description: "Crabs don't pinch you, and monkeys don't take your food. Wild animals notice you later." },
     rope_maker: { name: 'Rope maker', description: 'You twist 2 ropes from 2 big leaves, not 1.' },
     sure_foot: { name: 'Sure foot', description: 'Climbing a ladder or a rope does not make you tired.' },
+    cartographer: { name: 'Cartographer', description: 'In a hut, look at a map of everything you explored.' },
     wild_sense: { name: 'Wild sense', description: 'You see where animals would come after you or hurt you. These places look red.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].many}`,
@@ -221,6 +225,7 @@ export const en: Strings = {
     switch (msg.key) {
       case 'arrive': return 'You wash up on a quiet island. Gather food and water, and build a shelter before night.';
       case 'seaSalty': return 'The sea is too salty to drink. Look for fresh water.';
+      case 'mapHint': return 'Your map hangs on the hut wall. Tap Map to look at it.';
       case 'stepInto': return `You step into the ${obj(msg.obj)}. A good place to sleep.`;
       case 'tooFull': return "You're too full to eat that.";
       case 'eat': return `You eat ${itemCount(msg.item, 1)}. Yum!`;

@@ -72,7 +72,9 @@ const DOG_REACH = 2;
 const DOG_BARK_RANGE = 3;
 /** This far behind, the dog gives up walking and catches up at once (after fainting, sailing…). */
 const DOG_LOST = 12;
-export const SAVE_VERSION = 6;
+/** A cave bear seen this close to a place already on the map adds no new place. */
+const BEAR_SPOT_GAP = 6;
+export const SAVE_VERSION = 7;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -138,6 +140,8 @@ export interface SaveData {
   goalGiven: Items;
   sailed: boolean;
   dog: Dog | null;
+  /** Cells of this island where the explorer saw a cave bear (for the Cartographer's map). */
+  bearSpots: number[];
   warned: NeedId[];
   log: LogEntry[];
 }
@@ -163,6 +167,8 @@ export class Game {
   sailed = false;
   /** The adopted dog, or null before you find one. */
   dog: Dog | null = null;
+  /** Cells where the explorer saw a cave bear on this island, at least BEAR_SPOT_GAP apart. */
+  bearSpots: number[] = [];
   turn = 0;
   log: LogEntry[] = [];
   sleeping = false;
@@ -198,6 +204,7 @@ export class Game {
       this.goalGiven = save.goalGiven;
       this.sailed = save.sailed;
       this.dog = save.dog;
+      this.bearSpots = save.bearSpots;
       this.turn = save.turn;
       this.nextId = save.nextId;
       this.warned = new Set(save.warned);
@@ -260,6 +267,11 @@ export class Game {
 
   visibleAnimals(): Animal[] {
     return this.animals.filter((a) => this.map.isVisible(a.x, a.y));
+  }
+
+  /** With Cartographer, the explorer keeps a map on the wall of every hut. */
+  canReadMap(): boolean {
+    return this.has('cartographer') && this.objectAt(this.player.x, this.player.y)?.kind === 'hut';
   }
 
   /** 0 in the open, up to 1 inside a hut. */
@@ -471,8 +483,10 @@ export class Game {
     const onSnow = this.map.get(p.x, p.y) === Tile.Snow;
     p.x = nx;
     p.y = ny;
-    if (obj && OBJECTS[obj.kind].shelter) this.message({ key: 'stepInto', obj: obj.kind }, 'info');
-    else if (obj && OBJECTS[obj.kind].climb) this.climb(nx, ny, obj.kind);
+    if (obj && OBJECTS[obj.kind].shelter) {
+      this.message({ key: 'stepInto', obj: obj.kind }, 'info');
+      if (this.canReadMap()) this.message({ key: 'mapHint' }, 'info');
+    } else if (obj && OBJECTS[obj.kind].climb) this.climb(nx, ny, obj.kind);
     else if (!onSnow && this.map.get(nx, ny) === Tile.Snow) this.message({ key: 'snowCold' }, 'warn');
     this.endTurn();
     return true;
@@ -632,6 +646,7 @@ export class Game {
     this.sailAsked = false;
     this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
     this.animals = [];
+    this.bearSpots = [];
     this.dogToPlayer();
     this.populate();
     this.warned.clear();
@@ -1352,6 +1367,12 @@ export class Game {
         map.explored[i] = 1;
       },
     );
+    // Remember where cave bears live, for the map.
+    for (const a of this.animals) {
+      if (a.kind !== 'bear' || !map.isVisible(a.x, a.y)) continue;
+      const near = this.bearSpots.some((i) => Math.hypot((i % map.width) - a.x, Math.floor(i / map.width) - a.y) <= BEAR_SPOT_GAP);
+      if (!near) this.bearSpots.push(map.idx(a.x, a.y));
+    }
   }
 
   private emit(event: EventData): void {
@@ -1394,6 +1415,7 @@ export class Game {
       goalGiven: { ...this.goalGiven },
       sailed: this.sailed,
       dog: this.dog && { ...this.dog },
+      bearSpots: [...this.bearSpots],
       warned: [...this.warned],
       log: this.log.slice(-30),
     };
@@ -1420,7 +1442,11 @@ export class Game {
     }
     if (data.v === 5) {
       // Version 5 had no dog yet.
-      data = { ...data, v: SAVE_VERSION, dog: null };
+      data = { ...data, v: 6, dog: null };
+    }
+    if (data.v === 6) {
+      // Version 6 did not remember where the explorer saw cave bears.
+      data = { ...data, v: SAVE_VERSION, bearSpots: [] };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

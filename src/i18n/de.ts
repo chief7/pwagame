@@ -218,6 +218,9 @@ export const de: Strings = {
     yourDog: 'Dein Hund',
     dogNeeds: (food, water) => `Essen ${food} · Wasser ${water}`,
     dogTired: 'Müde. Gib ihm Essen und geh an Wasser vorbei, damit er trinken kann.',
+    map: 'Karte',
+    yourMap: 'Deine Karte',
+    mapSigns: { you: 'Du', hut: 'Hütte', fire: 'Lagerfeuer', spring: 'Quelle', goal: 'Ziel', bear: 'Bären' },
     feedDog: 'Füttern',
   },
   levels: {
@@ -270,6 +273,7 @@ export const de: Strings = {
     animal_friend: { name: 'Tierfreund', description: 'Krabben zwicken dich nicht, und Affen klauen dir kein Essen. Wilde Tiere bemerken dich später.' },
     rope_maker: { name: 'Seilmacher', description: 'Du drehst 2 Seile aus 2 großen Blättern, nicht nur 1.' },
     sure_foot: { name: 'Trittsicher', description: 'Klettern an Leiter oder Seil macht dich nicht müde.' },
+    cartographer: { name: 'Kartograf', description: 'In einer Hütte siehst du eine Karte von allem, was du erkundet hast.' },
     wild_sense: { name: 'Spürsinn', description: 'Du siehst, wo Tiere dich verfolgen oder dir wehtun würden. Diese Stellen sind rot.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].plural}`,
@@ -282,6 +286,7 @@ export const de: Strings = {
     switch (msg.key) {
       case 'arrive': return 'Du wirst an eine stille Insel gespült. Sammle Essen und Wasser und baue einen Unterschlupf, bevor es Nacht wird.';
       case 'seaSalty': return 'Das Meerwasser ist zu salzig zum Trinken. Such nach frischem Wasser.';
+      case 'mapHint': return 'An der Hüttenwand hängt deine Karte. Tippe auf Karte, um sie anzusehen.';
       case 'stepInto': return `Du gehst ${contract(`in ${obj(msg.obj, 'acc', 'the')}`)}. Ein guter Platz zum Schlafen.`;
       case 'tooFull': return 'Du bist zu satt, um das zu essen.';
       case 'eat': return `Du isst ${itemCount(msg.item, 1)}. Lecker!`;

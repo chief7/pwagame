@@ -96,7 +96,8 @@ flowchart TB
 | `src/ui/renderer.ts` | Draws terrain, objects, animals, the player, night light and effects on a canvas. |
 | `src/ui/animator.ts` | Turns game events into timed animations. |
 | `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
-| `src/main.ts` | Connects everything: HUD, Bag, Build and Skills panels, the grill button above the campfire, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
+| `src/ui/mapview.ts` | Draws the Cartographer's map of the explored island as one sprite (see 4.15). |
+| `src/main.ts` | Connects everything: HUD, Bag, Build, Skills and Map panels, the grill button above the campfire, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
 | `src/game/messages.ts` | The `Msg` type: every log message as data (a key and its arguments). |
 | `src/i18n/*.ts` | All text the player sees, in English (`en.ts`) and German (`de.ts`). |
 | `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
@@ -420,6 +421,7 @@ on a path cost 1 point, the third, fourth and fifth cost 2.
 | Building | Fishing rod | Unlocks the fishing rod recipe | `recipes.ts` (`skill`) |
 | | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
 | | Rope maker | The rope recipe makes 2 rope, not 1. The Build panel shows "Rope ×2". | `Game.recipeMakes()` |
+| | Cartographer | In a hut, the Map button shows a map of the explored island (see 4.15) | `Game.canReadMap()`, `mapview.ts` |
 | Explorer | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
 | | Small appetite | Food drops 20% slower | `needs.ts` (`hunger`) |
 | | Thick skin | Warmth drops 30% slower | `needs.ts` (`chill`) |
@@ -587,6 +589,31 @@ up to the beacon crosses both rings.
   (`canBeOpened()` in `objects.ts`, like brambles).
 - The mountain goat (`climber`) walks over steps (see 4.9).
 - Island 1 has no steps. Island 2 saves from before have no steps either.
+
+### 4.15 The Cartographer's map
+
+With the Cartographer skill (Building path, fourth, 2 points), the explorer
+keeps a map on the wall of every hut. There is no map anywhere else.
+
+- `game.canReadMap()` is true when the skill is learned and the player stands
+  on a hut. Only then does `main.ts` show the **Map** button (between Skills
+  and Sleep) and accept the `m` key. Stepping into a hut with the skill logs
+  `mapHint` after `stepInto`.
+- The Map panel shows `drawMap()` from `src/ui/mapview.ts`: the explored cells
+  as washes of colour on old paper. Unknown cells stay blank paper. The map is
+  rough on purpose: each 2 × 2 block of cells (`MAP_BLOCK`) becomes one 3 × 3
+  pixel patch with the most common ground of its explored cells. Ink lines
+  mark the coast (land next to sea). The edge of what the explorer knows has
+  no line, so it does not look like a shore.
+- Signs (`map_<sign>` sprites, `MapSign`): where you are (`you`), huts,
+  campfires, springs, the island goal once seen, and bear areas. A list under
+  the map names the signs that are on it. The panel draws the map at the
+  largest whole-number scale that fits.
+- **Bear areas.** After each sight update, `updateFov()` stores the cell of
+  every visible cave bear in `game.bearSpots`, unless a stored cell is 6 cells
+  or closer (`BEAR_SPOT_GAP`). So bears the explorer never saw are not on the
+  map. The map shows a paw at each spot and red hatching on the known ground
+  within 5 cells (`BEAR_AREA`). Landing on a new island clears the list.
 
 ---
 
@@ -783,7 +810,7 @@ Also add the kind to the `AnimalKind` type. A new temper needs new code in
 | Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
-| Skills | Building: fishing rod, handy builder, rope maker. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
+| Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
 | Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
 | Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps) |
@@ -884,10 +911,11 @@ The render loop runs at full frame rate while the animator is busy, and every
 | Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
 | Bag / Build / Skills / Sleep buttons | Open the panels, or sleep |
 | Grill button (above a campfire, with raw fish) | Cook one fish |
+| Map button (in a hut, with Cartographer) | Look at the map of the island |
 | Feed dog (Bag panel) | Give the dog one item |
 | Walk into your dog | Swap places with it |
 | 🌐 button (Bag panel and explorer picker) | Switch between English and German |
-| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `g`: grill a fish at the fire. `z`: sleep. `Esc`: close a panel. |
+| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `g`: grill a fish at the fire. `m`: map (in a hut, with Cartographer). `z`: sleep. `Esc`: close a panel. |
 
 Auto-walk (travel and hold) stops when:
 
@@ -906,11 +934,12 @@ Auto-walk (travel and hold) stops when:
 - The save holds: seed, random number state, turn, tiles, explored cells,
   objects, animals, player, home, needs, inventory, XP, learned skills,
   level, what the goal's stage already got (`goalGiven`), `sailed`, the dog,
-  warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
+  where cave bears were seen (`bearSpots`), warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 6. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 6 added
+- `SAVE_VERSION` is 7. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 7 added
+  `bearSpots`; version 6 saves load with an empty list. Version 6 added
   `dog` (null before you adopt one); version 5 saves load without a dog.
   Version 4 saves load
   with `sailed: false`: they had only one island, so a player who already
@@ -957,6 +986,7 @@ Run `npm test`. The tests are in:
 | `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
+| `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
 
 To add content, use the `add-content` skill (`.claude/skills/add-content/`).
@@ -1009,6 +1039,8 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Step speed | `animator.ts` → `STEP_MS` | 130 ms |
 | Cells across a phone | `renderer.ts` → `TILES_ACROSS` | 12 |
 | Grill button frame time, lift above the fire | `main.ts` → `GRILL_FRAME_MS`, `GRILL_LIFT` | 220 ms, 6 px |
+| Map roughness, bear area | `mapview.ts` → `MAP_BLOCK`, `BEAR_AREA` | 2 × 2 cells per patch, 5 cells |
+| Gap between bear places | `game.ts` → `BEAR_SPOT_GAP` | 6 cells |
 
 ---
 
@@ -1033,6 +1065,8 @@ Also run `npm run build` (typecheck and build) before you commit.
   rocky steps stand on grass or snow, and some ice walls on scree. The step
   sprites do not change with the ground below them.
 - The explorer stands in front of a ladder or rope and hides most of it.
+- The map is drawn again each time the panel opens; it is not stored. A bear
+  that wanders far after it was seen makes a second bear area.
 - There is no sound.
 - The balance of XP and skill costs has not been tested with real play.
 - The game has not been tested on a real phone.

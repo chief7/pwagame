@@ -523,6 +523,79 @@ describe('Game: the dog', () => {
   });
 });
 
+describe("Game: the Cartographer's map", () => {
+  /** A cave strip east of the explorer, open to see along. */
+  function caveRow(game: Game, cells: number): void {
+    for (let dx = 1; dx <= cells; dx++) {
+      const i = game.map.idx(game.player.x + dx, game.player.y);
+      game.map.tiles[i] = Tile.CaveFloor;
+      game.objects.delete(i);
+    }
+  }
+
+  it('comes after rope maker on the Building path and costs 2 points', () => {
+    expect(SKILLS.cartographer).toMatchObject({ path: 'build', cost: 2 });
+    const game = sandbox(70);
+    game.xp = xpForPoints(10);
+    expect(game.skillProblem('cartographer')).toEqual({ key: 'needSkill', skill: 'rope_maker' });
+  });
+
+  it('can only be read in a hut, once learned', () => {
+    const game = sandbox(71);
+    place(game, 1, 0, 'hut');
+    place(game, -1, 0, 'lean_to');
+    expect(game.canReadMap()).toBe(false);
+    game.move(1, 0);
+    expect(game.canReadMap()).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'stepInto', obj: 'hut' });
+    game.skills.add('cartographer');
+    expect(game.canReadMap()).toBe(true);
+    game.move(-1, 0);
+    expect(game.canReadMap()).toBe(false);
+    game.move(-1, 0);
+    expect(game.canReadMap()).toBe(false);
+    game.move(1, 0);
+    game.move(1, 0);
+    expect(game.canReadMap()).toBe(true);
+    expect(game.log.slice(-2).map((e) => e.msg)).toEqual([{ key: 'stepInto', obj: 'hut' }, { key: 'mapHint' }]);
+  });
+
+  it('remembers where you saw cave bears, one place for each bear area', () => {
+    const game = sandbox(72);
+    caveRow(game, 8);
+    game.animals = [{ id: 99, kind: 'bear', x: game.player.x + 3, y: game.player.y, facing: 'down', flee: 0 }];
+    expect(game.bearSpots).toEqual([]);
+    game.wait();
+    expect(game.bearSpots).toHaveLength(1);
+    // The same bear a few steps on is still the same bear area.
+    game.animals[0].x = game.player.x + 5;
+    game.wait();
+    expect(game.bearSpots).toHaveLength(1);
+    // A bear out of sight is not on the map.
+    game.animals.push({ id: 100, kind: 'bear', x: game.player.x - 30, y: game.player.y, facing: 'down', flee: 0 });
+    game.wait();
+    expect(game.bearSpots).toHaveLength(1);
+  });
+
+  it('keeps the bear places in the save, and forgets them on a new island', () => {
+    const game = boatNextTo(sandbox(73));
+    game.bearSpots = [game.map.idx(10, 10)];
+    expect(Game.fromSave(JSON.parse(JSON.stringify(game.toSave()))).bearSpots).toEqual(game.bearSpots);
+    for (const [i, o] of game.objects) if (o.kind.startsWith('boat_')) game.objects.set(i, { kind: 'boat_ready' });
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(2);
+    // Only bears seen on the new island can be on its map.
+    expect(game.bearSpots.every((i) => game.animals.some((a) => a.kind === 'bear' && game.map.idx(a.x, a.y) === i))).toBe(true);
+  });
+
+  it('loads version 6 saves with no bear places', () => {
+    const { bearSpots: _b, ...v6 } = { ...new Game(74).toSave(), v: 6 };
+    const game = Game.fromSave(JSON.parse(JSON.stringify(v6)));
+    expect(game.bearSpots).toEqual([]);
+    expect(game.toSave().v).toBe(SAVE_VERSION);
+  });
+});
+
 describe('clock', () => {
   it('starts in the morning and cycles through night', () => {
     expect(phase(0)).toBe('day');

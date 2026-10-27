@@ -15,6 +15,8 @@ export type Msg =
   | { key: 'arrive' }
   | { key: 'seaSalty' }
   | { key: 'stepInto'; obj: ObjectKind }
+  /** Stepped into a hut with Cartographer: the map hangs on its wall. */
+  | { key: 'mapHint' }
   | { key: 'tooFull' }
   | { key: 'eat'; item: ItemId }
   | { key: 'build'; obj: ObjectKind }

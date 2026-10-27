@@ -10,7 +10,7 @@ export type SkillId =
   | 'small_sips' | 'small_appetite' | 'thick_skin'
   | 'fishing_rod' | 'patient_angler' | 'handy_builder'
   | 'green_thumb' | 'night_eyes' | 'animal_friend' | 'wild_sense'
-  | 'rope_maker' | 'sure_foot';
+  | 'rope_maker' | 'sure_foot' | 'cartographer';
 
 export interface SkillDef {
   id: SkillId;
@@ -21,7 +21,7 @@ export interface SkillDef {
 
 /** Each path's skills, in the order they must be learned. */
 export const PATHS: Record<PathId, SkillId[]> = {
-  build: ['fishing_rod', 'handy_builder', 'rope_maker'],
+  build: ['fishing_rod', 'handy_builder', 'rope_maker', 'cartographer'],
   explorer: ['small_sips', 'small_appetite', 'thick_skin', 'night_eyes', 'sure_foot'],
   improve: ['green_thumb', 'patient_angler', 'animal_friend', 'wild_sense'],
 };

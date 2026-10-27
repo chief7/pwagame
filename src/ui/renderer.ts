@@ -346,6 +346,11 @@ export class Renderer {
     ctx.drawImage(baked.canvas, 0, 0, target.width, target.height);
   }
 
+  /** A sprite by name, as drawn in the world. */
+  sprite(name: string): Sprite | undefined {
+    return this.sprites.get(name)?.sprite;
+  }
+
   /** A sprite as an image URL at a whole-number scale, for HTML panels. */
   iconURL(name: string, scale = 3): string {
     const baked = this.sprites.get(name);
