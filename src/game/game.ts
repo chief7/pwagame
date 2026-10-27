@@ -5,6 +5,7 @@ import { ITEMS, type ItemId } from './defs/items';
 import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId, type StarId } from './defs/levels';
 import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPE_IDS, RECIPES, type RecipeId } from './defs/recipes';
+import { hutSprite, ROOMS, type RoomId } from './defs/rooms';
 import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
 import { computeFov } from './fov';
 import { Inventory } from './inventory';
@@ -20,6 +21,18 @@ const LOG_LIMIT = 100;
 const CAVE_SHELTER = 0.5;
 const RESPAWN_EVERY = 50;
 const SLEEP_LIMIT = 200;
+/** The most Energy a sleep gives out in the open and in a cave; shelters set their own (`rest`). */
+const OPEN_REST = 50;
+const CAVE_REST = 60;
+/** Health comes back this much faster asleep in a hut bed, and in a hut with a hearth. */
+const BED_HEAL = 2;
+const HEARTH_HEAL = 3;
+/** Extra rope from the rope recipe at the workbench. */
+const WORKSHOP_ROPE = 1;
+/** Water from one drink at the rain barrel. */
+const BARREL_DRINK = 35;
+/** How far the hearth lights the night round the hut. */
+const HEARTH_LIGHT = 2;
 /** Default chance per turn that a grumpy animal next to you hurts you. */
 const HIT_CHANCE = 0.5;
 /** Default turns an animal runs off after it hurt you. */
@@ -83,7 +96,7 @@ const STAR_FISH = 5;
 const STAR_EXPLORE = 0.75;
 const STAR_SAFE_DAYS = 3;
 const STAR_XP = 5;
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -143,7 +156,8 @@ export interface SaveData {
   height: number;
   tiles: string;
   explored: string;
-  objects: [number, ObjectKind, number?][];
+  /** Cell, kind, then the turn it regrows (0: none) and a hut's rooms, when there are any. */
+  objects: [number, ObjectKind, number?, RoomId[]?][];
   animals: Animal[];
   player: Player;
   home: { x: number; y: number };
@@ -205,6 +219,8 @@ export class Game {
   private animalsActing = false;
   /** The explorer walked into the finished goal: the UI asks whether to set sail. */
   private sailAsked = false;
+  /** The explorer walked into the hut: the UI shows its inside. */
+  private hutAsked = false;
   /** climberDist() of this turn. */
   private climbDist: { turn: number; dist: Int32Array } | null = null;
 
@@ -218,7 +234,12 @@ export class Game {
         this.map.tiles[i] = save.tiles.charCodeAt(i) - 48;
         this.map.explored[i] = save.explored.charCodeAt(i) === 49 ? 1 : 0;
       }
-      this.objects = new Map(save.objects.map(([i, kind, readyAt]) => [i, readyAt ? { kind, readyAt } : { kind }]));
+      this.objects = new Map(save.objects.map(([i, kind, readyAt, rooms]) => {
+        const obj: WorldObject = { kind };
+        if (readyAt) obj.readyAt = readyAt;
+        if (rooms?.length) obj.rooms = rooms;
+        return [i, obj];
+      }));
       this.animals = save.animals;
       this.player = save.player;
       this.home = save.home;
@@ -290,9 +311,10 @@ export class Game {
     return this.map.inBounds(x, y) ? this.objects.get(this.map.idx(x, y)) : undefined;
   }
 
-  /** Sprite name to draw for the object at a cell (regrowing plants look bare). */
-  objectSprite(obj: WorldObject): string {
+  /** Sprite name to draw for the object at a cell (regrowing plants look bare, huts show their rooms). */
+  objectSprite(obj: WorldObject, frame = 0): string {
     const def = OBJECTS[obj.kind];
+    if (obj.kind === 'hut') return hutSprite(obj.rooms, frame);
     if (def.tidal && !this.lowTide) return `${obj.kind}_wet`;
     if (obj.readyAt !== undefined && obj.readyAt > this.turn && def.depletedSprite) return def.depletedSprite;
     return obj.kind;
@@ -335,7 +357,31 @@ export class Game {
 
   /** With Cartographer, the explorer keeps a map on the wall of every hut. */
   canReadMap(): boolean {
-    return this.has('cartographer') && this.objectAt(this.player.x, this.player.y)?.kind === 'hut';
+    return this.has('cartographer') && !!this.hutHere();
+  }
+
+  /** The hut the explorer is in, or null. */
+  hutHere(): WorldObject | null {
+    const obj = this.objectAt(this.player.x, this.player.y);
+    return obj?.kind === 'hut' ? obj : null;
+  }
+
+  /** The explorer is in a hut that has this room. */
+  hasRoom(id: RoomId): boolean {
+    return !!this.hutHere()?.rooms?.includes(id);
+  }
+
+  /** This island already has a hut (the camp): there is only one. */
+  hasHut(): boolean {
+    for (const obj of this.objects.values()) if (obj.kind === 'hut') return true;
+    return false;
+  }
+
+  /** The most Energy a sleep at (x, y) gives: only the bed in a hut gives a full rest. */
+  restCap(x: number, y: number): number {
+    const obj = this.objectAt(x, y);
+    const rest = obj ? OBJECTS[obj.kind].rest ?? 0 : 0;
+    return Math.max(rest, this.map.get(x, y) === Tile.CaveFloor ? CAVE_REST : OPEN_REST);
   }
 
   /** 0 in the open, up to 1 inside a hut. */
@@ -350,7 +396,7 @@ export class Game {
     const out: [number, number, number][] = [];
     for (const [i, obj] of this.objects) {
       const def = OBJECTS[obj.kind];
-      const r = this.sailed && def.done ? def.done.lightRadius : def.lightRadius;
+      const r = this.sailed && def.done ? def.done.lightRadius : obj.rooms?.includes('hearth') ? HEARTH_LIGHT : def.lightRadius;
       if (r) out.push([i % this.map.width, Math.floor(i / this.map.width), r]);
     }
     return out;
@@ -360,13 +406,14 @@ export class Game {
     return this.nearestFire(x, y) !== null;
   }
 
-  /** The closest fire whose warmth reaches (x, y), or null if none does. */
+  /** The closest fire (or hearth) whose warmth reaches (x, y), or null if none does. */
   nearestFire(x: number, y: number): { x: number; y: number } | null {
     let best: { x: number; y: number } | null = null;
     let bestDist = Infinity;
     for (const [i, obj] of this.objects) {
-      const r = OBJECTS[obj.kind].warmthRadius;
-      if (!r) continue;
+      // A hearth is a fire too, but only for whoever is inside the hut.
+      const r = OBJECTS[obj.kind].warmthRadius ?? (obj.rooms?.includes('hearth') ? 0 : undefined);
+      if (r === undefined) continue;
       const fx = i % this.map.width;
       const fy = Math.floor(i / this.map.width);
       const d = Math.max(Math.abs(fx - x), Math.abs(fy - y));
@@ -431,8 +478,17 @@ export class Game {
   }
 
   /** What a recipe costs the explorer now (Handy builder saves a piece of wood). */
-  recipeCost(id: RecipeId): Partial<Record<ItemId, number>> {
-    const cost = { ...RECIPES[id].cost };
+  recipeCost(id: RecipeId): Items {
+    return this.withSkills(RECIPES[id].cost);
+  }
+
+  /** What a hut room costs the explorer now (Handy builder works here too). */
+  roomCost(id: RoomId): Items {
+    return this.withSkills(ROOMS[id].cost);
+  }
+
+  private withSkills(base: Items): Items {
+    const cost = { ...base };
     if (this.has('handy_builder') && cost.wood) {
       cost.wood--;
       if (!cost.wood) delete cost.wood;
@@ -440,15 +496,25 @@ export class Game {
     return cost;
   }
 
-  /** How many items a recipe that `makes` an item gives now (Rope maker twists 2 ropes). */
+  /** How many items a recipe that `makes` an item gives now (Rope maker twists 2 ropes, the workbench one more). */
   recipeMakes(id: RecipeId): number {
-    return id === 'rope' && this.has('rope_maker') ? ROPE_MAKER : 1;
+    if (id !== 'rope') return 1;
+    return (this.has('rope_maker') ? ROPE_MAKER : 1) + (this.hasRoom('workshop') ? WORKSHOP_ROPE : 0);
+  }
+
+  /** Why a room can't be added to the hut right now, or null if it can. */
+  roomProblem(id: RoomId): Msg | null {
+    const hut = this.hutHere();
+    if (!hut || hut.rooms?.includes(id)) return { key: 'notInHut' };
+    if (!this.inventory.hasAll(this.roomCost(id))) return { key: 'needMaterials' };
+    return null;
   }
 
   /** Why a recipe can't be built right now, or null if it can. */
   buildProblem(id: RecipeId): Msg | null {
     const recipe = RECIPES[id];
     if (recipe.skill && !this.has(recipe.skill)) return { key: 'needSkill', skill: recipe.skill };
+    if ('builds' in recipe && recipe.builds === 'hut' && this.hasHut()) return { key: 'oneHut' };
     if ('makes' in recipe && ITEMS[recipe.makes].tool && this.inventory.count(recipe.makes) > 0) {
       return { key: 'haveTool', item: recipe.makes };
     }
@@ -584,9 +650,11 @@ export class Game {
     const onSnow = this.map.get(p.x, p.y) === Tile.Snow;
     p.x = nx;
     p.y = ny;
-    if (obj && OBJECTS[obj.kind].shelter) {
+    if (obj?.kind === 'hut') {
+      this.message({ key: 'enterHut' }, 'info');
+      this.hutAsked = true;
+    } else if (obj && OBJECTS[obj.kind].shelter) {
       this.message({ key: 'stepInto', obj: obj.kind }, 'info');
-      if (this.canReadMap()) this.message({ key: 'mapHint' }, 'info');
     } else if (obj && OBJECTS[obj.kind].climb) this.climb(nx, ny, obj.kind);
     else if (!onSnow && this.map.get(nx, ny) === Tile.Snow) this.message({ key: 'snowCold' }, 'warn');
     this.endTurn();
@@ -715,6 +783,43 @@ export class Game {
     return true;
   }
 
+  /** Add a room to the hut the explorer is in. */
+  addRoom(id: RoomId): boolean {
+    const problem = this.roomProblem(id);
+    if (problem) {
+      this.message(problem, 'info');
+      return false;
+    }
+    const hut = this.hutHere()!;
+    const cost = this.roomCost(id);
+    this.inventory.takeAll(cost);
+    hut.rooms = [...(hut.rooms ?? []), id];
+    const p = this.player;
+    this.emit({ type: 'sparkle', x: p.x, y: p.y });
+    this.message({ key: 'roomBuilt', room: id }, 'good');
+    this.gainXp(Object.values(cost).reduce((sum, n) => sum + (n ?? 0), 0), p.x, p.y);
+    this.endTurn();
+    return true;
+  }
+
+  /** Drink from the rain barrel of the hut the explorer is in. */
+  drinkBarrel(): boolean {
+    if (!this.hasRoom('barrel')) {
+      this.message({ key: 'notInHut' }, 'info');
+      return false;
+    }
+    if (!this.drink(BARREL_DRINK, { key: 'drinkBarrel' })) return false;
+    this.endTurn();
+    return true;
+  }
+
+  /** True once after the explorer walked into a hut: the UI then shows its inside. */
+  takeHutRequest(): boolean {
+    const asked = this.hutAsked;
+    this.hutAsked = false;
+    return asked;
+  }
+
   /**
    * Leave the island on the finished goal. The boat of island 1 takes the
    * explorer to the next island; on the last island play can go on here.
@@ -789,6 +894,11 @@ export class Game {
       return false;
     }
     const p = this.player;
+    const cap = this.restCap(p.x, p.y);
+    if (this.needs.energy >= cap) {
+      this.message({ key: 'restLimit', cap }, 'info');
+      return false;
+    }
     const shelter = this.shelterAt(p.x, p.y);
     const obj = this.objectAt(p.x, p.y);
     if (shelter > 0) {
@@ -808,7 +918,11 @@ export class Game {
     for (let i = 0; i < SLEEP_LIMIT && this.sleeping; i++) {
       this.endTurn();
       if (!this.sleeping) break; // fainted
-      if (this.needs.energy >= 100) reason = 'rested';
+      if (this.needs.energy >= cap && cap < 100) {
+        // Away from the hut bed, sleep only goes so far.
+        this.needs.energy = cap;
+        reason = 'restless';
+      } else if (this.needs.energy >= 100) reason = 'rested';
       else if (this.needs.warmth < 12) reason = 'cold';
       else if (this.needs.food <= 0) reason = 'hungry';
       else if (this.needs.water <= 0) reason = 'thirsty';
@@ -1092,6 +1206,7 @@ export class Game {
       hunger: this.has('small_appetite') ? SMALL_APPETITE : 1,
       chill: this.has('thick_skin') ? THICK_SKIN : 1,
       cold: this.map.get(p.x, p.y) === Tile.Snow ? SNOW_CHILL : 0,
+      heal: !this.hutHere() ? 1 : this.hasRoom('hearth') ? HEARTH_HEAL : BED_HEAL,
     });
     if (!this.sleeping) this.warnAboutNeeds();
 
@@ -1633,7 +1748,10 @@ export class Game {
       height: this.map.height,
       tiles: String.fromCharCode(...this.map.tiles.map((t) => t + 48)),
       explored: Array.from(this.map.explored, (e) => (e ? '1' : '0')).join(''),
-      objects: [...this.objects].map(([i, o]) => (o.readyAt ? [i, o.kind, o.readyAt] : [i, o.kind])),
+      objects: [...this.objects].map(([i, o]) => {
+        if (o.rooms?.length) return [i, o.kind, o.readyAt ?? 0, [...o.rooms]];
+        return o.readyAt ? [i, o.kind, o.readyAt] : [i, o.kind];
+      }),
       animals: this.animals.map((a) => ({ ...a })),
       player: { ...this.player },
       home: { ...this.home },
@@ -1683,7 +1801,11 @@ export class Game {
     }
     if (data.v === 7) {
       // Version 7 had no island stars. The days without fainting count from now.
-      data = { ...data, v: SAVE_VERSION, stars: [], fishHere: 0, safeSince: data.turn };
+      data = { ...data, v: 8, stars: [], fishHere: 0, safeSince: data.turn };
+    }
+    if (data.v === 8) {
+      // Version 8 huts had no rooms. Their objects need no change: a hut gets its bed for free.
+      data = { ...data, v: SAVE_VERSION };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

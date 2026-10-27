@@ -63,7 +63,7 @@ flowchart TB
     inv["inventory.ts"]
     world["worldgen.ts"]
     support["map.ts · fov.ts · pathing.ts · rng.ts · actors.ts"]
-    defs["defs/<br/>items · objects · recipes · animals · skills · levels"]
+    defs["defs/<br/>items · objects · recipes · rooms · animals · skills · levels"]
   end
   subgraph Art["Sprite layer (pure data)"]
     sprites["sprites/<br/>pixel art generated in code"]
@@ -83,7 +83,7 @@ flowchart TB
 | Module | Responsibility |
 |---|---|
 | `src/game/game.ts` | The `Game` class. Holds all state. Runs actions and the turn. Sends events. Saves and loads. |
-| `src/game/defs/*.ts` | Data registries for items, world objects, recipes, animals, skills and levels (island goals). |
+| `src/game/defs/*.ts` | Data registries for items, world objects, recipes, hut rooms, animals, skills and levels (island goals). |
 | `src/game/needs.ts` | The five needs and how one turn changes them. |
 | `src/game/clock.ts` | Time of day, daylight, day and night phases. |
 | `src/game/inventory.ts` | What the player carries (a count per item). |
@@ -97,7 +97,7 @@ flowchart TB
 | `src/ui/animator.ts` | Turns game events into timed animations. |
 | `src/ui/input.ts` | Maps keys to commands. Finds a direction from a touch point. |
 | `src/ui/mapview.ts` | Draws the Cartographer's map of the explored island as one sprite (see 4.15). |
-| `src/main.ts` | Connects everything: HUD, Bag, Build, Skills and Map panels, the grill button above the campfire, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
+| `src/main.ts` | Connects everything: HUD, Bag, Build, Skills, Hut and Map panels, the grill button above the campfire, the island goal card, the sail question and end screen, touch and keys, render loop, autosave, language switch. |
 | `src/game/messages.ts` | The `Msg` type: every log message as data (a key and its arguments). |
 | `src/i18n/*.ts` | All text the player sees, in English (`en.ts`) and German (`de.ts`). |
 | `src/sprites/*.ts` | All pixel art, made in code from a shared palette. |
@@ -168,6 +168,8 @@ All actions return `true` when time passed and `false` when nothing happened.
 | `learn(skill)` | Spends skill points on a skill. No turn passes. |
 | `sail()` | Leaves the island on the finished goal (see 4.12). |
 | `sleep()` | Sleeps for many turns until a stop condition (see 4.4). |
+| `addRoom(room)` | Adds a room to the hut the player stands in (see 4.18). |
+| `drinkBarrel()` | Drinks at the rain barrel of the hut the player stands in (see 4.18). |
 
 What `move` does when the target cell is not free:
 
@@ -207,7 +209,7 @@ Change per turn:
 | Energy | −0.25 | +1.4 × (0.4 + 0.6 × shelter) |
 | Warmth | moves towards a target (see 4.3): +1.5 up, −0.6 down | same |
 | Health | −1 for each empty need (Food, Water, Energy, Warmth) | same |
-| Health | +0.25 if no need is empty and Food and Water are above 50 | +0.5 |
+| Health | +0.25 if no need is empty and Food and Water are above 50 | +0.5; in a hut bed +1, with a hearth +1.5 (see 4.4) |
 
 What this means in play (awake, no food or drink):
 
@@ -264,9 +266,27 @@ Shelter values:
 
 ### 4.4 Sleep
 
-The player can sleep when Energy is below 95. Sleep repeats turns until one of
-these occurs:
+The player can sleep when Energy is below 95 and below the rest limit of the
+place. **Only the bed in the hut (the camp) gives a full rest.** The rest
+limit (`restCap()`) is the most Energy a sleep there gives:
 
+| Place | Rest limit |
+|---|---|
+| Open ground | 50 (`OPEN_REST`) |
+| Cave floor | 60 (`CAVE_REST`) |
+| Lean-to | 75 (`rest` of the object) |
+| Hut (its bed) | 100 |
+
+At or above the limit, `sleep()` logs `restLimit` and no turn passes.
+
+In a hut, Health also comes back faster while asleep: ×2 (`BED_HEAL`, +1 per
+turn), ×3 with a hearth (`HEARTH_HEAL`, +1.5 per turn). The `heal` condition
+in `needs.ts` does this.
+
+Sleep repeats turns until one of these occurs:
+
+- Energy reaches the rest limit below 100 (`restless`: "You wake up, but not
+  fully rested").
 - Energy is 100 ("You wake up feeling rested").
 - Warmth is below 12 ("Too cold to sleep").
 - Food or Water is 0.
@@ -275,14 +295,14 @@ these occurs:
 
 When the player sleeps in a shelter or a cave, that cell becomes home.
 
-Time to sleep from Energy 20 to 100:
+Time to sleep from Energy 20 to the rest limit:
 
 | Place | Turns | Game hours |
 |---|---|---|
-| Open ground | about 143 | 14 (the cold usually wakes the player first) |
-| Cave | about 82 | 8 |
-| Lean-to | about 75 | 7.5 |
-| Hut | about 57 | 5.7 |
+| Open ground (to 50) | about 54 | 5.4 (the cold often wakes the player first) |
+| Cave (to 60) | about 41 | 4.1 |
+| Lean-to (to 75) | about 52 | 5.2 |
+| Hut (to 100) | about 57 | 5.7 |
 
 The UI does not animate each turn of sleep. It shows one `fade` event.
 
@@ -340,6 +360,11 @@ off part of the island. This check counts brambles as open and rivers as
 crossable (as if every bramble were cleared and every bridge built).
 Shelters (`walkable`) can be placed anywhere free, and the player can walk
 into them.
+
+Only one hut can stand on each island (the camp): with a hut on the island,
+`buildProblem('hut')` is `oneHut`. The Build panel shows that note, and before
+the Cartographer skill it says that a map of the island hangs on the hut wall
+with that skill (`hutMapRemark`).
 
 Special recipes:
 
@@ -422,7 +447,8 @@ The player gets XP (experience):
 | Action | XP |
 |---|---|
 | Gather from an object | 1 |
-| Build or make a recipe | 1 for each item in its cost (campfire 5, hut 22, cook a fish 1) |
+| Build or make a recipe | 1 for each item in its cost (campfire 5, hut 98, cook a fish 1) |
+| Add a room to the hut | 1 for each item in its cost (workshop 20, hearth 16, rain barrel 11) |
 | Catch a fish | 2 |
 | Give an item to the island goal (the boat) | 1 for each item |
 
@@ -445,7 +471,7 @@ on a path cost 1 point, the third, fourth and fifth cost 2.
 | Building | Fishing rod | Unlocks the fishing rod recipe | `recipes.ts` (`skill`) |
 | | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
 | | Rope maker | The rope recipe makes 2 rope, not 1. The Build panel shows "Rope ×2". | `Game.recipeMakes()` |
-| | Cartographer | In a hut, the Map button shows a map of the explored island (see 4.15) | `Game.canReadMap()`, `mapview.ts` |
+| | Cartographer | In a hut, a map of the explored island hangs on the wall (see 4.15) | `Game.canReadMap()`, `mapview.ts` |
 | Explorer | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
 | | Small appetite | Food drops 20% slower | `needs.ts` (`hunger`) |
 | | Thick skin | Warmth drops 30% slower | `needs.ts` (`chill`) |
@@ -631,9 +657,9 @@ With the Cartographer skill (Building path, fourth, 2 points), the explorer
 keeps a map on the wall of every hut. There is no map anywhere else.
 
 - `game.canReadMap()` is true when the skill is learned and the player stands
-  on a hut. Only then does `main.ts` show the **Map** button (between Skills
-  and Sleep) and accept the `m` key. Stepping into a hut with the skill logs
-  `mapHint` after `stepInto`.
+  on a hut. Then the Hut panel (see 4.18) shows the map on the wall with a
+  **Look** button, and the `m` key opens it. Without the skill the wall has an
+  empty nail and a tip (`noMap`). Old logs can still have `mapHint`.
 - The Map panel shows `drawMap()` from `src/ui/mapview.ts`: the explored cells
   as washes of colour on old paper. Unknown cells stay blank paper. The map is
   rough on purpose: each 2 × 2 block of cells (`MAP_BLOCK`) becomes one 3 × 3
@@ -706,6 +732,41 @@ the goal.
   `need`. The Build panel shows them in a card under the goal card: a gold
   `ui_star` when earned, else a grey `ui_star_empty` and the progress. The
   end screen shows all stars earned ("Stars: 4 of 6").
+
+### 4.18 The camp: the hut and its rooms
+
+The hut is the camp. It costs 40 wood, 30 leaves, 20 stone and 8 rope, and
+each island has only one (see 4.8). It is the only place for a full rest and
+heals faster (see 4.4).
+
+- **Inside.** Walking into a hut logs `enterHut` and sets a flag that the UI
+  reads with `game.takeHutRequest()`: `main.ts` opens the **Hut panel**. While
+  the player stands in a hut, the **Hut** button (between Skills and Sleep)
+  and the `e` key open it again. `game.hutHere()` gives the hut. A walk
+  (tap-to-travel, hold) stops when the panel opens.
+- **The Hut panel** shows the rooms side by side as one picture
+  (`room_main` or `room_main_map`, then each room), at the largest whole
+  scale that fits; the hearth flickers (not with reduced motion). Under it:
+  the bed (Sleep), the map (Look, or the empty nail), one row for each room,
+  and "Add a room" with each missing room, its cost and a Build button.
+- **Rooms** (`ROOMS` in `src/game/defs/rooms.ts`). A hut keeps its rooms in
+  `rooms` on its `WorldObject`. `game.addRoom(id)` needs the player in the
+  hut and the materials (`roomCost()`, with Handy builder 1 wood less), and
+  gives 1 XP for each item, with sparkles and `roomBuilt`.
+
+| Room | Cost | Effect | Where |
+|---|---|---|---|
+| Workshop (`workshop`) | 12 wood, 6 stone, 2 rope | The rope recipe in this hut makes 1 more (`WORKSHOP_ROPE`): 2, or 3 with Rope maker | `Game.recipeMakes()` |
+| Hearth (`hearth`) | 12 stone, 4 wood | A fire on the hut's own cell: cook fish there (the grill button too), light 2 cells at night (`HEARTH_LIGHT`), heal ×3 asleep | `Game.nearestFire()`, `lights()`, `endTurn()` |
+| Rain barrel (`barrel`) | 8 wood, 3 rope | Drink at home: +35 Water (`BARREL_DRINK`) | `Game.drinkBarrel()` |
+
+- **Outside**, the hut sprite shows its rooms: `hutSprite(rooms, frame)` in
+  `rooms.ts` gives `hut`, `hut_workshop`, `hut_workshop_hearth_barrel`… The
+  workshop is a bench under an awning on the left, the hearth a chimney with
+  smoke (2 frames, `…_2`), the rain barrel stands at the front right.
+  `game.objectSprite(obj, frame)` picks the name; the renderer passes its
+  fire frame.
+- The HUD line in a hut says "In your hut" (also with a hearth).
 
 ---
 
@@ -839,6 +900,7 @@ sprite. The sprite test fails if a sprite is missing.
 | Items | `src/game/defs/items.ts` (`ITEMS`) | `item_<id>` | Bag panel, recipes, gathering, eating |
 | World objects | `src/game/defs/objects.ts` (`OBJECTS`) | `<kind>`, plus `depletedSprite` and `frames` if set | World, gathering, shelter, fire |
 | Recipes | `src/game/defs/recipes.ts` (`RECIPES`) | the sprite of the object it builds | Build panel |
+| Hut rooms | `src/game/defs/rooms.ts` (`ROOMS`) | `room_<id>` inside, and the hut sprites with each set of rooms | Hut panel (see 4.18) |
 | Levels | `src/game/defs/levels.ts` (`LEVELS`) | the sprites of the goal objects | Island goal (see 4.12) |
 | Animals | `src/game/defs/animals.ts` (`ANIMALS`) | `animal_<kind>` | Spawning, animal behaviour |
 
@@ -870,6 +932,7 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `depletedSprite` | Sprite while waiting to regrow. |
 | `drink` | Water per drink. |
 | `shelter` | 0 to 1. Warmer nights, faster sleep, becomes home. |
+| `rest` | The most Energy a sleep here gives (lean-to 75, hut 100; see 4.4). |
 | `warmthRadius` | Warms the player within this many cells. |
 | `lightRadius` | Lights cells at night. |
 | `frames` | Sprite names for an animation (2 frames, 220 ms each). |
@@ -922,7 +985,8 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 |---|---|
 | Items | coconut, berries, mushroom, cooked fish, apple (food; apple 12 food, 8 water); wood, leaves, stone, fish, rope (materials; fish is raw); tar, resin (rare goal materials); stone axe, fishing rod (tools) |
 | Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (10 wood, 8 leaves, 4 stone), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (40 wood, 30 leaves, 20 stone, 8 rope; one on each island), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (6 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall) |
+| Hut rooms | workshop (12 wood, 6 stone, 2 rope), hearth (12 stone, 4 wood), rain barrel (8 wood, 3 rope) (see 4.18) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
 | Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound (see 4.17) |
@@ -945,7 +1009,9 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
   Call `outline()` first.
 - Sizes: terrain tiles are 16 × 16. Most objects are 16 × 16. Palms and trees
   are 24 × 32, the boat 24 × 30, the hut and the beacon 24 × 28, the lean-to
-  20 × 20 and the fishing pose 32 × 24. All are drawn bottom-centre on their
+  20 × 20 and the fishing pose 32 × 24. The rooms inside the hut
+  (`src/sprites/interiors.ts`) are 32 × 24 each and are only drawn in the Hut
+  panel. All are drawn bottom-centre on their
   cell, so tall sprites overlap the cell above.
 - **Transition tiles** are 12 tiles per set: 4 edges, 4 outer corners and 4
   inner corners. `transitionTileName()` picks one from the neighbour cells.
@@ -1025,11 +1091,12 @@ The render loop runs at full frame rate while the animator is busy, and every
 | Press and hold (280 ms) | Walk towards the finger until release. Moving the finger steers. |
 | Bag / Build / Skills / Sleep buttons | Open the panels, or sleep |
 | Grill button (above a campfire, with raw fish) | Cook one fish |
-| Map button (in a hut, with Cartographer) | Look at the map of the island |
+| Walk into the hut, or the Hut button (in a hut) | Go inside: the Hut panel with the bed, the map and the rooms |
+| Look (Hut panel, with Cartographer) | Look at the map of the island |
 | Feed dog (Bag panel) | Give the dog one item |
 | Walk into your dog | Swap places with it |
 | 🌐 button (Bag panel and explorer picker) | Switch between English and German |
-| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `g`: grill a fish at the fire. `m`: map (in a hut, with Cartographer). `z`: sleep. `Esc`: close a panel. |
+| Keys | Arrows, WASD, `hjkl`, numpad: move. `.` or `5`: wait. `i`: bag. `b`: build. `p`: skills. `g`: grill a fish at the fire. `e`: go inside the hut you stand in. `m`: map (in a hut, with Cartographer). `z`: sleep. `Esc`: close a panel. |
 
 Auto-walk (travel and hold) stops when:
 
@@ -1041,7 +1108,8 @@ Auto-walk (travel and hold) stops when:
 
 ## 9. Saving
 
-- `main.ts` saves `game.toSave()` as JSON in `localStorage` (`pwagame.save`)
+- `main.ts` saves `game.toSave()` as JSON in `localStorage` (`pwagame.save`;
+  a preview build uses `pwagame-<name>.save`, see below)
   0.8 s after each action, when the page is hidden, and on `pagehide`.
 - On start, the game loads the save. If the save is missing or broken, a new
   island starts.
@@ -1053,8 +1121,11 @@ Auto-walk (travel and hold) stops when:
   (`safeSince`), warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 8. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 8 added
+- `SAVE_VERSION` is 9. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 9 added the
+  rooms of a hut: an object is `[cell, kind, readyAt or 0, rooms]` when it
+  has rooms. Version 8 saves load as they are; their huts have a bed and no
+  rooms. Version 8 added
   `stars`, `fishHere` and `safeSince`; version 7 saves load with no stars,
   0 fish and `safeSince` at their turn. Their island 1 has no tide islet, so
   its hull needs no tar, and the goal card offers "New island, keep
@@ -1069,6 +1140,15 @@ Auto-walk (travel and hold) stops when:
   at level 1, but their island has no boat: the goal card tells the player
   to start a new island. Version 2 saves load with 0 XP and no skills. Version 1 saves also load: their log lines were
   English text and become `legacy` messages.
+- **The preview on GitHub Pages.** The site root is always the game on
+  `main`. Updates for testing go to the `preview` branch. A push there runs
+  "Preview checks" (`preview.yml`); when they pass, the deploy workflow
+  (`pages.yml`) runs from `main` (only `main` may deploy) and also builds
+  each branch in `PREVIEWS` (`<folder>=<branch>`, now `preview=preview`) with
+  `VITE_PREVIEW=<folder>` into `<site>/<folder>/`. A preview build keeps its
+  keys under `pwagame-<folder>.` and registers no service worker, so it never
+  touches the main game's save. Merging `preview` into `main` publishes
+  everything on it at once.
 - The chosen explorer (female or male) is saved as `pwagame.body`.
 - The language is saved as `pwagame.lang`.
 - The Bag panel has "New island" and "Reset all progress" (tap two times to
@@ -1103,8 +1183,8 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, animals, XP and skills, fishing and cooking, saving, events |
-| `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each possible neighbour pattern has a transition tile. |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
+| `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each set of hut rooms has its hut sprites (both smoke frames), and each room its inside sprite. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
@@ -1134,6 +1214,10 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Health regen threshold | `needs.ts` → `RATES.healthRegenAbove` | 50 |
 | Animal top-up | `game.ts` → `RESPAWN_EVERY` | 50 turns |
 | Longest sleep | `game.ts` → `SLEEP_LIMIT` | 200 turns |
+| Rest limits | `game.ts` → `OPEN_REST`, `CAVE_REST`; `objects.ts` → `rest` | 50, 60; lean-to 75, hut 100 |
+| Healing asleep in a hut | `game.ts` → `BED_HEAL`, `HEARTH_HEAL` | ×2, ×3 |
+| Hut cost, room costs | `recipes.ts` → `hut`; `rooms.ts` → `ROOMS` | see 4.18 |
+| Workbench rope, barrel drink, hearth light | `game.ts` → `WORKSHOP_ROPE`, `BARREL_DRINK`, `HEARTH_LIGHT` | +1 rope, 35, 2 cells |
 | Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 104 × 80 |
 | Region sizes | `worldgen.ts` → `HOME_SHARE`, `FOREST_SHARE`, `MIN_FAR_SHARE` | 0.38, 0.7, 0.15 |
 | Springs and chests | `worldgen.ts` → `SPRINGS`, `HOME_SPRINGS`, `CHESTS` | 8, 2, [2, 3, 3] |
@@ -1201,6 +1285,15 @@ Also run `npm run build` (typecheck and build) before you commit.
   normal shore tiles, so a few pixels of shallow water show at each end.
 - Animals can appear on the islet (crabs, monkeys, also snakes).
 - There is no sound.
+- Building the hut gives 98 XP at once (1 XP for each item), several skill
+  points. This has not been tested with real play.
+- The hearth only counts as a fire on the hut's own cell: it does not warm
+  the cells around the hut.
+- Saves from before version 9 can have more than one hut on an island. Each
+  keeps working; only new huts are limited to one.
+- The main game's service worker (on `main`) also sees the pages of a preview
+  folder. When the player is offline, it can show the last page it loaded,
+  also a preview page.
 - The balance of XP and skill costs has not been tested with real play.
 - The game has not been tested on a real phone.
 

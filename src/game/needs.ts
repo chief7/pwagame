@@ -26,6 +26,8 @@ export interface Conditions {
   chill?: number;
   /** Extra cold out in the open, day and night (snow on the peaks). */
   cold?: number;
+  /** How much faster Health comes back while asleep (a hut bed, a hearth); default 1. */
+  heal?: number;
 }
 
 const RATES = {
@@ -62,7 +64,7 @@ export function tickNeeds(n: Needs, c: Conditions): Needs {
 
   const empty = (['food', 'water', 'energy', 'warmth'] as const).filter((k) => n[k] <= 0).length;
   if (empty > 0) n.health -= RATES.healthDrainPerEmpty * empty;
-  else if (n.food > RATES.healthRegenAbove && n.water > RATES.healthRegenAbove) n.health += RATES.healthRegen * (c.sleeping ? 2 : 1);
+  else if (n.food > RATES.healthRegenAbove && n.water > RATES.healthRegenAbove) n.health += RATES.healthRegen * (c.sleeping ? 2 * (c.heal ?? 1) : 1);
 
   for (const k of NEED_IDS) n[k] = Math.max(0, Math.min(100, n[k]));
   return n;

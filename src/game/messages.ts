@@ -2,6 +2,7 @@ import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
 import type { LevelId, StageId, StarId } from './defs/levels';
 import type { ObjectKind } from './defs/objects';
+import type { RoomId } from './defs/rooms';
 import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
 
@@ -9,14 +10,26 @@ import type { NeedId } from './needs';
 // the UI turns a Msg into words in the player's language (see src/i18n/),
 // so the log can switch language after the fact.
 
-export type WakeReason = 'rested' | 'cold' | 'hungry' | 'thirsty' | 'none';
+/** `restless`: as rested as this place allows; only the bed in a hut gives a full rest. */
+export type WakeReason = 'rested' | 'restless' | 'cold' | 'hungry' | 'thirsty' | 'none';
 
 export type Msg =
   | { key: 'arrive' }
   | { key: 'seaSalty' }
   | { key: 'stepInto'; obj: ObjectKind }
-  /** Stepped into a hut with Cartographer: the map hangs on its wall. */
+  /** Stepped into a hut with Cartographer: the map hangs on its wall (old logs only; the Hut panel shows it now). */
   | { key: 'mapHint' }
+  /** Walked into the hut: the explorer goes inside. */
+  | { key: 'enterHut' }
+  /** Tried to build a second hut on this island. */
+  | { key: 'oneHut' }
+  /** Added a room to the hut. */
+  | { key: 'roomBuilt'; room: RoomId }
+  /** A room action outside the hut (or in a hut without that room). */
+  | { key: 'notInHut' }
+  | { key: 'drinkBarrel' }
+  /** Tried to sleep with as much Energy as this place can give: `cap` is that Energy. */
+  | { key: 'restLimit'; cap: number }
   | { key: 'tooFull' }
   | { key: 'eat'; item: ItemId }
   | { key: 'build'; obj: ObjectKind }

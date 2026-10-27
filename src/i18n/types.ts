@@ -3,6 +3,7 @@ import type { ItemId } from '../game/defs/items';
 import type { LevelId, StageId, StarId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
+import type { RoomId } from '../game/defs/rooms';
 import type { PathId, SkillId } from '../game/defs/skills';
 import type { FloatWhat, Msg } from '../game/messages';
 import type { NeedId } from '../game/needs';
@@ -86,7 +87,28 @@ export interface Strings {
     /** On an island from before the tide islet: start a new island 1 and keep bag, XP, skills and dog. */
     oldIsland: string;
     keepProgress: string;
+    /** The Hut button and the Hut panel: the bed, the map wall, the rooms and adding a room. */
+    hut: string;
+    yourHut: string;
+    bed: string;
+    bedNote: string;
+    lookAtMap: string;
+    mapNote: string;
+    /** On the map wall without the Cartographer skill. */
+    noMap: string;
+    /** Under the hut in the Build panel, before the Cartographer skill. */
+    hutMapRemark: string;
+    /** The workbench row: "Make 2 rope from 2 big leaves". */
+    workbenchNote(n: number): string;
+    makeRope: string;
+    hearthNote: string;
+    cook: string;
+    barrelNote: string;
+    drink: string;
+    addRoom: string;
   };
+  /** Rooms the explorer can add to the hut. */
+  rooms: Record<RoomId, { name: string; description: string }>;
   /** Each island star: its name, and what to do for it. */
   stars: Record<StarId, { name: string; task: string }>;
   /** Goal card hints for the rare materials: where to find them. */
