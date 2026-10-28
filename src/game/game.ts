@@ -1197,7 +1197,7 @@ export class Game {
     hut.rooms = [...(hut.rooms ?? []), id];
     const p = this.player;
     this.emit({ type: 'sparkle', x: p.x, y: p.y });
-    this.message({ key: 'roomBuilt', room: id }, 'good');
+    this.message(hut.kind === 'crew_cabin' ? { key: 'roomBuilt', room: id, cabin: true } : { key: 'roomBuilt', room: id }, 'good');
     this.gainXp(Object.values(cost).reduce((sum, n) => sum + (n ?? 0), 0), p.x, p.y);
     this.endTurn();
     return true;

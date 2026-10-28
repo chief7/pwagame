@@ -878,7 +878,12 @@ wall of rock all round, and one way in (see §5).
 On the oil rig, the crew cabin is the camp: `isCamp()` is true for the hut
 and the crew cabin. The cabin works like a hut in every way below (going
 inside, the Hut panel titled "Your crew cabin", the bed, rooms, the map wall,
-healing, one camp on each island), and it has its own stove.
+healing, one camp on each island), and it has its own stove. Its rooms
+have their own steel pictures (`cabin_main`, `cabin_main_map`,
+`cabin_workshop`, `cabin_hearth` with 2 frames, `cabin_barrel`: riveted
+walls, a grating floor, a porthole and a bunk bed) and their own names
+(`Strings.cabinRooms`: Workbench, Stove, Water tank). The rooms work the
+same as in a hut.
 
 The hut is the camp. It takes 24 logs, 12 wood, 30 leaves, 20 stone and 8 rope, and
 each island has only one (see 4.8). It is the only place for a full rest and
@@ -1888,7 +1893,7 @@ Also run `npm run build` (typecheck and build) before you commit.
 - Rigs from saves before the fishing boat have no boat wreck: their player
   cannot sail.
 - The crew cabin shows its rooms only inside (in the Hut panel), not on the
-  cabin outside, and its rooms look like the wooden rooms of a hut.
+  cabin outside.
 - A deck's safety line also runs across the end of a gangway.
 - The derrick is 32 × 48 pixels and the fishing boat 48 × 28, larger than
   other tall sprites (24 × 32). The boat covers part of the explorer when they

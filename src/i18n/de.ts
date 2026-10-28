@@ -235,6 +235,13 @@ const NEEDS = { health: 'Leben', food: 'Essen', water: 'Wasser', energy: 'Energi
 
 const obj = (kind: ObjectKind, c: Case, det: Det) => phrase(OBJECT[kind], c, det);
 
+/** The rooms of the crew cabin on the oil rig. */
+const CABIN_ROOM: Record<RoomId, Noun> = {
+  workshop: { g: 'f', word: 'Werkbank' },
+  hearth: { g: 'm', word: 'Ofen' },
+  barrel: { g: 'm', word: 'Wassertank' },
+};
+
 const ROOM: Record<RoomId, Noun> = {
   workshop: { g: 'f', word: 'Werkstatt' },
   hearth: { g: 'm', word: 'Kamin' },
@@ -379,6 +386,11 @@ export const de: Strings = {
     hearth: { name: 'Kamin', description: 'Ein Feuer drinnen. Brate Fisch zu Hause und werde im Schlaf schneller gesund.' },
     barrel: { name: 'Regentonne', description: 'Fängt Regen vom Dach auf. So kannst du zu Hause trinken.' },
   },
+  cabinRooms: {
+    workshop: { name: 'Werkbank', description: 'Eine Stahlbank mit Schraubstock. Seile, die du in der Kabine drehst, geben 1 mehr.' },
+    hearth: { name: 'Ofen', description: 'Ein eiserner Ofen. Brate Fisch zu Hause und werde im Schlaf schneller gesund.' },
+    barrel: { name: 'Wassertank', description: 'Fängt Regen vom Kabinendach auf. So kannst du zu Hause trinken.' },
+  },
   stars: {
     chests: { name: 'Schatzsucher', task: 'Öffne jede Truhe auf dieser Insel.' },
     fish: { name: 'Angler', task: 'Fang 5 Fische auf dieser Insel.' },
@@ -501,7 +513,9 @@ export const de: Strings = {
       case 'stepInto': return `Du gehst ${contract(`in ${obj(msg.obj, 'acc', 'the')}`)}. Ein guter Platz zum Schlafen.`;
       case 'enterHut': return msg.obj ? `Du gehst ${contract(`in ${obj(msg.obj, 'acc', 'the')}`)}.` : 'Du gehst in deine Hütte.';
       case 'oneHut': return 'Du hast schon eine Hütte auf dieser Insel. Drinnen baust du neue Räume an.';
-      case 'roomBuilt': return `Du baust ${phrase(ROOM[msg.room], 'acc', 'a')} an deine Hütte an.`;
+      case 'roomBuilt': return msg.cabin
+        ? `Du baust ${phrase(CABIN_ROOM[msg.room], 'acc', 'a')} in deine Mannschaftskabine ein.`
+        : `Du baust ${phrase(ROOM[msg.room], 'acc', 'a')} an deine Hütte an.`;
       case 'notInHut': return 'Das geht nur in deiner Hütte.';
       case 'drinkBarrel': return 'Du trinkst frisches Regenwasser aus der Tonne. Herrlich!';
       case 'restLimit': return `Hier kannst du dich nicht mehr erholen (Energie ${msg.cap}). Nur das Bett in deiner Hütte gibt dir volle Erholung.`;

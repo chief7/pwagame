@@ -147,6 +147,8 @@ export interface Strings {
   };
   /** Rooms the explorer can add to the hut. */
   rooms: Record<RoomId, { name: string; description: string }>;
+  /** The same rooms in the crew cabin on the oil rig: a workbench, a stove, a water tank. */
+  cabinRooms: Record<RoomId, { name: string; description: string }>;
   /** Each island star: its name, and what to do for it. */
   stars: Record<StarId, { name: string; task: string }>;
   /** Goal card hints for the rare materials: where to find them. */

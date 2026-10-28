@@ -861,8 +861,20 @@ const bakedRooms = new Map<string, HTMLCanvasElement>();
 
 /** Sprite of a room inside the hut (frame 1 is the hearth's second flame). */
 function roomSprite(room: RoomId | 'main', frame = 0): string {
-  if (room === 'main') return game.canReadMap() ? 'room_main_map' : 'room_main';
-  return room === 'hearth' && frame % 2 ? 'room_hearth_2' : `room_${room}`;
+  // The crew cabin on the rig has its own steel rooms.
+  const kind = inCabin() ? 'cabin' : 'room';
+  if (room === 'main') return game.canReadMap() ? `${kind}_main_map` : `${kind}_main`;
+  return room === 'hearth' && frame % 2 ? `${kind}_hearth_2` : `${kind}_${room}`;
+}
+
+/** The explorer is in the crew cabin, not a hut. */
+function inCabin(): boolean {
+  return game.hutHere()?.kind === 'crew_cabin';
+}
+
+/** A room's name and description: the cabin's rooms have their own. */
+function roomWords(room: RoomId): { name: string; description: string } {
+  return (inCabin() ? t().cabinRooms : t().rooms)[room];
 }
 
 /** Act from inside the hut: a turn passes, and the panel shows the result. */
@@ -895,7 +907,7 @@ function renderHut(rows: HTMLElement): void {
     closeSheet();
     run({ type: 'sleep' });
   });
-  rows.append(row(icon('room_main'), words.ui.bed, note(words.ui.bedNote), bed));
+  rows.append(row(icon(inCabin() ? 'cabin_main' : 'room_main'), words.ui.bed, note(words.ui.bedNote), bed));
 
   // The map on the wall, or the empty nail.
   if (game.canReadMap()) {
@@ -909,7 +921,7 @@ function renderHut(rows: HTMLElement): void {
   }
 
   for (const room of built) {
-    const name = words.rooms[room].name;
+    const name = roomWords(room).name;
     if (room === 'workshop') {
       const problem = game.buildProblem('rope');
       rows.append(row(icon(roomSprite(room)), name, el('div', {}, [
@@ -929,8 +941,8 @@ function renderHut(rows: HTMLElement): void {
   if (missing.length) rows.append(el('h3', { className: 'path', textContent: words.ui.addRoom }));
   for (const room of missing) {
     const problem = game.roomProblem(room);
-    rows.append(row(icon(roomSprite(room)), words.rooms[room].name, el('div', {}, [
-      el('span', { className: 'row-note', textContent: words.rooms[room].description }), costList(game.roomCost(room)),
+    rows.append(row(icon(roomSprite(room)), roomWords(room).name, el('div', {}, [
+      el('span', { className: 'row-note', textContent: roomWords(room).description }), costList(game.roomCost(room)),
     ]), button(words.ui.build, () => game.addRoom(room), !!problem)));
   }
 }
@@ -945,7 +957,7 @@ function hutScene(rooms: (RoomId | 'main')[]): HTMLElement {
   const view = el('canvas', { width: width * scale, height: first.height * scale });
   view.style.width = `${view.width / dpr}px`;
   view.setAttribute('role', 'img');
-  view.setAttribute('aria-label', t().ui.yourHut);
+  view.setAttribute('aria-label', inCabin() ? t().ui.yourCabin : t().ui.yourHut);
   const ctx = view.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
   const draw = (frame: number) => {

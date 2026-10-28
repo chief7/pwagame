@@ -303,6 +303,11 @@ export const en: Strings = {
     hearth: { name: 'Hearth', description: 'A fire inside. Cook fish at home, and heal faster in your sleep.' },
     barrel: { name: 'Rain barrel', description: 'Catches rain from the roof, so you can drink at home.' },
   },
+  cabinRooms: {
+    workshop: { name: 'Workbench', description: 'A steel bench with a vise. Rope you make in your cabin gives 1 more.' },
+    hearth: { name: 'Stove', description: 'An iron stove. Cook fish at home, and heal faster in your sleep.' },
+    barrel: { name: 'Water tank', description: 'Catches rain from the cabin roof, so you can drink at home.' },
+  },
   stars: {
     chests: { name: 'Treasure hunter', task: 'Open every chest on this island.' },
     fish: { name: 'Angler', task: 'Catch 5 fish on this island.' },
@@ -425,7 +430,9 @@ export const en: Strings = {
       case 'stepInto': return `You step into the ${obj(msg.obj)}. A good place to sleep.`;
       case 'enterHut': return msg.obj ? `You go inside the ${obj(msg.obj)}.` : 'You go inside your hut.';
       case 'oneHut': return 'You already have a hut on this island. Add rooms to it from inside.';
-      case 'roomBuilt': return `You add ${a(en.rooms[msg.room].name.toLowerCase())} to your hut.`;
+      case 'roomBuilt': return msg.cabin
+        ? `You add ${a(en.cabinRooms[msg.room].name.toLowerCase())} to your crew cabin.`
+        : `You add ${a(en.rooms[msg.room].name.toLowerCase())} to your hut.`;
       case 'notInHut': return 'You can only do that inside your hut.';
       case 'drinkBarrel': return 'You drink fresh rain water from the barrel. Lovely!';
       case 'restLimit': return `You can't rest any more here (Energy ${msg.cap}). Only the bed in your hut gives a full rest.`;

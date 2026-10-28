@@ -200,6 +200,134 @@ export function roomBarrel(): Sprite {
   return s.outline();
 }
 
+// The crew cabin on the oil rig has its own rooms: riveted steel walls, a
+// grating floor, a porthole, a bunk bed, an iron stove and a water tank.
+
+/** Steel back wall with plate seams and rivets, a pipe for a post, a grating floor with a yellow kick plate. */
+function cabinRoom(name: string): Sprite {
+  return new Sprite(name, W, H).paint((x, y) => {
+    if (x <= 1) return x === 0 ? P.steelDeep : P.steelDark;
+    if (y < FLOOR - 1) {
+      const seam = x % 8 === 1 || y === 7;
+      const rivet = (x % 8 === 3 || x % 8 === 7) && (y === 2 || y === 12);
+      return seam ? P.steelDark : rivet ? P.steelLight : hash2(x, y, 93) < 0.025 ? P.rust : y < 2 ? P.steelDark : P.steel;
+    }
+    if (y === FLOOR - 1) return Math.floor(x / 2) % 2 ? P.hazard : P.steelDeep;
+    // Grating: bars across, every other row, over the dark below.
+    return (y - FLOOR) % 2 === 0 ? (x % 4 === 0 ? P.steelDark : P.steel) : x % 4 === 0 ? P.steelDark : P.steelDeep;
+  });
+}
+
+/** A round porthole: a brass rim, sea and sky behind thick glass. */
+function porthole(s: Sprite, cx: number, cy: number): void {
+  for (let y = cy - 4; y <= cy + 4; y++) {
+    for (let x = cx - 4; x <= cx + 4; x++) {
+      const d = Math.hypot(x + 0.5 - (cx + 0.5), y + 0.5 - (cy + 0.5));
+      if (d > 4.2) continue;
+      s.set(x, y, d > 3.2 ? (x + y < cx + cy ? P.goldLight : P.goldDark) : y < cy ? P.waterShallow : P.water);
+    }
+  }
+  s.set(cx - 1, cy - 2, P.foam);
+  s.set(cx - 2, cy - 1, P.foam);
+}
+
+/** The main room of the cabin: a steel bunk bed, a porthole, and the map once the explorer is a Cartographer. */
+export function cabinMain(withMap: boolean): Sprite {
+  const s = cabinRoom(withMap ? 'cabin_main_map' : 'cabin_main');
+  porthole(s, 7, 6);
+  if (withMap) put(s, wallMapArt(), 18, 2);
+  else s.set(23, 4, P.steelDeep); // an empty hook
+  // Bunk bed: a steel frame with two bunks and grey-blue blankets.
+  for (let y = 5; y <= FLOOR + 1; y++) for (const x of [13, 29]) s.set(x, y, P.steelDeep);
+  for (const by of [8, FLOOR - 1]) {
+    for (let x = 14; x <= 28; x++) {
+      s.set(x, by - 1, x < 17 ? P.paintWhite : P.paintBlue);
+      s.set(x, by, x < 17 ? P.steelLight : P.paintBlueDark);
+      s.set(x, by + 1, P.steelDark);
+    }
+  }
+  // A ladder up to the top bunk.
+  for (let y = 9; y <= FLOOR; y += 2) for (let x = 27; x <= 28; x++) s.set(x, y, P.steelLight);
+  return s.outline();
+}
+
+/** A steel workbench with a vise, spanners on a pegboard, and an oil can. */
+export function cabinWorkshop(): Sprite {
+  const s = cabinRoom('cabin_workshop');
+  // Pegboard with tools.
+  for (let y = 2; y <= 8; y++) for (let x = 6; x <= 22; x++) s.set(x, y, x % 3 === 0 && y % 3 === 0 ? P.woodDark : P.woodCut);
+  for (const [x0, len] of [[8, 5], [12, 4], [16, 6]]) {
+    for (let y = 3; y < 3 + len; y++) s.set(x0, y, P.steelLight);
+    s.set(x0 - 1, 3, P.steelDark);
+    s.set(x0 + 1, 3, P.steelDark);
+  }
+  s.set(20, 3, P.paintRed);
+  for (let y = 4; y <= 7; y++) s.set(20, y, P.steelDark);
+  // The bench top, a vise on its left end, and its legs.
+  for (let x = 4; x <= 26; x++) {
+    s.set(x, FLOOR - 5, P.steelLight);
+    s.set(x, FLOOR - 4, P.steelDark);
+  }
+  for (let y = FLOOR - 3; y <= FLOOR + 1; y++) for (const x of [5, 25]) s.set(x, y, P.steelDeep);
+  for (let y = FLOOR - 8; y <= FLOOR - 6; y++) for (let x = 6; x <= 9; x++) s.set(x, y, y === FLOOR - 8 ? P.steelLight : P.steelDeep);
+  s.set(10, FLOOR - 7, P.steelDark);
+  s.set(11, FLOOR - 7, P.steelDark);
+  // An oil can and a coil of rope on the bench.
+  for (const [x, y, c] of [[18, 9, P.paintRed], [19, 9, P.paintRedDark], [18, 10, P.paintRed], [19, 10, P.paintRedDark], [20, 8, P.steelDark]] as const) s.set(x, y, c);
+  for (const [x, y] of [[22, 10], [23, 10], [22, 9], [23, 9]]) s.set(x, y, P.straw);
+  return s.outline();
+}
+
+/** An iron stove with a glowing window and a pipe up through the ceiling; a kettle on top. The fire flickers. */
+export function cabinStove(frame: 0 | 1): Sprite {
+  const s = cabinRoom(frame ? 'cabin_hearth_2' : 'cabin_hearth');
+  // The pipe.
+  for (let y = 0; y <= 6; y++) for (let x = 15; x <= 17; x++) s.set(x, y, x === 15 ? P.steelDark : P.steelDeep);
+  // The stove body on short legs.
+  for (let y = 7; y <= FLOOR; y++) {
+    for (let x = 10; x <= 22; x++) s.set(x, y, y === 7 ? P.steelDark : x === 10 ? P.steelDark : P.coal);
+  }
+  for (const x of [11, 21]) s.set(x, FLOOR + 1, P.steelDeep);
+  // The fire window.
+  for (let y = 10; y <= 13; y++) {
+    for (let x = 13; x <= 19; x++) {
+      // Flames that lean one way, then the other.
+      const tip = 11 + Math.round(Math.sin((x + frame * 2) * 1.3));
+      s.set(x, y, y === 13 ? P.flameRed : y < tip ? P.interior : y === tip ? P.flameCore : y === 12 ? P.flameOrange : P.flame);
+    }
+  }
+  // A kettle on the top.
+  for (let x = 12; x <= 15; x++) for (let y = 4; y <= 6; y++) s.set(x, y, y === 4 ? P.steelLight : P.steel);
+  s.set(16, 5, P.steel);
+  // Steam from its spout.
+  s.set(17, frame ? 3 : 4, P.steam);
+  // Coal in a bucket beside it.
+  for (let x = 24; x <= 28; x++) for (let y = FLOOR - 2; y <= FLOOR + 1; y++) s.set(x, y, y === FLOOR - 2 ? P.coalShine : x === 24 ? P.steel : P.steelDark);
+  return s.outline();
+}
+
+/** A steel water tank with a blue band and a tap, filled by a pipe from the roof; a mug on a hook. */
+export function cabinTank(): Sprite {
+  const s = cabinRoom('cabin_barrel');
+  for (let y = 0; y <= 6; y++) s.set(14, y, P.steelDeep);
+  for (let y = 6; y <= FLOOR; y++) {
+    for (let x = 9; x <= 20; x++) {
+      s.set(x, y, y === 6 ? P.steelLight : y === 10 || y === 11 ? P.paintBlue : x <= 10 ? P.steelLight : x >= 19 ? P.steelDeep : P.steel);
+    }
+  }
+  // A gauge, and the tap with a drop under it.
+  for (const [x, y, c] of [[12, 8, P.paintWhite], [13, 8, P.paintWhite], [13, 7, P.outline]] as const) s.set(x, y, c);
+  for (const [x, y] of [[21, 13], [22, 13], [22, 14]]) s.set(x, y, P.steelDark);
+  s.set(22, 12, P.paintBlue);
+  s.set(22, 16, P.waterShallow);
+  // A mug on a hook.
+  for (const [x, y, c] of [[26, 4, P.steelDark], [25, 5, P.paintWhite], [26, 5, P.paintWhite], [25, 6, P.paintWhite], [26, 6, P.paintWhite], [27, 5, P.paintWhite]] as const) s.set(x, y, c);
+  return s.outline();
+}
+
 export function interiors(): Sprite[] {
-  return [roomMain(false), roomMain(true), roomWorkshop(), roomHearth(0), roomHearth(1), roomBarrel()];
+  return [
+    roomMain(false), roomMain(true), roomWorkshop(), roomHearth(0), roomHearth(1), roomBarrel(),
+    cabinMain(false), cabinMain(true), cabinWorkshop(), cabinStove(0), cabinStove(1), cabinTank(),
+  ];
 }
