@@ -252,6 +252,25 @@ export const PALETTE = {
   scorpionLight: '#c4844a',
   scorpionDark: '#64361c',
 
+  // The oil rig: painted steel, rust and safety paint.
+  steel: '#8a96a0',
+  steelLight: '#b4bec6',
+  steelDark: '#5f6b75',
+  steelDeep: '#3c444c',
+  rust: '#a65a2e',
+  rustLight: '#c97f48',
+  rustDark: '#6f3a1e',
+  hazard: '#e9b824',
+  hazardDark: '#a87f12',
+  paintWhite: '#e4e8e6',
+  paintRedLight: '#e0705a',
+  paintRed: '#c8432f',
+  paintRedDark: '#8e2c1f',
+  paintBlue: '#3f6f9a',
+  paintBlueDark: '#2c4f70',
+  glass: '#2a4a5c',
+  waterShade: '#1f5f7e',
+
   // The Cartographer's map: ink and washes on old paper.
   paper: '#ead8ae',
   paperLight: '#f5e8c6',
