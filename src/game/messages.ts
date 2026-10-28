@@ -25,7 +25,7 @@ export type Msg =
   /** Tried to build a second hut on this island. */
   | { key: 'oneHut' }
   /** Added a room to the hut. */
-  | { key: 'roomBuilt'; room: RoomId }
+  | { key: 'roomBuilt'; room: RoomId; cabin?: true }
   /** A room action outside the hut (or in a hut without that room). */
   | { key: 'notInHut' }
   | { key: 'drinkBarrel' }

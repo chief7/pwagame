@@ -3194,6 +3194,7 @@ describe('Game: the crew cabin is the camp on the rig', () => {
     give(game, ROOMS.hearth.cost);
     expect(game.addRoom('hearth')).toBe(true);
     expect(game.hutHere()?.rooms).toEqual(['hearth']);
+    expect(game.log.map((e) => e.msg)).toContainEqual({ key: 'roomBuilt', room: 'hearth', cabin: true });
     expect(game.canReadMap()).toBe(false);
     game.skills.add('cartographer');
     expect(game.canReadMap()).toBe(true);
