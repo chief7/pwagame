@@ -362,14 +362,18 @@ const en: WikiWords = {
       title: 'Island 1: the tropical island',
       paras: [
         'The island has three parts. You start on the **home coast**. A wall of **brambles** closes it off: make a stone axe to chop through. Behind it is the **wild forest**, and then a **river**: build a bridge to reach the **far side**, where most hills and caves are.',
+        'Wide sandy beaches with palms, a forest of broadleaf and pine trees, and **three deep caves**. Coconuts, berries, mushrooms, fish and glowcaps are the food. Crabs, turtles, monkeys, piglets and bats live here, and far from camp boars, wasps, snakes and cave bears.',
         'An old **boat wreck** lies on a beach of the far side. Repair it and sail to the next island. The hull needs **tar** from the old barrels on the tide islet (walk over the sandbar at low tide).',
+        'When the boat is ready, walk into it to set sail. You land on Pine Ridge and keep your bag, XP, skills, stars and your dog.',
       ],
     },
     two: {
       title: 'Island 2: Pine Ridge',
       paras: [
-        'A cold island with a northern forest and a big mountain. There are no coconuts here: apples, berries, mushrooms and fish are the food. Snow is cold even in the day.',
+        'A cold island with a northern forest of spruces, birches, apple trees and ferns, a big mountain of cliffs and scree, and **two deep caves**. There are no coconuts here: apples, berries, mushrooms, fish and glowcaps are the food. Snow is cold even in the day: bring wood for a fire.',
+        'Crabs, rabbits, squirrels and bats live here, and far from camp boars, wasps, cave bears and **mountain goats**. The goats climb over the rocky steps.',
         'An old stone ring stands on the snowy peak. Build a **signal beacon** on it and light it, so a passing ship takes you on board. On the way up, you cross a ring of **rocky steps** (build a ladder on one) and then a ring of **ice walls** (hang a climbing rope on one). The tinder needs **resin** from snowy spruces.',
+        'This is the last island for now. After the ship comes, you can stay on Pine Ridge or start a new island.',
       ],
     },
     goalTitle: 'Goal stages',
@@ -619,14 +623,18 @@ const de: WikiWords = {
       title: 'Insel 1: die Tropeninsel',
       paras: [
         'Die Insel hat drei Teile. Du beginnst an der **Heimatküste**. Eine Wand aus **Dornengestrüpp** sperrt sie ab: Bau eine Steinaxt, um dich durchzuschlagen. Dahinter liegt der **wilde Wald** und dann ein **Fluss**: Bau eine Brücke zur **anderen Seite**, wo die meisten Hügel und Höhlen sind.',
+        'Breite Sandstrände mit Palmen, ein Wald aus Laubbäumen und Kiefern und **drei tiefe Höhlen**. Kokosnüsse, Beeren, Pilze, Fisch und Leuchtpilze sind das Essen. Hier leben Krabben, Schildkröten, Affen, Ferkel und Fledermäuse, und weit weg vom Lager Wildschweine, Wespen, Schlangen und Höhlenbären.',
         'Ein altes **Bootswrack** liegt an einem Strand auf der anderen Seite. Repariere es und segle zur nächsten Insel. Der Rumpf braucht **Teer** aus den alten Fässern auf der Gezeiteninsel (geh bei Ebbe über die Sandbank).',
+        'Wenn das Boot fertig ist, lauf dagegen, um loszusegeln. Du landest auf dem Kiefernkamm und behältst deine Tasche, EP, Fähigkeiten, Sterne und deinen Hund.',
       ],
     },
     two: {
       title: 'Insel 2: Kiefernkamm',
       paras: [
-        'Eine kalte Insel mit einem Nadelwald und einem großen Berg. Hier gibt es keine Kokosnüsse: Äpfel, Beeren, Pilze und Fisch sind das Essen. Schnee ist auch am Tag kalt.',
+        'Eine kalte Insel mit einem Nadelwald aus Fichten, Birken, Apfelbäumen und Farnen, einem großen Berg aus Klippen und Geröll und **zwei tiefen Höhlen**. Hier gibt es keine Kokosnüsse: Äpfel, Beeren, Pilze, Fisch und Leuchtpilze sind das Essen. Schnee ist auch am Tag kalt: Nimm Holz für ein Feuer mit.',
+        'Hier leben Krabben, Hasen, Eichhörnchen und Fledermäuse, und weit weg vom Lager Wildschweine, Wespen, Höhlenbären und **Bergziegen**. Die Ziegen klettern über die Felsstufen.',
         'Auf dem verschneiten Gipfel steht ein alter Steinkreis. Bau darauf ein **Leuchtfeuer** und zünde es an, damit ein Schiff dich an Bord holt. Auf dem Weg nach oben kommst du über einen Ring aus **Felsstufen** (bau eine Leiter daran) und dann über einen Ring aus **Eiswänden** (häng ein Kletterseil daran). Der Zunder braucht **Harz** von verschneiten Fichten.',
+        'Das ist vorerst die letzte Insel. Wenn das Schiff kommt, kannst du auf dem Kiefernkamm bleiben oder eine neue Insel beginnen.',
       ],
     },
     goalTitle: 'Schritte zum Ziel',

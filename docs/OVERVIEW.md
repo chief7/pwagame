@@ -539,7 +539,7 @@ Each island is a **level** with one big goal: something the player builds
 in stages to leave the island. `src/game/defs/levels.ts` (`LEVELS`) holds
 each level's `biome` (how world generation shapes it, see §5), its goal
 object (`site`) and its stages. Two levels exist: 1 (`tropical`) and 2
-(`mountain`).
+(`mountain`). §4.20 describes each island and its goal as a whole.
 
 Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
 
@@ -834,6 +834,83 @@ heals faster (see 4.4).
   `game.objectSprite(obj, frame)` picks the name; the renderer passes its
   fire frame.
 - The HUD line in a hut says "In your hut" (also with a hearth).
+
+### 4.20 The islands
+
+This section brings together, for each island, what is on it and what its
+goal is. The details are in the sections it links to. Both islands are
+104 × 80 cells and have the same three regions (home coast, wild forest,
+far side), split by a bramble wall and a river (see §5). The explorer
+always starts on a beach of the home coast.
+
+What both islands share:
+
+- 8 springs (2 or more on the home coast) and the river for fresh water.
+- 8 chests in the open (2 home coast, 3 wild forest, 3 far side) and one
+  more at the far end of each deep cave.
+- Deep caves with glowcaps, crystals and bats, and cave bears (see 4.18).
+- One stray dog, far from camp, until the player has a dog (see 4.13).
+- One hut (see 4.19).
+- The Treasure hunter and Safe and sound stars (see 4.17).
+
+#### Island 1: the tropical island (`tropical`)
+
+| | |
+|---|---|
+| Land | Wide sandy beaches, a broadleaf and pine forest, rocky hills with caves, mostly on the far side |
+| Trees and plants | Palms (tall, leaning, young), broadleaf and pine trees, bushes, berry bushes, mushrooms |
+| Food | Coconuts, berries, mushrooms, fish, glowcaps (caves) |
+| Animals | Crab, turtle, monkey, piglet, bat. Wild: boar, wasps, snake, cave bear |
+| Deep caves | 3 |
+| Chests | 12 (8 in the open, 1 on the tide islet, 3 in the deep caves) |
+| Special place | The tide islet with its sandbar, dry only at low tide (5–11 and 17–23 o'clock) (see 4.16) |
+| Rare material | Tar, 6 in all, from the 3 old barrels on the tide islet |
+| Stars | Treasure hunter, Angler (catch 5 fish), Safe and sound |
+
+**Goal: repair the boat and sail away.** An old boat wreck (`boat_wreck`)
+lies on a beach of the far side. The player repairs it in four stages:
+
+1. **Hull** (12 logs, 6 wood, 6 stone, 4 tar). Logs come from trees chopped
+   with the stone axe. Tar comes from the tide islet.
+2. **Mast** (4 logs, 2 wood, 6 rope).
+3. **Sail** (12 leaves, 3 rope).
+4. **Supplies** (4 coconuts, 3 cooked fish). The player needs the Fishing
+   rod skill and a campfire.
+
+The player must clear the brambles and bridge the river to reach the boat.
+When the boat is ready, walking into it asks "Set sail?". The boat sails
+away with the explorer, and the player lands on island 2. The bag, XP,
+skills, stars, needs and the dog come along (see 4.12).
+
+#### Island 2: Pine Ridge (`mountain`)
+
+| | |
+|---|---|
+| Land | A narrow beach, a northern forest, and a mountain of cliffs and scree with snow on the peak |
+| Trees and plants | Spruces, snowy spruces, birches, broadleaf trees, apple trees, ferns, bushes, berry bushes, mushrooms. No palms |
+| Food | Apples, berries, mushrooms, fish, glowcaps (caves). No coconuts |
+| Animals | Crab, rabbit, squirrel, bat. Wild: boar, wasps, mountain goat (climbs over steps), cave bear |
+| Deep caves | 2 |
+| Chests | 10 (8 in the open, 2 in the deep caves) |
+| Cold | Open snow is cold also in the day: its warmth target is 60 by day and 0 at night (see 4.3) |
+| Special places | Two rings of steep steps round the peak: rocky steps (ladder) and ice walls (climbing rope) (see 4.14) |
+| Rare material | Resin, from snowy spruces (50% with each gather; at least 4 trees) |
+| Stars | Treasure hunter, Explorer (explore 75% of the island), Safe and sound |
+
+**Goal: light a signal beacon on the peak.** An old stone ring
+(`beacon_site`) stands on the highest snow. The player builds the beacon
+in three stages:
+
+1. **Stone base** (16 stone).
+2. **Wood pile** (10 logs, 4 wood, 4 rope).
+3. **Tinder** (12 leaves, 4 wood, 3 resin).
+
+To reach the peak, the player builds a ladder on a rocky step and then
+hangs a climbing rope on an ice wall. Bring wood for a campfire, because
+the snow is cold. When the beacon is ready, walking into it asks "Light the
+beacon?". The beacon burns, a passing ship takes the player on board and
+the end screen shows the stars earned. Island 2 is the last level for now:
+the player can stay on the island or start a new one (see 4.12).
 
 ---
 

@@ -107,23 +107,10 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
 - **Fishing:** with the Fishing rod skill you can make a fishing rod. Bump the
   sea while carrying it to fish. Raw fish can't be eaten: cook it next to a
   campfire (tap the grill button above the fire, or use the Build panel).
-- **Island goal:** an old boat wreck lies on a beach on the far side.
-  Repair it in four steps (hull, mast, sail, supplies) by walking into it
-  with what it needs; you can bring things in as many trips as you like.
-  The hull needs tar from the old barrels on a little tide islet off the
-  coast. A sandbar leads there, but it is dry only at low tide (5–11 and
-  17–23 o'clock); if the water comes in while you are on it, you wade back,
-  wet and cold.
-  Rope for the mast and sail is twisted from leaves (Build panel). The Build
-  panel shows the next step. When the boat is ready, walk into it to set
-  sail to the second island. You keep your bag, XP, skills and needs.
-- **Island 2 (Pine Ridge):** a cold island with a northern forest (spruces,
-  birches, apple trees, ferns) and a mountain of cliffs and scree with snow
-  on the peak. Snow is cold even in the day: bring wood for a fire. Build a
-  signal beacon on the peak in three steps (stone base, wood pile, tinder),
-  then light it so a passing ship takes you on board. The tinder needs resin
-  from the snowy spruces. The next island is not
-  built yet, so you can stay or start a new one.
+- **Island goal:** each island has one big goal that gets you off it (see
+  [The islands](#the-islands) below). Walk into the goal with what it needs;
+  you can bring things in as many trips as you like. The Build panel shows
+  the next step.
 - **Island stars:** each island has three optional tasks (open every
   chest, catch 5 fish or explore most of the island, go 3 days without
   fainting). The Build panel shows them; each star gives 5 XP.
@@ -137,6 +124,61 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
   Saves from before the tide islet still work. Their island 1 has no islet,
   so the hull needs no tar, and the Build panel offers a new island 1 that
   keeps your bag, XP, skills and dog.
+
+## The islands
+
+Every island has the same three parts: the home coast where you start, the
+wild forest behind a wall of brambles, and the far side across a river.
+Each island has springs, chests, a few deep caves, a stray dog and room
+for one hut. Each island also has one goal and three stars.
+
+### Island 1: the tropical island
+
+- **The land:** wide sandy beaches with palms, a forest of broadleaf and
+  pine trees, and rocky hills with caves, mostly on the far side. Three deep
+  caves.
+- **Food:** coconuts, berries, mushrooms, fish, and glowcaps in the deep
+  caves.
+- **Animals:** crabs, turtles, monkeys, piglets and bats. Wild: boars,
+  wasps, snakes and cave bears.
+- **The tide islet:** a little islet off a beach, with three old tar
+  barrels, a palm and a chest. A sandbar leads there, but it is dry only at
+  low tide (5–11 and 17–23 o'clock); if the water comes in while you are on
+  it, you wade back, wet and cold.
+- **Goal: repair the boat and sail away.** An old boat wreck lies on a beach
+  on the far side. Repair it in four steps:
+  1. Hull: 12 logs, 6 wood, 6 stone, 4 tar (from the barrels on the islet).
+  2. Mast: 4 logs, 2 wood, 6 rope.
+  3. Sail: 12 leaves, 3 rope.
+  4. Supplies: 4 coconuts, 3 cooked fish.
+
+  Logs come from trees chopped with a stone axe. Rope is twisted from
+  leaves (Build panel). When the boat is ready, walk into it to set sail to
+  the second island. You keep your bag, XP, skills, stars, needs and dog.
+- **Stars:** open every chest, catch 5 fish, go 3 days without fainting.
+
+### Island 2: Pine Ridge
+
+- **The land:** a narrow beach, a northern forest (spruces, birches, apple
+  trees, ferns) and a mountain of cliffs and scree with snow on the peak.
+  Two deep caves. Snow is cold even in the day: bring wood for a fire.
+- **Food:** apples, berries, mushrooms, fish, and glowcaps in the deep
+  caves. There are no coconuts.
+- **Animals:** crabs, rabbits, squirrels and bats. Wild: boars, wasps, cave
+  bears and mountain goats (they climb over the steps).
+- **The way up:** a ring of rocky steps (build a ladder on one) and then a
+  ring of ice walls (hang a climbing rope on one) go round the peak.
+  Climbing costs a little Energy.
+- **Goal: light a signal beacon on the peak.** An old stone ring stands on
+  the highest snow. Build the beacon in three steps:
+  1. Stone base: 16 stone.
+  2. Wood pile: 10 logs, 4 wood, 4 rope.
+  3. Tinder: 12 leaves, 4 wood, 3 resin (from the snowy spruces).
+
+  Then walk into it to light it, and a passing ship takes you on board. The
+  next island is not built yet, so you can stay or start a new one.
+- **Stars:** open every chest, explore most of the island, go 3 days
+  without fainting.
 
 ## Controls
 
