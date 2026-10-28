@@ -6,7 +6,7 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway' | 'platform' | 'rain_tank';
 
 export type Recipe = {
   id: RecipeId;
@@ -52,6 +52,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   lantern: { id: 'lantern', makes: 'lantern', cost: { crystal: 3, wood: 1, rope: 1 } },
   // Island 4: mend a broken gangway between two platforms of the rig with scrap metal.
   gangway: { id: 'gangway', builds: 'gangway_ew', onto: ['gangway_end_n', 'gangway_end_s', 'gangway_end_e', 'gangway_end_w'], cost: { scrap: 6 } },
+  // Island 4: a new cell of deck at the edge of the crew platform, and a tank that catches rain.
+  platform: { id: 'platform', builds: 'platform_deck', cost: { scrap: 6, wood: 2 } },
+  rain_tank: { id: 'rain_tank', builds: 'water_tank', cost: { scrap: 6 } },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];

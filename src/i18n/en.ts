@@ -115,6 +115,8 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   derrick_working: { name: 'drilling tower', gather: 'You fill diesel from the pump' },
   fishing_boat_wreck: { name: 'old fishing boat' },
   fishing_boat: { name: 'fishing boat' },
+  supply_crate: { name: 'supply crate' },
+  platform_deck: { name: 'platform' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -273,6 +275,10 @@ export const en: Strings = {
     holdNote: 'The hold goes with the boat. Heavy things count; the rest does not.',
     inHold: 'In the hold',
     holdEmpty: 'The hold is empty.',
+    radio: 'Radio',
+    radioNote: 'Order one crate each day. About 2 hours later, a helicopter drops it on the helipad.',
+    order: 'Order',
+    orders: { food: 'Food crate', build: 'Building crate', fuel: 'Fuel crate' },
   },
   rooms: {
     workshop: { name: 'Workshop', description: 'A workbench. Rope you make in your hut gives 1 more.' },
@@ -350,6 +356,8 @@ export const en: Strings = {
     ladder: { name: 'Ladder', description: 'Gets you up a rocky step in the mountains. Stand next to the step to build it.' },
     climbing_rope: { name: 'Climbing rope', description: 'Gets you up a wall of ice near the peak. Stand next to the wall to build it.' },
     lantern: { name: 'Crystal lantern', description: 'Cave crystals glow in a little wooden frame. You see further in dark caves and at night.' },
+    platform: { name: 'Platform', description: 'Lays a new piece of deck at the edge of the crew platform. Stand at the edge and face the sea.' },
+    rain_tank: { name: 'Rain tank', description: 'A steel tank that catches rain water. Drink from it.' },
     gangway: { name: 'Mend gangway', description: 'Fixes a broken gangway on the rig with scrap metal. Stand next to a broken end to build it.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
@@ -412,6 +420,14 @@ export const en: Strings = {
         : msg.obj === 'derrick_working'
           ? 'The drilling tower works again! Its pump brings up diesel. Walk into it to fill up.'
           : `The ${obj(msg.obj)} is finished! Walk into it to go inside.`;
+      case 'openRadio': return 'The radio hums. You can order supplies.';
+      case 'noRadio': return 'Stand next to the working radio, after you called for help.';
+      case 'onTheWay': return 'Your crate is on its way. Listen for the helicopter.';
+      case 'orderedToday': return 'You already ordered a crate today. Try again tomorrow.';
+      case 'ordered': return `“One ${en.ui.orders[msg.order].toLowerCase()}, please!” The radio crackles: “On its way!”`;
+      case 'delivered': return `A helicopter roars over the rig and drops a ${en.ui.orders[msg.order].toLowerCase()} on the helipad!`;
+      case 'platformBuilt': return 'You bolt a new piece of deck to the platform.';
+      case 'noDeckSpot': return 'Stand at the edge of the crew platform and face the sea. New deck must stay near the cabin, and away from gangways and other platforms.';
       case 'openChart': return 'You climb on board and unroll the sea chart.';
       case 'noBoat': return 'Stand next to the fishing boat.';
       case 'hereAlready': return 'You are here already.';

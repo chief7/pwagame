@@ -547,10 +547,49 @@ export function fishingBoat(): Sprite[] {
   return [fishingBoatSprite('fishing_boat_wreck', false), fishingBoatSprite('fishing_boat', true)];
 }
 
+/** A supply crate from the helicopter: a wooden crate with its orange parachute folded on top. */
+export function supplyCrate(): Sprite {
+  const s = new Sprite('supply_crate');
+  for (let y = 6; y <= 14; y++) {
+    for (let x = 2; x <= 13; x++) {
+      const band = x === 2 || x === 13 || y === 14 || y === 9;
+      s.set(x, y, band ? P.woodDark : x < 5 ? P.woodLight : (x + y) % 5 === 0 ? P.woodDark : P.wood);
+    }
+  }
+  // The parachute cloth heaped on the lid, with its cords.
+  for (let y = 2; y <= 6; y++) {
+    const half = 2 + (y - 2) * 1.2;
+    for (let x = Math.floor(8 - half); x <= Math.ceil(7 + half); x++) {
+      const stripe = Math.floor((x + 1) / 3) % 2;
+      s.set(x, y, stripe ? P.paintWhite : y < 4 ? P.flameOrange : P.flameRed);
+    }
+  }
+  for (const [x, y] of [[3, 7], [12, 7], [4, 8], [11, 8]]) s.set(x, y, P.strawLight);
+  return s.outline().shadow(8, 15, 7, 1.2);
+}
+
+/** The icon of the platform recipe: a piece of deck with its safety line, its face and a leg. */
+export function platformIcon(): Sprite {
+  const s = new Sprite('platform_deck');
+  for (let y = 3; y <= 10; y++) {
+    for (let x = 1; x <= 14; x++) {
+      const edge = y === 3 || x === 1 || x === 14;
+      const stripe = Math.floor((y === 3 ? x : y) / 2) % 2 ? P.hazard : P.steelDeep;
+      s.set(x, y, edge ? stripe : deckPixel(x, y, 318, false));
+    }
+  }
+  for (let x = 1; x <= 14; x++) {
+    s.set(x, 11, P.hazard);
+    s.set(x, 12, x % 4 === 2 ? P.steelLight : P.steelDark);
+  }
+  for (let y = 13; y <= 15; y++) for (const x of [4, 5, 10, 11]) s.set(x, y, x === 4 || x === 10 ? P.steelLight : P.steelDeep);
+  return s.outline();
+}
+
 export function rigSprites(): Sprite[] {
   return [
     ...deck(), ...deckSide(), ...helipad(), ...gangway(), ...gangwayEnds(),
     container(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
-    pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(),
+    pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(), supplyCrate(), platformIcon(),
   ];
 }
