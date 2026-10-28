@@ -512,33 +512,48 @@ export function crewCabin(): Sprite {
 }
 
 /** An old fishing boat tied up at the rig, with a hole in its side. */
+/** Left and right edge of the boat's hull at row y: a low stern on the left, a raised bow on the right. */
+function boatHull(y: number): [number, number] {
+  const keel = Math.max(0, y - 21);
+  return [2 + keel * 2 + (y < 18 ? 1 : 0), (y < 16 ? 46 - (16 - y) : 45) - keel * 2];
+}
+
 function fishingBoatSprite(name: string, repaired: boolean): Sprite {
-  const s = new Sprite(name, 24, 24);
-  for (let y = 13; y <= 20; y++) {
-    const inset = y > 17 ? (y - 17) * 2 : 0;
-    for (let x = 1 + inset; x <= 22 - Math.max(0, inset - 1); x++) {
-      let c: string = y <= 14 ? P.paintWhite : y === 15 ? P.paintRed : y <= 18 ? (x < 5 ? P.paintBlue : P.paintBlueDark) : P.rustDark;
+  const s = new Sprite(name, 48, 28);
+  // The hull: a white band, a red line, the blue side and a dark keel.
+  for (let y = 13; y <= 24; y++) {
+    const [l, r] = boatHull(y);
+    for (let x = l; x <= r; x++) {
+      let c: string = y <= 15 ? (x < l + 3 ? P.paintWhite : y === 13 ? P.steelLight : P.paintWhite)
+        : y === 16 ? P.paintRed
+        : y <= 21 ? (x < l + 4 ? P.paintBlue : P.paintBlueDark)
+        : P.rustDark;
       // The old boat is rusty and patchy; the repaired one has fresh paint.
-      if (!repaired && y > 15 && hash2(x, y, 317) < 0.15) c = P.rust;
+      if (!repaired && y > 16 && hash2(x, y, 317) < 0.15) c = P.rust;
       s.set(x, y, c);
     }
   }
-  // The raised bow on the right.
-  for (const [x, y] of [[21, 12], [22, 12], [22, 11], [23, 11]]) s.set(x, y, P.paintWhite);
+  // Portholes along the side.
+  for (const x of [20, 26, 32]) s.set(x, 18, P.glass);
   // A hole to repair, or the plate bolted over it.
-  for (const [x, y] of [[6, 16], [7, 16], [8, 17], [7, 17], [6, 17]]) s.set(x, y, repaired ? P.steel : P.interior);
-  // Wheelhouse.
-  for (let y = 6; y <= 12; y++) {
-    for (let x = 12; x <= 18; x++) s.set(x, y, y === 6 ? P.paintRed : y === 7 ? P.paintRedDark : x === 18 ? P.steelLight : P.paintWhite);
+  for (const [x, y] of [[9, 18], [10, 18], [11, 19], [10, 19], [9, 19], [10, 20]]) s.set(x, y, repaired ? P.steel : P.interior);
+  // Wheelhouse with windows and a red roof.
+  for (let y = 4; y <= 12; y++) {
+    for (let x = 24; x <= 35; x++) {
+      s.set(x, y, y === 4 ? P.paintRed : y === 5 ? P.paintRedDark : x === 35 ? P.steelLight : x === 24 ? P.steel : P.paintWhite);
+    }
   }
-  for (let y = 9; y <= 10; y++) for (let x = 13; x <= 17; x++) s.set(x, y, P.glass);
-  // Mast, with a little flag once it can sail.
-  for (let y = 1; y <= 12; y++) s.set(7, y, P.steelDark);
-  for (let x = 5; x <= 9; x++) s.set(x, 4, P.steelDark);
-  if (repaired) for (const [x, y] of [[8, 1], [9, 1], [10, 1], [8, 2], [9, 2]]) s.set(x, y, P.hazard);
+  for (let y = 7; y <= 8; y++) for (const x0 of [26, 31]) for (let x = x0; x < x0 + 3; x++) s.set(x, y, P.glass);
+  // A net drum and a crate on the open deck at the stern.
+  for (let y = 9; y <= 12; y++) for (let x = 6; x <= 11; x++) s.set(x, y, y === 9 ? P.straw : (x + y) % 2 ? P.strawDark : P.straw);
+  for (let y = 10; y <= 12; y++) for (let x = 14; x <= 18; x++) s.set(x, y, y === 10 ? P.woodLight : P.wood);
+  // Mast with a boom, and a little flag once it can sail.
+  for (let y = 0; y <= 12; y++) s.set(20, y, P.steelDark);
+  for (let i = 0; i <= 8; i++) s.set(20 - i, 3 + Math.round(i * 0.6), P.steelDark);
+  if (repaired) for (const [x, y] of [[21, 0], [22, 0], [23, 0], [21, 1], [22, 1]]) s.set(x, y, P.hazard);
   s.outline();
   // Foam where the hull meets the sea.
-  for (let x = 2; x <= 21; x++) if (hash2(x, 21, 314) < 0.6) s.set(x, 21, P.foam);
+  for (let x = 4; x <= 43; x++) if (hash2(x, 25, 314) < 0.6) s.set(x, 25, P.foam);
   return s;
 }
 
