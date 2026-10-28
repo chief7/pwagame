@@ -26,7 +26,8 @@ export type ObjectKind =
   | 'mussel_bed' | 'life_ring' | 'derrick' | 'crane' | 'crew_cabin' | 'balloon_crashed'
   | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready'
   | 'derrick_working' | 'fishing_boat_wreck' | 'fishing_boat'
-  | 'supply_crate' | 'platform_deck';
+  | 'supply_crate' | 'platform_deck'
+  | 'ore_vein' | 'clay_bank' | 'sealed_crate' | 'furnace' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade';
 
 export interface Yield {
   item: ItemId;
@@ -87,6 +88,12 @@ export interface ObjectDef {
   boat?: true;
   /** A crate the helicopter dropped: a store that goes away when it is empty. */
   dropped?: true;
+  /** Built on a sea cell next to a rig deck, in front of the explorer (the fish trap). */
+  onSea?: true;
+  /** Smelting needs one of these next to the explorer. */
+  furnace?: true;
+  /** Not an object: building it makes the boat's hold bigger. */
+  holdUpgrade?: true;
   /** Not an object: building it lays a new deck cell on the sea (a platform on the rig). */
   deck?: true;
   /** A store: walking into it opens the Store panel (see Game.storeItem). */
@@ -316,6 +323,35 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   supply_crate: def({ kind: 'supply_crate', store: true, dropped: true }),
   // Only for the recipe: the platform recipe lays a deck cell, not an object.
   platform_deck: def({ kind: 'platform_deck', deck: true }),
+  // Island 2: rocks with iron and coal (the pickaxe); island 1: clay at the river (the shovel);
+  // every island: old crates the crowbar opens. They grow back slowly, the crates do not.
+  ore_vein: def({
+    kind: 'ore_vein', blocksSight: true, depletedSprite: 'ore_vein_mined',
+    gather: { yields: [{ item: 'iron_ore', min: 1, max: 2 }, { item: 'coal', min: 1, max: 1, chance: 0.5 }], needs: 'pickaxe', after: { regrow: 300 } },
+  }),
+  clay_bank: def({
+    kind: 'clay_bank', depletedSprite: 'clay_bank_dug',
+    gather: { yields: [{ item: 'clay', min: 2, max: 3 }], needs: 'shovel', after: { regrow: 200 } },
+  }),
+  sealed_crate: def({
+    kind: 'sealed_crate',
+    gather: {
+      yields: [{ item: 'spare_part', min: 1, max: 1 }, { item: 'coconut', min: 1, max: 2, chance: 0.5 }, { item: 'rope', min: 1, max: 2, chance: 0.5 }],
+      needs: 'crowbar', after: { remove: true },
+    },
+  }),
+  // The rig's buildings.
+  furnace: def({ kind: 'furnace', furnace: true, lightRadius: 2, frames: ['furnace', 'furnace_2'] }),
+  greenhouse: def({
+    kind: 'greenhouse', blocksSight: true, depletedSprite: 'greenhouse_picked',
+    gather: { yields: [{ item: 'vegetables', min: 2, max: 3 }], after: { regrow: 120 } },
+  }),
+  water_maker: def({ kind: 'water_maker', drink: 35 }),
+  fish_trap: def({
+    kind: 'fish_trap', onSea: true, depletedSprite: 'fish_trap_empty',
+    gather: { yields: [{ item: 'fish', min: 1, max: 2 }], after: { regrow: 100 } },
+  }),
+  hold_upgrade: def({ kind: 'hold_upgrade', holdUpgrade: true }),
   crane: def({ kind: 'crane', blocksSight: true }),
   // The camp on the rig: a bed for a full rest, and a little stove to cook on.
   crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),

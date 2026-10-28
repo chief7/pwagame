@@ -81,6 +81,7 @@ export function cheats(game: Game): { title: string; cheats: Cheat[] }[] {
     ['steam_vent', 'a steam vent'], ['hot_spring', 'a hot spring'], ['sandbar_ns', 'the sandbar'], ['barrel', 'the tar barrels'],
     ['gangway_end_e', 'a broken gangway'], ['crew_cabin', 'the crew cabin'], ['diesel_drums', 'the fuel drums'],
     ['fishing_boat_wreck', 'the fishing boat'], ['derrick', 'the derrick'],
+    ['ore_vein', 'an ore vein'], ['clay_bank', 'a clay bank'], ['sealed_crate', 'a sealed crate'],
   ];
   for (const [kind, name] of spots) {
     const same = (k: ObjectKind) => k === kind || (kind === 'sandbar_ns' && k === 'sandbar_ew') || (kind === 'gangway_end_e' && !!OBJECTS[k].broken)

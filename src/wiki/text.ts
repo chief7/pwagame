@@ -169,6 +169,8 @@ const en: WikiWords = {
     wood: 'Wood', log: 'Logs', leaves: 'Big leaves', stone: 'Stone', fish: 'Raw fish', rope: 'Rope',
     axe: 'Stone axe', fishing_rod: 'Fishing rod', tar: 'Tar', resin: 'Resin', sulphur: 'Sulphur',
     glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern', scrap: 'Scrap metal', diesel: 'Diesel', mussels: 'Mussels', pack_frame: 'Pack frame',
+    pickaxe: 'Pickaxe', shovel: 'Shovel', crowbar: 'Crowbar', iron_ore: 'Iron ore', coal: 'Coal', clay: 'Clay',
+    spare_part: 'Spare part', steel_plate: 'Steel plate', vegetables: 'Vegetables',
   },
   ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash', deck: 'rig decks' },
 
@@ -401,6 +403,7 @@ const en: WikiWords = {
         'The **radio room** stands on the platform furthest away. Mend its aerial, give its generator **diesel** from the old fuel drums, and fix the radio set. Then call for help.',
         'Repair the old **drilling tower** (12 scrap, 2 rope): its pump gives 2 diesel every half day. Repair the old **fishing boat** at the dock (10 scrap, 6 wood, 4 rope), then walk into it to open the sea chart. Sail to islands 1, 2 and 3 to fetch wood, stone, food and more. A trip takes 6 hours and 2 diesel. The **hold** carries 60 heavy things, and every island stays as you left it.',
         'After the call for help, walk into the radio to order **one crate each day**: food, building materials or fuel. About 2 hours later a helicopter drops it on the helipad. Build a **platform** (6 scrap, 2 wood) at the edge of the crew platform for more room, and a **rain tank** (6 scrap) for water.',
+        'Make a **pickaxe**, a **shovel** and a **crowbar** from scrap. Mine iron ore and coal on Pine Ridge, dig clay at the river of island 1, and open sealed crates with spare parts on islands 1 to 3. On the rig, build a **furnace** to smelt steel plates, a **greenhouse** for vegetables, a **water maker**, **fish traps**, and a bigger hold for the boat.',
       ],
     },
     goalTitle: 'Goal stages',
@@ -454,6 +457,8 @@ const de: WikiWords = {
     wood: 'Holz', log: 'Holzstämme', leaves: 'Große Blätter', stone: 'Stein', fish: 'Roher Fisch', rope: 'Seil',
     axe: 'Steinaxt', fishing_rod: 'Angelrute', tar: 'Teer', resin: 'Harz', sulphur: 'Schwefel',
     glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne', scrap: 'Schrott', diesel: 'Diesel', mussels: 'Muscheln', pack_frame: 'Kraxe',
+    pickaxe: 'Spitzhacke', shovel: 'Schaufel', crowbar: 'Brecheisen', iron_ore: 'Eisenerz', coal: 'Kohle', clay: 'Lehm',
+    spare_part: 'Ersatzteil', steel_plate: 'Stahlplatte', vegetables: 'Gemüse',
   },
   ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche', deck: 'Decks der Bohrinsel' },
 
@@ -686,6 +691,7 @@ const de: WikiWords = {
         'Der **Funkraum** steht auf der Plattform, die am weitesten weg ist. Richte seine Antenne auf, gib seinem Generator **Diesel** aus den alten Ölfässern und repariere das Funkgerät. Dann ruf Hilfe.',
         'Repariere den alten **Bohrturm** (12 Schrott, 2 Seile): Seine Pumpe gibt jeden halben Tag 2 Diesel. Repariere das alte **Fischerboot** am Anleger (10 Schrott, 6 Holz, 4 Seile), dann lauf dagegen, um die Seekarte zu öffnen. Fahr zu den Inseln 1, 2 und 3 und hol Holz, Steine, Essen und mehr. Eine Fahrt dauert 6 Stunden und braucht 2 Diesel. Der **Laderaum** trägt 60 schwere Dinge, und jede Insel bleibt so, wie du sie verlassen hast.',
         'Nach dem Hilferuf lauf gegen das Funkgerät, um **jeden Tag eine Kiste** zu bestellen: Essen, Baumaterial oder Treibstoff. Etwa 2 Stunden später wirft ein Hubschrauber sie auf dem Landeplatz ab. Bau eine **Plattform** (6 Schrott, 2 Holz) am Rand der Mannschaftsplattform für mehr Platz, und einen **Regentank** (6 Schrott) für Wasser.',
+        'Bau aus Schrott eine **Spitzhacke**, eine **Schaufel** und ein **Brecheisen**. Hack Eisenerz und Kohle auf dem Kiefernkamm, grab Lehm am Fluss von Insel 1 und öffne versiegelte Kisten mit Ersatzteilen auf den Inseln 1 bis 3. Bau auf der Bohrinsel einen **Schmelzofen** für Stahlplatten, ein **Gewächshaus** für Gemüse, eine **Wasseranlage**, **Fischreusen** und einen größeren Laderaum für das Boot.',
       ],
     },
     goalTitle: 'Schritte zum Ziel',
