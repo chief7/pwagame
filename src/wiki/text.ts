@@ -107,6 +107,8 @@ export interface WikiWords {
     skill: (name: string) => string;
     atFire: string;
     onto: (name: string) => string;
+    /** A building that goes up in trips on a site (the hut). */
+    site: string;
     paras: string[];
   };
   skills: {
@@ -166,7 +168,7 @@ const en: WikiWords = {
     coconut: 'Coconut', berries: 'Berries', mushroom: 'Mushroom', cooked_fish: 'Cooked fish', apple: 'Apple',
     wood: 'Wood', log: 'Logs', leaves: 'Big leaves', stone: 'Stone', fish: 'Raw fish', rope: 'Rope',
     axe: 'Stone axe', fishing_rod: 'Fishing rod', tar: 'Tar', resin: 'Resin', sulphur: 'Sulphur',
-    glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern', scrap: 'Scrap metal', diesel: 'Diesel', mussels: 'Mussels',
+    glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern', scrap: 'Scrap metal', diesel: 'Diesel', mussels: 'Mussels', pack_frame: 'Pack frame',
   },
   ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash', deck: 'rig decks' },
 
@@ -237,7 +239,7 @@ const en: WikiWords = {
   camp: {
     title: 'Your camp: the hut and its rooms',
     paras: [
-      'The hut is big work, and each island has only one. It is your **camp**: walk into it to go inside. The Hut panel shows the bed, the map wall and the rooms.',
+      'The hut is big work, and each island has only one. First build its **frame**, then walk into the frame to give it the materials, in as many trips as you like. The hut is your **camp**: walk into it to go inside. The Hut panel shows the bed, the map wall and the rooms.',
       'The **bed** is the only place for a full rest, and Health comes back faster while you sleep in it. With the Cartographer skill, your map hangs on the wall.',
     ],
     hutCost: 'The hut costs',
@@ -285,9 +287,11 @@ const en: WikiWords = {
     skill: (name) => `Learn the skill “${name}” first.`,
     atFire: 'Stand next to a campfire.',
     onto: (name) => `Stand next to a ${name.toLowerCase()}.`,
+    site: 'First build its frame, then bring the materials in trips.',
     paras: [
       'Buildings go in front of you, in the way you face. A bridge goes straight ahead over the river (1 to 3 cells of water), and stepping stones over the lava flow of island 3. Items such as the axe and rope go into your bag.',
       'A building is never placed where it would cut off part of the island, so you can never lock yourself in.',
+      'Your bag holds **30 heavy things**: wood, logs, stone, scrap and diesel. Food, leaves, rope, tools and rare materials weigh nothing. When the bag is full, you cannot gather more heavy things. Keep the rest in a **store crate** (one on each island). The skill Strong back adds 10, and a pack frame adds 15.',
     ],
   },
   skills: {
@@ -447,7 +451,7 @@ const de: WikiWords = {
     coconut: 'Kokosnuss', berries: 'Beeren', mushroom: 'Pilz', cooked_fish: 'Gebratener Fisch', apple: 'Apfel',
     wood: 'Holz', log: 'Holzstämme', leaves: 'Große Blätter', stone: 'Stein', fish: 'Roher Fisch', rope: 'Seil',
     axe: 'Steinaxt', fishing_rod: 'Angelrute', tar: 'Teer', resin: 'Harz', sulphur: 'Schwefel',
-    glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne', scrap: 'Schrott', diesel: 'Diesel', mussels: 'Muscheln',
+    glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne', scrap: 'Schrott', diesel: 'Diesel', mussels: 'Muscheln', pack_frame: 'Kraxe',
   },
   ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche', deck: 'Decks der Bohrinsel' },
 
@@ -518,7 +522,7 @@ const de: WikiWords = {
   camp: {
     title: 'Dein Lager: die Hütte und ihre Räume',
     paras: [
-      'Die Hütte ist viel Arbeit, und auf jeder Insel gibt es nur eine. Sie ist dein **Lager**: Lauf hinein, um sie zu betreten. Das Hütten-Fenster zeigt das Bett, die Kartenwand und die Räume.',
+      'Die Hütte ist viel Arbeit, und auf jeder Insel gibt es nur eine. Bau zuerst ihr **Gerüst**, dann lauf dagegen, um ihm die Dinge zu geben, so oft du willst. Die Hütte ist dein **Lager**: Lauf hinein, um sie zu betreten. Das Hütten-Fenster zeigt das Bett, die Kartenwand und die Räume.',
       'Nur im **Bett** schläfst du dich ganz aus, und dort kommt dein Leben im Schlaf schneller zurück. Mit dem Talent Kartograf hängt deine Karte an der Wand.',
     ],
     hutCost: 'Die Hütte kostet',
@@ -565,10 +569,12 @@ const de: WikiWords = {
     cols: { what: 'Was', cost: 'Kostet', note: 'Gut zu wissen' },
     skill: (name) => `Lerne zuerst das Talent „${name}“.`,
     atFire: 'Stell dich neben ein Lagerfeuer.',
-    onto: (name) => `Stell dich neben eine ${name}.`,
+    onto: (name) => `Stell dich daneben (${name}).`,
+    site: 'Bau zuerst das Gerüst, dann bring die Dinge in mehreren Wegen.',
     paras: [
       'Gebäude entstehen vor dir, in die Richtung, in die du schaust. Eine Brücke geht geradeaus über den Fluss (1 bis 3 Felder Wasser), Trittsteine über den Lavastrom von Insel 3. Dinge wie die Axt und Seile kommen in deine Tasche.',
       'Ein Gebäude wird nie so gebaut, dass es einen Teil der Insel absperrt. Du kannst dich also nie selbst einsperren.',
+      'Deine Tasche trägt **30 schwere Dinge**: Holz, Holzstämme, Steine, Schrott und Diesel. Essen, Blätter, Seile, Werkzeuge und seltene Materialien wiegen nichts. Wenn die Tasche voll ist, kannst du keine schweren Dinge mehr sammeln. Bewahr den Rest in einer **Vorratskiste** auf (eine pro Insel). Das Talent Starker Rücken gibt 10 dazu, eine Kraxe 15.',
     ],
   },
   skills: {

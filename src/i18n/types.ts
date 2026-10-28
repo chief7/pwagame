@@ -106,6 +106,25 @@ export interface Strings {
     barrelNote: string;
     drink: string;
     addRoom: string;
+    /** The load row in the Bag and Store panels: "Load", "18 / 30 heavy things". */
+    load: string;
+    loadOf(have: number, limit: number): string;
+    loadNote: string;
+    /** The Store panel. */
+    store: string;
+    notAtStore: string;
+    inBag: string;
+    inStore: string;
+    bagEmptyShort: string;
+    storeEmpty: string;
+    heavy: string;
+    putOne: string;
+    putAll: string;
+    takeOne: string;
+    takeAll: string;
+    /** A building that goes up in trips (the hut): how it works, and what its site still needs. */
+    siteNote: string;
+    siteLeft: string;
   };
   /** Rooms the explorer can add to the hut. */
   rooms: Record<RoomId, { name: string; description: string }>;

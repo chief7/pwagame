@@ -40,6 +40,16 @@ export type Msg =
   | { key: 'noBridgeSpot' }
   /** Tried to lay stepping stones without lava ahead. */
   | { key: 'noLavaSpot' }
+  /** The bag is too heavy for more heavy things (wood, logs, stone, scrap, diesel). */
+  | { key: 'tooHeavy' }
+  /** Walked into a store crate: the Store panel opens. */
+  | { key: 'openStore' }
+  /** Tried to build a second store crate on this island. */
+  | { key: 'oneStore' }
+  /** A building site: what it still needs, what was given, and that it is finished (`obj` is then the building). */
+  | { key: 'siteNeeds'; obj: ObjectKind; left: [ItemId, number][] }
+  | { key: 'siteGive'; obj: ObjectKind; given: [ItemId, number][]; left: [ItemId, number][] }
+  | { key: 'siteDone'; obj: ObjectKind }
   /** Walked into a broken gangway end on the oil rig: mend it with scrap. */
   | { key: 'gangwayBroken' }
   | { key: 'gangwayMended' }

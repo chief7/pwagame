@@ -88,6 +88,7 @@ const ITEM: ItemWords<CountNoun> = {
   scrap: { g: 'n', word: 'Stück Schrott', plural: 'Stück Schrott', short: ['Schrott', 'Schrott'] },
   diesel: { g: 'm', word: 'Kanister Diesel', plural: 'Kanister Diesel', short: ['Diesel', 'Diesel'] },
   mussels: { g: 'f', word: 'Handvoll Muscheln', plural: 'Handvoll Muscheln', short: ['Muscheln', 'Muscheln'] },
+  pack_frame: { g: 'f', word: 'Kraxe', plural: 'Kraxen', short: ['Kraxe', 'Kraxen'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -113,6 +114,8 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   campfire: { g: 'n', word: 'Lagerfeuer' },
   lean_to: { g: 'm', word: 'Unterstand' },
   hut: { g: 'f', word: 'Hütte' },
+  hut_site: { g: 'n', word: 'Hüttengerüst' },
+  store_crate: { g: 'f', word: 'Vorratskiste' },
   bramble: { g: 'n', word: 'Dornengestrüpp', gather: 'Du schlägst dich durch das Dornengestrüpp' },
   bridge_ns: { g: 'f', word: 'Brücke' },
   bridge_ew: { g: 'f', word: 'Brücke' },
@@ -317,6 +320,22 @@ export const de: Strings = {
     barrelNote: 'Frisches Regenwasser vom Dach. +35 Wasser.',
     drink: 'Trinken',
     addRoom: 'Raum anbauen',
+    load: 'Last',
+    loadOf: (have, limit) => `${have} / ${limit} schwere Dinge`,
+    loadNote: 'Holz, Holzstämme, Steine, Schrott und Diesel sind schwer. Den Rest bewahrst du in einer Vorratskiste auf.',
+    store: 'Vorratskiste',
+    notAtStore: 'Stell dich neben deine Vorratskiste.',
+    inBag: 'In deiner Tasche',
+    inStore: 'In der Vorratskiste',
+    bagEmptyShort: 'Deine Tasche ist leer.',
+    storeEmpty: 'Die Vorratskiste ist leer.',
+    heavy: 'Schwer',
+    putOne: '1 hineinlegen',
+    putAll: 'Alle hineinlegen',
+    takeOne: '1 nehmen',
+    takeAll: 'Alle nehmen',
+    siteNote: 'Zuerst baust du das Gerüst. Dann lauf dagegen, um ihm diese Dinge zu geben, so oft du willst.',
+    siteLeft: 'Das Gerüst braucht noch:',
   },
   rooms: {
     workshop: { name: 'Werkstatt', description: 'Eine Werkbank. Seile, die du in der Hütte drehst, geben 1 mehr.' },
@@ -383,6 +402,8 @@ export const de: Strings = {
     campfire: { name: 'Lagerfeuer', description: 'Hält dich warm und macht die Nacht hell.' },
     lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf für unterwegs. Wärmere Nächte, aber nur das Bett in einer Hütte gibt volle Erholung.' },
     hut: { name: 'Hütte', description: 'Dein Lager. Ein Bett für volle Erholung, und drinnen baust du neue Räume an. Eine pro Insel.' },
+    store_crate: { name: 'Vorratskiste', description: 'Bewahrt auf, was du nicht trägst. Lauf dagegen, um Dinge hineinzulegen oder herauszunehmen. Eine pro Insel.' },
+    pack_frame: { name: 'Kraxe', description: 'Ein Holzgestell für den Rücken. Du trägst 15 schwere Dinge mehr.' },
     rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Für das Inselziel brauchst du Seile.' },
     axe: { name: 'Steinaxt', description: 'Schlägt Holzstämme von Bäumen und einen Weg durch Dornengestrüpp.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
@@ -414,6 +435,8 @@ export const de: Strings = {
     rope_maker: { name: 'Seilmacher', description: 'Du drehst 2 Seile aus 2 großen Blättern, nicht nur 1.' },
     sure_foot: { name: 'Trittsicher', description: 'Klettern an Leiter oder Seil macht dich nicht müde.' },
     cartographer: { name: 'Kartograf', description: 'In einer Hütte siehst du eine Karte von allem, was du erkundet hast.' },
+    strong_back: { name: 'Starker Rücken', description: 'Du trägst 10 schwere Dinge mehr.' },
+    pack_frame: { name: 'Kraxe', description: 'Du kannst eine Kraxe bauen. Mit ihr trägst du 15 schwere Dinge mehr.' },
     wild_sense: { name: 'Spürsinn', description: 'Du siehst, wo Tiere dich verfolgen oder dir wehtun würden. Diese Stellen sind rot.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].plural}`,
@@ -442,6 +465,12 @@ export const de: Strings = {
       case 'noRoom': return 'Hier ist kein Platz zum Bauen.';
       case 'noBridgeSpot': return 'Stell dich an einen Fluss und schau zum Wasser. Eine Brücke reicht bis zu 3 Schritte weit.';
       case 'noLavaSpot': return 'Stell dich an den Lavastrom und schau zur Lava. Trittsteine reichen bis zu 3 Schritte weit.';
+      case 'tooHeavy': return 'Deine Tasche ist zu schwer für mehr Holz, Holzstämme, Steine, Schrott oder Diesel. Leg etwas in eine Vorratskiste, oder verbrauche es.';
+      case 'openStore': return 'Du öffnest deine Vorratskiste.';
+      case 'oneStore': return 'Du hast schon eine Vorratskiste auf dieser Insel.';
+      case 'siteNeeds': return `${cap(obj(msg.obj, 'nom', 'the'))} braucht noch ${itemList(msg.left)}.`;
+      case 'siteGive': return `Du gibst ${obj(msg.obj, 'dat', 'the')} ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;
+      case 'siteDone': return `${cap(obj(msg.obj, 'nom', 'the'))} ist fertig! Lauf hinein.`;
       case 'gangwayBroken': return 'Dieser Steg ist in der Mitte kaputt. Repariere ihn mit Schrott: Bau „Steg reparieren“ daneben.';
       case 'gangwayMended': return 'Du schraubst Schrott über die Lücke. Der Steg ist wieder ganz!';
       case 'lavaHot': return 'Viel zu heiß! Auf Lava kannst du nicht laufen. Leg Trittsteine über den Lavastrom.';

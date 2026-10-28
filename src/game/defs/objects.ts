@@ -11,7 +11,7 @@ export type ObjectKind =
   | 'stone_boulder' | 'stone_pebbles' | 'stone_mossy' | 'stalagmite'
   | 'log' | 'log_pile' | 'log_driftwood'
   | 'chest_closed' | 'chest_open' | 'spring'
-  | 'campfire' | 'lean_to' | 'hut'
+  | 'campfire' | 'lean_to' | 'hut' | 'hut_site' | 'store_crate'
   | 'bramble' | 'bridge_ns' | 'bridge_ew'
   | 'boat_wreck' | 'boat_hull' | 'boat_mast' | 'boat_sail' | 'boat_ready'
   | 'tree_spruce' | 'tree_spruce_snow' | 'tree_birch' | 'tree_apple' | 'fern'
@@ -74,6 +74,13 @@ export interface ObjectDef {
   climb?: true;
   /** The island's goal (see levels.ts): walking into it hands over materials. */
   goal?: true;
+  /**
+   * A building site: walking into it hands over what the recipe that builds
+   * it still needs (its `siteCost`), and then it becomes this object.
+   */
+  site?: ObjectKind;
+  /** A store: walking into it opens the Store panel (see Game.storeItem). */
+  store?: true;
   /** Walkable over the sea: a gangway between the platforms of the oil rig. */
   overSea?: true;
   /**
@@ -167,6 +174,9 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   campfire: def({ kind: 'campfire', warmthRadius: 2, lightRadius: 5, frames: ['campfire', 'campfire_2'] }),
   lean_to: def({ kind: 'lean_to', walkable: true, shelter: 0.6, rest: 75 }),
   hut: def({ kind: 'hut', walkable: true, shelter: 1, rest: 100 }),
+  // The hut goes up in trips: its frame first, then the materials.
+  hut_site: def({ kind: 'hut_site', site: 'hut' }),
+  store_crate: def({ kind: 'store_crate', store: true }),
   bramble: def({
     kind: 'bramble',
     gather: { yields: [{ item: 'wood', min: 1, max: 1 }, { item: 'leaves', min: 1, max: 1 }], needs: 'axe', after: { remove: true } },
@@ -306,4 +316,8 @@ export interface WorldObject {
   readyAt?: number;
   /** The rooms added to a hut (see rooms.ts). */
   rooms?: RoomId[];
+  /** What a store crate holds. */
+  store?: Partial<Record<ItemId, number>>;
+  /** What a building site already got. */
+  given?: Partial<Record<ItemId, number>>;
 }

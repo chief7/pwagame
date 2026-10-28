@@ -69,9 +69,16 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
   in a shelter (or a cave) makes it home and rests you faster. A stone axe
   goes in your bag; a bridge goes across the river in front of you. The
   hut, the bridge and the big island goals need logs.
+- **Carrying:** your bag holds 30 heavy things (wood, logs, stone, scrap
+  and diesel). Food, leaves, rope and tools weigh nothing. When the bag is
+  full, you cannot gather more heavy things. Keep the rest in a store crate
+  (6 wood, 2 rope; one on each island): walk into it to put things in or
+  take them out. The skill Strong back adds 10, and a pack frame (a skill
+  and a recipe) adds 15.
 - **The camp:** the hut is big work (24 logs, 12 wood, 30 leaves, 20 stone,
-  8 rope),
-  and each island has only one. Walk into it to go inside. Its bed is the
+  8 rope), more than one bag holds. First build its frame, then walk into
+  the frame to give it the materials, in as many trips as you like. Each
+  island has only one hut. Walk into it to go inside. Its bed is the
   only place for a full rest: sleep elsewhere stops at 50 Energy in the
   open, 60 in a cave and 75 in a lean-to. In the bed, Health also comes back
   faster. From inside, add rooms: a workshop (rope made there gives one
