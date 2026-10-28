@@ -6,11 +6,16 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway';
 
 export type Recipe = {
   id: RecipeId;
   cost: Partial<Record<ItemId, number>>;
+  /**
+   * A big building that goes up in trips: the recipe places its site (for
+   * `cost`, often nothing), and the site takes these materials one trip at a time.
+   */
+  siteCost?: Partial<Record<ItemId, number>>;
   /** A skill the explorer must have learned first. */
   skill?: SkillId;
   /** Only possible next to a campfire (cooking). */
@@ -25,8 +30,13 @@ export type Recipe = {
 export const RECIPES: Record<RecipeId, Recipe> = {
   campfire: { id: 'campfire', builds: 'campfire', cost: { wood: 3, stone: 2 } },
   lean_to: { id: 'lean_to', builds: 'lean_to', cost: { wood: 4, leaves: 5 } },
-  // The camp: only one on each island, and it is big work.
-  hut: { id: 'hut', builds: 'hut', cost: { log: 24, wood: 12, leaves: 30, stone: 20, rope: 8 } },
+  // The camp: only one on each island, and it is big work. More than a bag
+  // can carry, so it is built on a site that takes the materials in trips.
+  hut: { id: 'hut', builds: 'hut_site', cost: {}, siteCost: { log: 24, wood: 12, leaves: 30, stone: 20, rope: 8 } },
+  // Keeps what you do not carry: one on each island.
+  store_crate: { id: 'store_crate', builds: 'store_crate', cost: { wood: 6, rope: 2 } },
+  // Carry more heavy things; needs the Pack frame skill.
+  pack_frame: { id: 'pack_frame', makes: 'pack_frame', cost: { wood: 4, rope: 3 }, skill: 'pack_frame' },
   axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
   rope: { id: 'rope', makes: 'rope', cost: { leaves: 2 } },
   // Faces the way the explorer does; game.ts turns it into bridge_ew when needed.

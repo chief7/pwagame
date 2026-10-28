@@ -26,6 +26,7 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   scrap: { one: 'piece of scrap metal', many: 'pieces of scrap metal', short: ['scrap', 'scrap'] },
   diesel: { one: 'can of diesel', many: 'cans of diesel', short: ['diesel', 'diesel'] },
   mussels: { one: 'handful of mussels', many: 'handfuls of mussels', short: ['mussels', 'mussels'] },
+  pack_frame: { one: 'pack frame', many: 'pack frames', short: ['pack frame', 'pack frames'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -51,6 +52,8 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   campfire: { name: 'campfire' },
   lean_to: { name: 'lean-to' },
   hut: { name: 'hut' },
+  hut_site: { name: 'hut frame' },
+  store_crate: { name: 'store crate' },
   bramble: { name: 'bramble thicket', gather: 'You chop through the brambles' },
   bridge_ns: { name: 'bridge' },
   bridge_ew: { name: 'bridge' },
@@ -241,6 +244,22 @@ export const en: Strings = {
     barrelNote: 'Fresh rain water from the roof. +35 water.',
     drink: 'Drink',
     addRoom: 'Add a room',
+    load: 'Load',
+    loadOf: (have, limit) => `${have} / ${limit} heavy things`,
+    loadNote: 'Wood, logs, stone, scrap and diesel are heavy. Keep the rest in a store crate.',
+    store: 'Store crate',
+    notAtStore: 'Stand next to your store crate.',
+    inBag: 'In your bag',
+    inStore: 'In the store crate',
+    bagEmptyShort: 'Your bag is empty.',
+    storeEmpty: 'The store crate is empty.',
+    heavy: 'Heavy',
+    putOne: 'Put in 1',
+    putAll: 'Put in all',
+    takeOne: 'Take 1',
+    takeAll: 'Take all',
+    siteNote: 'First you build the frame. Then walk into it to give it these materials, in as many trips as you like.',
+    siteLeft: 'The frame still needs:',
   },
   rooms: {
     workshop: { name: 'Workshop', description: 'A workbench. Rope you make in your hut gives 1 more.' },
@@ -307,6 +326,8 @@ export const en: Strings = {
     campfire: { name: 'Campfire', description: 'Keeps you warm and lights up the night.' },
     lean_to: { name: 'Lean-to', description: 'A simple shelter for trips. Warmer nights, but only the bed in a hut gives a full rest.' },
     hut: { name: 'Hut', description: 'Your camp. A bed for a full rest, and you can add rooms from inside. One on each island.' },
+    store_crate: { name: 'Store crate', description: 'Keeps what you do not carry. Walk into it to put things in or take them out. One on each island.' },
+    pack_frame: { name: 'Pack frame', description: 'A wooden frame on your back. You can carry 15 more heavy things.' },
     axe: { name: 'Stone axe', description: 'Chops logs from trees and clears brambles.' },
     rope: { name: 'Rope', description: 'Twisted from big leaves. You need rope for the island goal.' },
     bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
@@ -338,6 +359,8 @@ export const en: Strings = {
     rope_maker: { name: 'Rope maker', description: 'You twist 2 ropes from 2 big leaves, not 1.' },
     sure_foot: { name: 'Sure foot', description: 'Climbing a ladder or a rope does not make you tired.' },
     cartographer: { name: 'Cartographer', description: 'In a hut, look at a map of everything you explored.' },
+    strong_back: { name: 'Strong back', description: 'You can carry 10 more heavy things.' },
+    pack_frame: { name: 'Pack frame', description: 'You can build a pack frame. With it you carry 15 more heavy things.' },
     wild_sense: { name: 'Wild sense', description: 'You see where animals would come after you or hurt you. These places look red.' },
   },
   itemStack: (id, count) => `${count} × ${ITEM[id].many}`,
@@ -366,6 +389,12 @@ export const en: Strings = {
       case 'noRoom': return 'There is no room to build here.';
       case 'noBridgeSpot': return 'Stand at a river and face the water. A bridge can cross up to 3 steps.';
       case 'noLavaSpot': return 'Stand at the lava flow and face the lava. Stepping stones can cross up to 3 steps.';
+      case 'tooHeavy': return 'Your bag is too heavy for more wood, logs, stone, scrap or diesel. Put some in a store crate, or use them.';
+      case 'openStore': return 'You open your store crate.';
+      case 'oneStore': return 'You already have a store crate on this island.';
+      case 'siteNeeds': return `The ${obj(msg.obj)} still needs ${itemList(msg.left)}.`;
+      case 'siteGive': return `You give the ${obj(msg.obj)} ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;
+      case 'siteDone': return `The ${obj(msg.obj)} is finished! Walk into it to go inside.`;
       case 'gangwayBroken': return 'This gangway is broken in the middle. Mend it with scrap metal: build “Mend gangway” next to it.';
       case 'gangwayMended': return 'You bolt scrap metal over the gap. The gangway is whole again!';
       case 'lavaHot': return "Too hot! You can't walk on lava. Lay stepping stones across the lava flow.";

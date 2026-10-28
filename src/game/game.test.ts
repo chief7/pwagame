@@ -9,7 +9,7 @@ import { LEVELS } from './defs/levels';
 import { RECIPES } from './defs/recipes';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
-import { Game, SAVE_VERSION } from './game';
+import { BAG_LOAD, Game, PACK_FRAME_LOAD, SAVE_VERSION, STRONG_BACK_LOAD } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
 import { distanceMap, reachWithBridges } from './pathing';
@@ -980,9 +980,11 @@ describe('Game: building and sleeping', () => {
 
   it('sleeping in a hut restores energy, keeps you warm and makes it home', () => {
     const game = sandbox(7);
-    give(game, RECIPES.hut.cost);
+    give(game, RECIPES.hut.siteCost!);
     game.player.facing = 'right';
     game.build('hut');
+    // Hand the frame everything at once (it ignores the carry limit), then step inside.
+    game.move(1, 0);
     game.move(1, 0);
     expect(game.shelterAt(game.player.x, game.player.y)).toBe(1);
     game.turn = nightTurn();
@@ -1158,7 +1160,8 @@ describe('Game: brambles, the axe and the river', () => {
     game.inventory.add('wood', 20);
     game.inventory.add('leaves', 20);
     game.inventory.add('stone', 20);
-    expect(game.buildProblem('hut')).toEqual({ key: 'needMaterials' });
+    expect(game.siteCost('hut').log).toBe(24);
+    expect(game.buildProblem('bridge')).toEqual({ key: 'needMaterials' });
     expect(game.build('axe')).toBe(true);
     game.player.facing = 'right';
     expect(game.build('lean_to')).toBe(true);
@@ -2278,11 +2281,9 @@ describe('Game: the camp (hut, bed and rooms)', () => {
   }
 
   it('costs a lot, and there is only one on each island', () => {
-    const cost = Object.values(RECIPES.hut.cost).reduce((sum, n) => sum + (n ?? 0), 0);
+    const cost = Object.values(RECIPES.hut.siteCost!).reduce((sum, n) => sum + (n ?? 0), 0);
     expect(cost).toBeGreaterThanOrEqual(90);
     const game = sandbox(110);
-    give(game, RECIPES.hut.cost);
-    give(game, RECIPES.hut.cost);
     game.player.facing = 'right';
     expect(game.hasHut()).toBe(false);
     expect(game.build('hut')).toBe(true);
@@ -2604,6 +2605,119 @@ describe('Game: island 4, the oil rig', () => {
     expect(loaded.map.get(loaded.player.x, loaded.player.y)).toBe(Tile.Deck);
     expect(loaded.objectAt(loaded.player.x + 1, loaded.player.y)?.kind).toBe('gangway_ew');
     expect(loaded.isPassable(loaded.player.x + 1, loaded.player.y)).toBe(true);
+  });
+});
+
+describe('Game: the carry limit, the store crate and the hut frame', () => {
+  it('counts only heavy things, and the skills and the pack frame carry more', () => {
+    const game = sandbox(130);
+    game.inventory.add('wood', 5);
+    game.inventory.add('stone', 4);
+    game.inventory.add('leaves', 20);
+    game.inventory.add('coconut', 6);
+    expect(game.load).toBe(9);
+    expect(game.loadLimit).toBe(BAG_LOAD);
+    game.skills.add('strong_back');
+    expect(game.loadLimit).toBe(BAG_LOAD + STRONG_BACK_LOAD);
+    expect(game.buildProblem('pack_frame')).toEqual({ key: 'needSkill', skill: 'pack_frame' });
+    game.skills.add('pack_frame');
+    give(game, { rope: 3 });
+    expect(game.build('pack_frame')).toBe(true);
+    expect(game.loadLimit).toBe(BAG_LOAD + STRONG_BACK_LOAD + PACK_FRAME_LOAD);
+  });
+
+  it('stops gathering heavy things when the bag is full, but not light things', () => {
+    const game = sandbox(131);
+    game.inventory.add('stone', BAG_LOAD);
+    place(game, 1, 0, 'stone_pebbles');
+    const turn = game.turn;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooHeavy' });
+    place(game, 1, 0, 'bush');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('leaves')).toBe(1);
+  });
+
+  it('lets one gather go a little over the limit', () => {
+    const game = sandbox(132);
+    game.inventory.add('stone', BAG_LOAD - 1);
+    place(game, 1, 0, 'log_pile');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.load).toBeGreaterThan(BAG_LOAD);
+  });
+
+  it('builds one store crate on each island, and keeps things in it', () => {
+    const game = sandbox(133);
+    game.player.facing = 'right';
+    give(game, RECIPES.store_crate.cost);
+    expect(game.build('store_crate')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('store_crate');
+    give(game, RECIPES.store_crate.cost);
+    expect(game.buildProblem('store_crate')).toEqual({ key: 'oneStore' });
+    // Walking into it opens the Store panel; no time passes.
+    const turn = game.turn;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.takeStoreRequest()).toBe(true);
+    game.inventory.add('stone', 20);
+    game.inventory.add('coconut', 3);
+    expect(game.storeItem('stone', 20)).toBe(true);
+    expect(game.storeItem('coconut', 1)).toBe(true);
+    expect(game.inventory.count('stone')).toBe(0);
+    expect(game.storeNear()?.store).toEqual({ stone: 20, coconut: 1 });
+    // Taking out stops at the carry limit.
+    game.inventory.add('wood', BAG_LOAD - 5 - game.load);
+    expect(game.takeItem('stone', 20)).toBe(true);
+    expect(game.inventory.count('stone')).toBe(5);
+    expect(game.storeNear()?.store).toEqual({ stone: 15, coconut: 1 });
+    expect(game.takeItem('stone', 1)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooHeavy' });
+    expect(game.takeItem('coconut', 5)).toBe(true);
+    expect(game.storeNear()?.store).toEqual({ stone: 15 });
+    // The store keeps its things in the save.
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.objectAt(loaded.player.x + 1, loaded.player.y)?.store).toEqual({ stone: 15 });
+    // Away from the crate, nothing moves.
+    game.player.x -= 3;
+    expect(game.storeItem('wood', 1)).toBe(false);
+  });
+
+  it('builds the hut on a frame that takes its materials in trips', () => {
+    const game = sandbox(134);
+    game.player.facing = 'right';
+    expect(game.buildProblem('hut')).toBe(null);
+    expect(game.build('hut')).toBe(true);
+    const x = game.player.x + 1;
+    const y = game.player.y;
+    expect(game.objectAt(x, y)?.kind).toBe('hut_site');
+    expect(game.hasHut()).toBe(true);
+    expect(game.buildProblem('hut')).toEqual({ key: 'oneHut' });
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toMatchObject({ key: 'siteNeeds', obj: 'hut_site' });
+    // First trip: the logs.
+    game.inventory.add('log', 24);
+    const xp = game.xp;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.xp).toBe(xp + 24);
+    expect(game.log.at(-1)?.msg).toMatchObject({ key: 'siteGive', given: [['log', 24]] });
+    expect(game.siteLeft(x, y)).toEqual({ wood: 12, leaves: 30, stone: 20, rope: 8 });
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.siteLeft(x, y)).toEqual({ wood: 12, leaves: 30, stone: 20, rope: 8 });
+    // Second trip: the rest.
+    give(game, { wood: 12, leaves: 30, stone: 20, rope: 8 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(x, y)?.kind).toBe('hut');
+    expect(game.objectAt(x, y)?.given).toBeUndefined();
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'siteDone', obj: 'hut' });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.hutHere()?.kind).toBe('hut');
+  });
+
+  it('loads a version 9 save', () => {
+    const game = sandbox(135);
+    const old = { ...game.toSave(), v: 9 };
+    expect(Game.fromSave(old).turn).toBe(game.turn);
   });
 });
 

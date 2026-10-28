@@ -244,7 +244,7 @@ function campSection(): HTMLElement {
   return section('camp', c.title, [
     el('div', 'camp-head', [sprite(hutSprite(ROOM_IDS), 3), el('div', undefined, c.paras.map(para))]),
     el('h3', undefined, [c.hutCost]),
-    cost(RECIPES.hut.cost),
+    cost(RECIPES.hut.siteCost ?? RECIPES.hut.cost),
     el('h3', undefined, [c.roomsTitle]),
     para(c.roomsIntro),
     inside,
@@ -328,10 +328,11 @@ function buildSection(): HTMLElement {
       r.skill && b.skill(t().skills[r.skill].name),
       r.atFire && b.atFire,
       r.onto && b.onto(t().objectName(r.onto[0])),
+      r.siteCost && b.site,
     ].filter(Boolean) as string[];
     return [
       el('span', 'named', [sprite(recipeSprite(id), 'builds' in r ? 1.5 : 2), el('span', undefined, [el('strong', undefined, [t().recipes[id].name]), el('br'), el('small', undefined, [t().recipes[id].description])])]),
-      cost(r.cost),
+      cost(r.siteCost ?? r.cost),
       notes.join(' '),
     ];
   });

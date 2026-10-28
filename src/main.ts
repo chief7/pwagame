@@ -288,6 +288,8 @@ function afterTurn(): void {
   if (game.takeSailRequest()) openSheet(game.sailed ? 'end' : 'sail');
   // Walking into the hut goes inside.
   if (game.takeHutRequest()) openSheet('hut');
+  // Walking into a store crate opens it.
+  if (game.takeStoreRequest()) openSheet('store');
 }
 
 function run(cmd: Command): void {
@@ -356,7 +358,7 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'sail' | 'end' | 'cheats';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'store' | 'sail' | 'end' | 'cheats';
 let sheetKind: SheetKind = 'bag';
 /** Flickers the hearth in the Hut panel while it is open. */
 let hearthTimer: number | undefined;
@@ -400,13 +402,15 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, store: words.ui.store, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
     cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
   clearInterval(hearthTimer);
   if (sheetKind === 'hut') {
     renderHut(rows);
+  } else if (sheetKind === 'store') {
+    renderStore(rows);
   } else if (sheetKind === 'sail' || sheetKind === 'end') {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
@@ -425,6 +429,7 @@ function renderSheet(): void {
       if (dog.tired) note.append(el('span', { className: 'row-note locked', textContent: words.ui.dogTired }));
       rows.append(row(icon(dog.tired ? 'dog_rest' : 'dog'), words.ui.yourDog, note));
     }
+    rows.append(loadRow());
     if (!entries.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmpty }));
     for (const [id, count] of entries) {
       const food = ITEMS[id].eat;
@@ -447,7 +452,7 @@ function renderSheet(): void {
       }
       const note = food
         ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
-        : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : words.ui.forBuilding;
+        : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : ITEMS[id].heavy ? `${words.ui.heavy} · ${words.ui.forBuilding}` : words.ui.forBuilding;
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), actions.childElementCount ? actions : undefined));
     }
   } else {
@@ -462,15 +467,19 @@ function renderSheet(): void {
           afterTurn();
         }
       });
-      const costs = costList(game.recipeCost(id));
+      // A building that goes up in trips shows what its site will take, or still needs once it stands.
+      const site = 'builds' in recipe ? siteOf(recipe.builds) : null;
+      const costs = costList(site ?? (recipe.siteCost ? game.siteCost(id) : game.recipeCost(id)));
       const { description } = words.recipes[id];
       const makes = game.recipeMakes(id);
       const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
-      if (problem && (problem.key === 'needSkill' || problem.key === 'needFire' || problem.key === 'oneHut')) {
+      if (problem && !site && (problem.key === 'needSkill' || problem.key === 'needFire' || problem.key === 'oneHut' || problem.key === 'oneStore')) {
         note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
       }
+      if (site) note.insertBefore(el('span', { className: 'row-note goal-step', textContent: words.ui.siteLeft }), costs);
+      else if (recipe.siteCost) note.append(el('span', { className: 'row-note goal-hint', textContent: words.ui.siteNote }));
       // The map on the hut wall needs the Cartographer skill: say so before the hut is built.
       if (id === 'hut' && !game.hasHut() && !game.has('cartographer')) {
         note.append(el('span', { className: 'row-note goal-hint', textContent: words.ui.hutMapRemark }));
@@ -500,6 +509,66 @@ function renderSheet(): void {
     }
   }
   ui.sheetBody.replaceChildren(rows, foot);
+}
+
+/** How many heavy things the explorer carries, of how many the bag holds. */
+function loadRow(): HTMLElement {
+  const words = t();
+  const full = game.load >= game.loadLimit;
+  const note = el('div', {}, [
+    el('div', { className: `row-note${full ? ' locked' : ''}`, textContent: words.ui.loadOf(game.load, game.loadLimit) }),
+    el('div', { className: 'row-note', textContent: words.ui.loadNote }),
+  ]);
+  return row(icon('ui_load'), words.ui.load, note);
+}
+
+/** What the island's building site of this kind still needs, or null when there is none. */
+function siteOf(kind: string): Partial<Record<ItemId, number>> | null {
+  for (const [i, obj] of game.objects) {
+    if (obj.kind !== kind || !OBJECTS[obj.kind].site) continue;
+    const x = i % game.map.width;
+    return game.siteLeft(x, (i - x) / game.map.width);
+  }
+  return null;
+}
+
+/** The Store panel: the bag and the store crate side by side, with buttons to move things. */
+function renderStore(rows: HTMLElement): void {
+  const words = t();
+  const store = game.storeNear();
+  if (!store) {
+    rows.append(el('p', { className: 'empty', textContent: words.ui.notAtStore }));
+    return;
+  }
+  const act = (fn: () => boolean) => () => {
+    fn();
+    updateHud();
+    saveSoon();
+  };
+  const buttons = (labels: [string, () => boolean][]) => {
+    const box = el('div', { className: 'row-actions' });
+    for (const [label, fn] of labels) {
+      const b = el('button', { type: 'button', textContent: label });
+      b.addEventListener('click', act(fn));
+      box.append(b);
+    }
+    return box;
+  };
+  rows.append(loadRow());
+  rows.append(el('h3', { className: 'path', textContent: words.ui.inBag }));
+  const bag = game.inventory.entries();
+  if (!bag.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmptyShort }));
+  for (const [id, count] of bag) {
+    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: ITEMS[id].heavy ? words.ui.heavy : '' }),
+      buttons([[words.ui.putOne, () => game.storeItem(id, 1)], [words.ui.putAll, () => game.storeItem(id, count)]])));
+  }
+  rows.append(el('h3', { className: 'path', textContent: words.ui.inStore }));
+  const kept = (Object.entries(store.store ?? {}) as [ItemId, number][]).filter(([, n]) => n > 0);
+  if (!kept.length) rows.append(el('p', { className: 'empty', textContent: words.ui.storeEmpty }));
+  for (const [id, count] of kept) {
+    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: ITEMS[id].heavy ? words.ui.heavy : '' }),
+      buttons([[words.ui.takeOne, () => game.takeItem(id, 1)], [words.ui.takeAll, () => game.takeItem(id, count)]])));
+  }
 }
 
 /** The Cheats panel of preview builds: each row does one cheat, then closes the panel. */

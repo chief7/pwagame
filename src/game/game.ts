@@ -103,7 +103,11 @@ const STAR_FISH = 5;
 const STAR_EXPLORE = 0.75;
 const STAR_SAFE_DAYS = 3;
 const STAR_XP = 5;
-export const SAVE_VERSION = 9;
+/** How many heavy things the bag holds, and how many more with Strong back and with the pack frame. */
+export const BAG_LOAD = 30;
+export const STRONG_BACK_LOAD = 10;
+export const PACK_FRAME_LOAD = 15;
+export const SAVE_VERSION = 10;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -115,6 +119,12 @@ export interface LogEntry {
 export type TravelResult = 'moved' | 'arrived' | 'blocked';
 
 type Items = Partial<Record<ItemId, number>>;
+
+/** What a store crate holds, and what a building site already got (in the save). */
+export interface ObjectStock {
+  store?: Items;
+  given?: Items;
+}
 
 /** How far the island's goal has come, for the goal card in the Build panel. */
 export type GoalState =
@@ -163,8 +173,11 @@ export interface SaveData {
   height: number;
   tiles: string;
   explored: string;
-  /** Cell, kind, then the turn it regrows (0: none) and a hut's rooms, when there are any. */
-  objects: [number, ObjectKind, number?, RoomId[]?][];
+  /**
+   * Cell, kind, then the turn it regrows (0: none) and a hut's rooms, when
+   * there are any, then what a store crate holds and a building site got.
+   */
+  objects: [number, ObjectKind, number?, RoomId[]?, ObjectStock?][];
   animals: Animal[];
   player: Player;
   home: { x: number; y: number };
@@ -228,6 +241,8 @@ export class Game {
   private sailAsked = false;
   /** The explorer walked into the hut: the UI shows its inside. */
   private hutAsked = false;
+  /** The explorer walked into a store crate: the UI shows the Store panel. */
+  private storeAsked = false;
   /** climberDist() of this turn. */
   private climbDist: { turn: number; dist: Int32Array } | null = null;
   /** The deep caves of this map (found from its tiles, which never change). */
@@ -244,10 +259,12 @@ export class Game {
         this.map.tiles[i] = save.tiles.charCodeAt(i) - 48;
         this.map.explored[i] = save.explored.charCodeAt(i) === 49 ? 1 : 0;
       }
-      this.objects = new Map(save.objects.map(([i, kind, readyAt, rooms]) => {
+      this.objects = new Map(save.objects.map(([i, kind, readyAt, rooms, stock]) => {
         const obj: WorldObject = { kind };
         if (readyAt) obj.readyAt = readyAt;
         if (rooms?.length) obj.rooms = rooms;
+        if (stock?.store) obj.store = stock.store;
+        if (stock?.given) obj.given = stock.given;
         return [i, obj];
       }));
       this.animals = save.animals;
@@ -439,10 +456,35 @@ export class Game {
     return !!this.hutHere()?.rooms?.includes(id);
   }
 
-  /** This island already has a hut (the camp): there is only one. */
+  /** This island already has a hut (the camp), or its building site: there is only one. */
   hasHut(): boolean {
-    for (const obj of this.objects.values()) if (obj.kind === 'hut') return true;
+    for (const obj of this.objects.values()) if (obj.kind === 'hut' || obj.kind === 'hut_site') return true;
     return false;
+  }
+
+  /** This island already has a store crate: there is only one. */
+  hasStore(): boolean {
+    for (const obj of this.objects.values()) if (OBJECTS[obj.kind].store) return true;
+    return false;
+  }
+
+  /** The store crate next to the explorer, or null. */
+  storeNear(): WorldObject | null {
+    for (const [dx, dy] of DIRS) {
+      const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
+      if (obj && OBJECTS[obj.kind].store) return obj;
+    }
+    return null;
+  }
+
+  /** How many heavy things the explorer carries (see ITEMS `heavy`). */
+  get load(): number {
+    return this.inventory.entries().reduce((sum, [id, n]) => sum + (ITEMS[id].heavy ? n : 0), 0);
+  }
+
+  /** How many heavy things the bag holds: more with Strong back and with the pack frame. */
+  get loadLimit(): number {
+    return BAG_LOAD + (this.has('strong_back') ? STRONG_BACK_LOAD : 0) + (this.inventory.count('pack_frame') > 0 ? PACK_FRAME_LOAD : 0);
   }
 
   /** The most Energy a sleep at (x, y) gives: only the bed in a hut gives a full rest. */
@@ -592,6 +634,11 @@ export class Game {
     return this.withSkills(RECIPES[id].cost);
   }
 
+  /** What a building site of this recipe takes, in trips (Handy builder works here too). */
+  siteCost(id: RecipeId): Items {
+    return this.withSkills(RECIPES[id].siteCost ?? {});
+  }
+
   /** What a hut room costs the explorer now (Handy builder works here too). */
   roomCost(id: RoomId): Items {
     return this.withSkills(ROOMS[id].cost);
@@ -624,7 +671,8 @@ export class Game {
   buildProblem(id: RecipeId): Msg | null {
     const recipe = RECIPES[id];
     if (recipe.skill && !this.has(recipe.skill)) return { key: 'needSkill', skill: recipe.skill };
-    if ('builds' in recipe && recipe.builds === 'hut' && this.hasHut()) return { key: 'oneHut' };
+    if ('builds' in recipe && (recipe.builds === 'hut' || recipe.builds === 'hut_site') && this.hasHut()) return { key: 'oneHut' };
+    if ('builds' in recipe && OBJECTS[recipe.builds].store && this.hasStore()) return { key: 'oneStore' };
     if ('makes' in recipe && ITEMS[recipe.makes].tool && this.inventory.count(recipe.makes) > 0) {
       return { key: 'haveTool', item: recipe.makes };
     }
@@ -934,6 +982,43 @@ export class Game {
     return true;
   }
 
+  /** True once after the explorer walked into a store crate: the UI then shows the Store panel. */
+  takeStoreRequest(): boolean {
+    const asked = this.storeAsked;
+    this.storeAsked = false;
+    return asked;
+  }
+
+  /** Put up to n of an item from the bag into the store crate next to the explorer. Takes no time. */
+  storeItem(id: ItemId, n: number): boolean {
+    const store = this.storeNear();
+    const count = Math.min(n, this.inventory.count(id));
+    if (!store || count <= 0) return false;
+    this.inventory.take(id, count);
+    store.store = { ...store.store, [id]: (store.store?.[id] ?? 0) + count };
+    return true;
+  }
+
+  /** Take up to n of an item from the store crate into the bag, as much as the bag can carry. Takes no time. */
+  takeItem(id: ItemId, n: number): boolean {
+    const store = this.storeNear();
+    const have = store?.store?.[id] ?? 0;
+    if (!store || have <= 0) return false;
+    const room = ITEMS[id].heavy ? this.loadLimit - this.load : Infinity;
+    if (room <= 0) {
+      this.message({ key: 'tooHeavy' }, 'info');
+      return false;
+    }
+    const count = Math.min(n, have, room);
+    this.inventory.add(id, count);
+    const left = have - count;
+    const rest = { ...store.store };
+    if (left > 0) rest[id] = left;
+    else delete rest[id];
+    store.store = rest;
+    return true;
+  }
+
   /** True once after the explorer walked into a hut: the UI then shows its inside. */
   takeHutRequest(): boolean {
     const asked = this.hutAsked;
@@ -1067,6 +1152,12 @@ export class Game {
     const def = OBJECTS[obj.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
 
+    if (def.store) {
+      this.storeAsked = true;
+      this.message({ key: 'openStore' }, 'info');
+      return false;
+    }
+    if (def.site) return this.workOnSite(x, y, obj);
     if (def.drink) {
       const msg: Msg = obj.kind === 'hot_spring' ? { key: 'drink', warm: true } : obj.kind === 'water_tank' ? { key: 'drink', tank: true } : { key: 'drink' };
       return this.drink(def.drink, msg);
@@ -1094,6 +1185,12 @@ export class Game {
     }
     if (obj.readyAt !== undefined && obj.readyAt > this.turn) {
       this.message({ key: 'nothingLeft', obj: obj.kind }, 'info');
+      return false;
+    }
+    // A full bag takes no more heavy things (one gather can still go a little over).
+    const heavy = gather.yields.some((y) => ITEMS[y.item].heavy && (!y.tool || this.inventory.count(y.tool) > 0));
+    if (heavy && this.load >= this.loadLimit) {
+      this.message({ key: 'tooHeavy' }, 'info');
       return false;
     }
 
@@ -1168,6 +1265,64 @@ export class Game {
     this.emit({ type: 'sparkle', x, y });
     this.message({ key: 'goalStage', stage: stage.id }, 'good');
     return true;
+  }
+
+  /**
+   * Hand a building site what it still needs from the bag. When it has
+   * everything, it becomes its building (the hut).
+   */
+  private workOnSite(x: number, y: number, obj: WorldObject): boolean {
+    const recipe = RECIPE_IDS.find((id) => {
+      const r = RECIPES[id];
+      return 'builds' in r && r.builds === obj.kind && r.siteCost;
+    });
+    if (!recipe) return false;
+    const cost = this.siteCost(recipe);
+    const leftOf = () => (Object.entries(cost) as [ItemId, number][])
+      .map(([item, n]): [ItemId, number] => [item, n - (obj.given?.[item] ?? 0)])
+      .filter(([, n]) => n > 0);
+    const given: [ItemId, number][] = [];
+    for (const [item, still] of leftOf()) {
+      const n = Math.min(still, this.inventory.count(item));
+      if (n <= 0) continue;
+      this.inventory.take(item, n);
+      obj.given = { ...obj.given, [item]: (obj.given?.[item] ?? 0) + n };
+      given.push([item, n]);
+      this.emit({ type: 'float', x, y, amount: -n, what: { item }, tone: 'info' });
+    }
+    const left = leftOf();
+    const site = obj.kind;
+    if (!given.length) {
+      this.message({ key: 'siteNeeds', obj: site, left }, 'info');
+      return false;
+    }
+    this.gainXp(given.reduce((sum, [, n]) => sum + n, 0), x, y);
+    if (left.length) {
+      this.message({ key: 'siteGive', obj: site, given, left }, 'good');
+      return true;
+    }
+    obj.kind = OBJECTS[site].site!;
+    delete obj.given;
+    this.emit({ type: 'sparkle', x, y });
+    this.message({ key: 'siteDone', obj: obj.kind }, 'good');
+    return true;
+  }
+
+  /** What a building site still needs, or null if (x, y) is no site. */
+  siteLeft(x: number, y: number): Items | null {
+    const obj = this.objectAt(x, y);
+    if (!obj || !OBJECTS[obj.kind].site) return null;
+    const recipe = RECIPE_IDS.find((id) => {
+      const r = RECIPES[id];
+      return 'builds' in r && r.builds === obj.kind && r.siteCost;
+    });
+    if (!recipe) return null;
+    const left: Items = {};
+    for (const [item, n] of Object.entries(this.siteCost(recipe)) as [ItemId, number][]) {
+      const still = n - (obj.given?.[item] ?? 0);
+      if (still > 0) left[item] = still;
+    }
+    return left;
   }
 
   /** Cast the fishing rod into the sea at (x, y). Always takes a turn. */
@@ -1913,6 +2068,12 @@ export class Game {
       tiles: String.fromCharCode(...this.map.tiles.map((t) => t + 48)),
       explored: Array.from(this.map.explored, (e) => (e ? '1' : '0')).join(''),
       objects: [...this.objects].map(([i, o]) => {
+        if (o.store || o.given) {
+          const stock: ObjectStock = {};
+          if (o.store) stock.store = { ...o.store };
+          if (o.given) stock.given = { ...o.given };
+          return [i, o.kind, o.readyAt ?? 0, [...(o.rooms ?? [])], stock];
+        }
         if (o.rooms?.length) return [i, o.kind, o.readyAt ?? 0, [...o.rooms]];
         return o.readyAt ? [i, o.kind, o.readyAt] : [i, o.kind];
       }),
@@ -1969,6 +2130,11 @@ export class Game {
     }
     if (data.v === 8) {
       // Version 8 huts had no rooms. Their objects need no change: a hut gets its bed for free.
+      data = { ...data, v: 9 };
+    }
+    if (data.v === 9) {
+      // Version 9 had no store crates and no building sites. A bag over the
+      // carry limit keeps everything; only gathering heavy things waits.
       data = { ...data, v: SAVE_VERSION };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
