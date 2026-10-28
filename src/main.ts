@@ -830,7 +830,7 @@ canvas.addEventListener('pointerup', (e) => endPress(e, false));
 canvas.addEventListener('pointercancel', (e) => endPress(e, true));
 
 function tap(x: number, y: number): void {
-  const target = renderer.cellAt(x, y);
+  const target = renderer.tapCell(game, x, y);
   const dx = target.x - game.player.x;
   const dy = target.y - game.player.y;
   if (dx === 0 && dy === 0) return run({ type: 'wait' });
