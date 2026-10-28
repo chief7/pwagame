@@ -291,4 +291,6 @@ export const PALETTE = {
   washAshDark: '#978e84',
   washLava: '#d98a5c',
   washLavaDark: '#c8714a',
+  washDeck: '#b8b9b2',
+  washDeckDark: '#a5a79f',
 } as const;

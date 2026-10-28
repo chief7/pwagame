@@ -707,5 +707,7 @@ export function balloon(): Sprite[] {
     balloonSprite('balloon_ready', 'ready', 0),
     balloonSprite('balloon_ready_2', 'ready', 1),
     balloonGone(),
+    // Island 4: the balloon after its crash on the oil rig looks like the old one on the crater.
+    balloonSprite('balloon_crashed', 'site'),
   ];
 }

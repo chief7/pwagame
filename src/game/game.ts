@@ -410,7 +410,11 @@ export class Game {
   isPassable(x: number, y: number): boolean {
     const obj = this.objectAt(x, y);
     if (this.map.isFlow(x, y)) return !!obj && !!OBJECTS[obj.kind].bridge;
-    if (this.map.get(x, y) === Tile.Water) return !!obj && !!OBJECTS[obj.kind].tidal && this.lowTide;
+    if (this.map.get(x, y) === Tile.Water) {
+      if (!obj) return false;
+      const def = OBJECTS[obj.kind];
+      return def.tidal ? this.lowTide : !!def.overSea;
+    }
     if (!this.map.isFloor(x, y)) return false;
     return !obj || !!OBJECTS[obj.kind].walkable;
   }
@@ -627,7 +631,7 @@ export class Game {
     if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
-      if (recipe.onto) return { key: 'noStep', obj: recipe.onto };
+      if (recipe.onto) return { key: 'noStep', obj: recipe.onto[0] };
       const built = OBJECTS[recipe.builds];
       return built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
@@ -887,13 +891,14 @@ export class Game {
       return true;
     }
     const spot = this.buildSpot(recipe.builds, recipe.onto)!;
+    const mends = !!OBJECTS[this.objectAt(spot.cells[0].x, spot.cells[0].y)?.kind ?? spot.kind].broken;
     for (const cell of spot.cells) {
       this.objects.set(this.map.idx(cell.x, cell.y), { kind: spot.kind });
       this.emit({ type: 'sparkle', x: cell.x, y: cell.y });
     }
     const [first] = spot.cells;
     this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: first.x, targetY: first.y });
-    this.message({ key: 'build', obj: spot.kind }, 'good');
+    this.message(mends ? { key: 'gangwayMended' } : { key: 'build', obj: spot.kind }, 'good');
     this.gainXp(xp, first.x, first.y);
     this.endTurn();
     return true;
@@ -1062,10 +1067,17 @@ export class Game {
     const def = OBJECTS[obj.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
 
-    if (def.drink) return this.drink(def.drink, obj.kind === 'hot_spring' ? { key: 'drink', warm: true } : { key: 'drink' });
+    if (def.drink) {
+      const msg: Msg = obj.kind === 'hot_spring' ? { key: 'drink', warm: true } : obj.kind === 'water_tank' ? { key: 'drink', tank: true } : { key: 'drink' };
+      return this.drink(def.drink, msg);
+    }
     if (def.goal) return this.workOnGoal(x, y, obj);
+    if (def.broken) {
+      this.message({ key: 'gangwayBroken' }, 'info');
+      return false;
+    }
     if (def.steep) {
-      const recipe = RECIPE_IDS.map((id) => RECIPES[id]).find((r) => r.onto === obj.kind);
+      const recipe = RECIPE_IDS.map((id) => RECIPES[id]).find((r) => r.onto?.includes(obj.kind));
       const way = recipe && 'builds' in recipe ? recipe.builds : obj.kind;
       this.message({ key: 'tooSteep', obj: obj.kind, way }, 'info');
       return false;
@@ -1250,8 +1262,9 @@ export class Game {
    * nearest free neighbour. A bridge goes straight ahead across the river
    * instead, facing the way the explorer does. A way up a step (`onto`)
    * goes on such a step in front, else on the nearest one next to the explorer.
+   * Mending a broken gangway fills the whole gap between its two broken ends.
    */
-  private buildSpot(kind: ObjectKind, onto?: ObjectKind): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
+  private buildSpot(kind: ObjectKind, onto?: ObjectKind[]): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
     const p = this.player;
     const [fx, fy] = facingDelta(p.facing);
     if (OBJECTS[kind].bridge) {
@@ -1263,8 +1276,16 @@ export class Game {
     }
     const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
     if (onto) {
-      const at = order.find(([dx, dy]) => this.objectAt(p.x + dx, p.y + dy)?.kind === onto && !this.animalAt(p.x + dx, p.y + dy));
-      return at ? { kind, cells: [{ x: p.x + at[0], y: p.y + at[1] }] } : null;
+      const at = order.find(([dx, dy]) => {
+        const obj = this.objectAt(p.x + dx, p.y + dy);
+        return !!obj && onto.includes(obj.kind) && !this.animalAt(p.x + dx, p.y + dy);
+      });
+      if (!at) return null;
+      const x = p.x + at[0];
+      const y = p.y + at[1];
+      const run = OBJECTS[this.objectAt(x, y)!.kind].broken;
+      if (run) return { kind: run === 'ns' ? 'gangway_ns' : 'gangway_ew', cells: this.brokenRun(x, y, run) };
+      return { kind, cells: [{ x, y }] };
     }
     for (const [dx, dy] of order) {
       const x = p.x + dx;
@@ -1279,6 +1300,24 @@ export class Game {
       if (ok) return { kind, cells: [{ x, y }] };
     }
     return null;
+  }
+
+  /** The broken gangway ends in a row with (x, y), along the way the gangway runs. */
+  private brokenRun(x: number, y: number, run: 'ns' | 'ew'): { x: number; y: number }[] {
+    const [dx, dy] = run === 'ns' ? [0, 1] : [1, 0];
+    const broken = (cx: number, cy: number) => {
+      const obj = this.objectAt(cx, cy);
+      return !!obj && OBJECTS[obj.kind].broken === run;
+    };
+    let sx = x;
+    let sy = y;
+    while (broken(sx - dx, sy - dy)) {
+      sx -= dx;
+      sy -= dy;
+    }
+    const cells: { x: number; y: number }[] = [];
+    for (let cx = sx, cy = sy; broken(cx, cy); cx += dx, cy += dy) cells.push({ x: cx, y: cy });
+    return cells;
   }
 
   /** The open river (or lava, `flow`) cells straight ahead, if they end on free ground within a bridge's span. */

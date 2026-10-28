@@ -26,11 +26,33 @@ function shadedWater(x: number, y: number, seed: number): Color {
   return n < (y - 8) / 8 ? P.water : P.waterDeep;
 }
 
+/** The sides a deck tile can have a safety line on, in the order its name lists them. */
+const RIM_SIDES = ['n', 'e', 'w'] as const;
+
+/**
+ * Deck tiles: plain (`deck`) or rusty (`deck_rust`), each with a yellow and
+ * black safety line along the sides that meet the sea: `deck_n`, `deck_rust_ew`…
+ * (The south side has its line on the face below it, see deckSide.)
+ */
 export function deck(): Sprite[] {
-  return [
-    new Sprite('deck').paint((x, y) => deckPixel(x, y, 301, false)),
-    new Sprite('deck_rust').paint((x, y) => deckPixel(x, y, 302, true)),
-  ];
+  const tiles: Sprite[] = [];
+  for (const [variant, seed, rusty] of [['', 301, false], ['_rust', 302, true]] as const) {
+    for (let mask = 0; mask < 1 << RIM_SIDES.length; mask++) {
+      const sides = RIM_SIDES.filter((_, i) => mask & (1 << i));
+      const name = `deck${variant}${sides.length ? `_${sides.join('')}` : ''}`;
+      tiles.push(new Sprite(name).paint((x, y) => {
+        const stripe = Math.floor((sides.includes('n') && y <= 1 ? x : y) / 2) % 2 ? P.hazard : P.steelDeep;
+        if (sides.includes('n') && y === 0) return P.steelDeep;
+        if (sides.includes('w') && x === 0) return P.steelDeep;
+        if (sides.includes('e') && x === 15) return P.steelDeep;
+        if (sides.includes('n') && y === 1) return stripe;
+        if (sides.includes('w') && x === 1) return stripe;
+        if (sides.includes('e') && x === 14) return stripe;
+        return deckPixel(x, y, seed, rusty);
+      }));
+    }
+  }
+  return tiles;
 }
 
 /**
@@ -52,20 +74,6 @@ export function deckSide(): Sprite[] {
     return shadedWater(x, y, 304);
   });
   return [side('deck_side', false), side('deck_side_leg', true)];
-}
-
-/** A yellow safety line just inside a deck tile's edge; laid over the deck where it meets the sea. */
-export function deckRims(): Sprite[] {
-  return (['n', 'e', 'w'] as const).map((d) => {
-    const s = new Sprite(`deck_rim_${d}`);
-    for (let i = 0; i < TILE; i++) {
-      const c = Math.floor(i / 2) % 2 ? P.hazard : P.steelDeep;
-      if (d === 'n') { s.set(i, 0, P.steelDeep); s.set(i, 1, c); }
-      if (d === 'w') { s.set(0, i, P.steelDeep); s.set(1, i, c); }
-      if (d === 'e') { s.set(15, i, P.steelDeep); s.set(14, i, c); }
-    }
-    return s;
-  });
 }
 
 /** One painted landing circle with an H, cut into 3 × 3 deck tiles (`helipad_0` … `helipad_8`). */
@@ -160,28 +168,140 @@ export function container(): Sprite {
   return s.outline().shadow(8, 15, 7.5, 1.2);
 }
 
-/** Two old red fuel drums: the rig's diesel. */
-export function dieselDrums(): Sprite {
-  const s = new Sprite('diesel_drums');
+/** Two old red fuel drums: the rig's diesel. Empty ones are faded, with their lids off. */
+function drums(name: string, empty: boolean): Sprite {
+  const s = new Sprite(name);
+  const [light, mid, dark] = empty ? [P.rustLight, P.rust, P.rustDark] : [P.paintRedLight, P.paintRed, P.paintRedDark];
   for (const cx of [5, 11]) {
     for (let y = 5; y <= 14; y++) {
       for (let x = cx - 3; x <= cx + 2; x++) {
         const side = x - cx;
-        let c: string = side === -2 ? P.paintRedLight : side >= 1 ? P.paintRedDark : P.paintRed;
-        if (y === 8 || y === 12) c = side >= 1 ? P.outline : P.paintRedDark;
-        if (side === -3) c = P.paintRed;
-        if (hash2(x, y, 309 + cx) < 0.08) c = P.rust;
+        let c: string = side === -2 ? light : side >= 1 ? dark : mid;
+        if (y === 8 || y === 12) c = side >= 1 ? P.outline : dark;
+        if (side === -3) c = mid;
+        if (hash2(x, y, 309 + cx) < (empty ? 0.25 : 0.08)) c = empty ? P.steelDark : P.rust;
         s.set(x, y, c);
       }
     }
-    // The lid, seen a little from above, with its cap.
+    // The lid, seen a little from above, with its cap (or the dark hole where it was).
     for (let x = cx - 3; x <= cx + 2; x++) {
       s.set(x, 3, P.steelLight);
-      s.set(x, 4, P.steelDark);
+      s.set(x, 4, empty && x > cx - 3 && x < cx + 2 ? P.interior : P.steelDark);
     }
-    s.set(cx, 3, P.steelDeep);
+    if (!empty) s.set(cx, 3, P.steelDeep);
   }
   return s.outline().shadow(8, 15, 7.5, 1.2);
+}
+
+export function dieselDrums(): Sprite[] {
+  return [drums('diesel_drums', false), drums('diesel_drums_empty', true)];
+}
+
+/** A wooden pallet left on the deck: firewood. */
+export function pallet(): Sprite {
+  const s = new Sprite('pallet');
+  // Top boards across three runners, seen a little from above.
+  for (let y = 7; y <= 12; y++) {
+    for (let x = 1; x <= 14; x++) {
+      const gap = y === 9 || y === 11;
+      s.set(x, y, gap ? P.woodDeep : y === 7 ? P.woodLight : x < 4 ? P.woodLight : hash2(x, y, 315) < 0.2 ? P.woodDark : P.wood);
+    }
+  }
+  for (const x of [1, 7, 14]) for (let y = 13; y <= 14; y++) s.set(x, y, P.woodDark);
+  for (let x = 1; x <= 14; x++) if (![1, 7, 14].includes(x)) s.set(x, 13, P.woodDeep);
+  return s.outline().shadow(8, 15, 7.5, 1);
+}
+
+/** A heap of old fishing net with a float: rope. */
+export function oldNet(): Sprite {
+  const s = new Sprite('old_net');
+  for (let y = 6; y <= 14; y++) {
+    for (let x = 1; x <= 14; x++) {
+      const d = Math.hypot((x + 0.5 - 7.5) / 6.8, (y + 0.5 - 11) / 4.6);
+      if (d > 1) continue;
+      // Knots where the cords cross, and holes between them.
+      const knot = (x + y) % 3 === 0 || (x - y + 30) % 3 === 0;
+      s.set(x, y, knot ? (x + y < 17 ? P.strawLight : P.straw) : d < 0.6 ? P.strawDeep : P.strawDark);
+    }
+  }
+  // A round red float caught in the net.
+  for (const [x, y, c] of [[10, 7, P.paintRedLight], [11, 7, P.paintRed], [10, 8, P.paintRed], [11, 8, P.paintRedDark]] as const) s.set(x, y, c);
+  return s.outline().shadow(8, 15, 7, 1.1);
+}
+
+/** A grey tank that catches rain water, with a tap at the bottom. */
+export function waterTank(): Sprite {
+  const s = new Sprite('water_tank', 16, 20);
+  for (let y = 3; y <= 17; y++) {
+    for (let x = 2; x <= 13; x++) {
+      const band = y === 7 || y === 13;
+      s.set(x, y, y === 3 ? P.steelLight : band ? P.steelDeep : x <= 3 ? P.steelLight : x >= 12 ? P.steelDeep : P.steel);
+    }
+  }
+  // The funnel on top that catches the rain, and a drop on the tap.
+  for (let x = 4; x <= 11; x++) s.set(x, 2, P.steelDark);
+  for (let x = 5; x <= 10; x++) s.set(x, 1, P.steelLight);
+  s.set(7, 2, P.waterShallow);
+  s.set(8, 2, P.water);
+  for (const [x, y, c] of [[13, 15, P.paintBlue], [14, 15, P.paintBlue], [14, 16, P.paintBlueDark]] as const) s.set(x, y, c);
+  s.outline().shadow(8, 19, 7, 1.1);
+  s.set(14, 18, P.waterShallow);
+  return s;
+}
+
+/** Black mussels on a rig leg at the waterline, in a fringe of weed; picked, only a few are left. */
+export function musselBed(): Sprite[] {
+  const bed = (name: string, picked: boolean) => {
+    const s = new Sprite(name);
+    // Green weed hanging down the leg.
+    for (const [x, y0] of [[5, 7], [7, 8], [9, 7], [11, 9], [4, 10]]) {
+      for (let y = y0; y <= 14; y++) s.set(x, y, (x + y) % 3 ? P.moss : P.leafDark);
+    }
+    const shells: [number, number][] = [[4, 11], [7, 10], [10, 11], [5, 13], [9, 13], [12, 12], [7, 13]];
+    for (const [cx, cy] of picked ? shells.slice(0, 2) : shells) {
+      // A mussel: a dark oval with a pale shine on top.
+      s.set(cx, cy, P.paintBlue);
+      s.set(cx + 1, cy, P.steelLight);
+      s.set(cx, cy + 1, P.paintBlueDark);
+      s.set(cx + 1, cy + 1, P.paintBlueDark);
+      s.set(cx + 2, cy + 1, P.outline);
+    }
+    return s.outline();
+  };
+  return [bed('mussel_bed', false), bed('mussel_bed_picked', true)];
+}
+
+/** Item icons for the rig: scrap metal, a can of diesel and a handful of mussels. */
+export function rigItemIcons(): Sprite[] {
+  const scrap = new Sprite('item_scrap');
+  // A bent plate and a short pipe.
+  for (let y = 7; y <= 13; y++) {
+    for (let x = 2 + Math.max(0, 9 - y); x <= 12; x++) scrap.set(x, y, y === 7 ? P.rustLight : hash2(x, y, 316) < 0.3 ? P.rustDark : P.rust);
+  }
+  for (let i = 0; i <= 8; i++) {
+    scrap.set(4 + i, 7 - Math.round(i * 0.5), P.steelLight);
+    scrap.set(4 + i, 8 - Math.round(i * 0.5), P.steelDark);
+  }
+  scrap.outline();
+  const can = new Sprite('item_diesel');
+  for (let y = 4; y <= 14; y++) {
+    for (let x = 4; x <= 11; x++) can.set(x, y, x === 4 ? P.paintRedLight : x >= 10 ? P.paintRedDark : y === 8 ? P.paintRedDark : P.paintRed);
+  }
+  for (const [x, y] of [[5, 2], [6, 2], [7, 2], [5, 3], [7, 3]]) can.set(x, y, P.steelDark);
+  for (const [x, y] of [[9, 3], [10, 2]]) can.set(x, y, P.steelLight);
+  can.outline();
+  const mussels = new Sprite('item_mussels');
+  for (const [cx, cy, flip] of [[5, 9, false], [10, 8, true], [8, 12, false]] as const) {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        if (Math.hypot(dx / 3.2, dy / 2.2) > 1) continue;
+        const lit = flip ? dx > 0 && dy < 0 : dx < 0 && dy < 0;
+        mussels.set(cx + dx, cy + dy, lit ? P.paintBlue : dy > 0 ? P.outline : P.paintBlueDark);
+      }
+    }
+  }
+  mussels.outline();
+  return [scrap, can, mussels];
 }
 
 /** Bent pipes on a rusty plate: scrap metal to pick up. */
@@ -283,13 +403,21 @@ export function crane(): Sprite {
   return s;
 }
 
-/** The radio room: a small steel cabin with a bent aerial on its roof. */
-export function radioHut(): Sprite {
-  const s = new Sprite('radio_hut', 24, 28);
+/** How far the radio room is repaired (the stages of the rig's goal). */
+export type RadioStage = 'site' | 'aerial' | 'power' | 'ready';
+
+/**
+ * The radio room: a small steel cabin with an aerial on its roof. At first
+ * the aerial is bent over; then it stands straight, then a generator stands
+ * next to the cabin, and the working radio lights the window and blinks.
+ */
+function radioRoom(name: string, stage: RadioStage, frame: 0 | 1 = 0): Sprite {
+  const s = new Sprite(name, 24, 28);
+  const fixed = stage !== 'site';
   for (let y = 14; y <= 26; y++) {
     for (let x = 3; x <= 18; x++) {
       let c: string = x <= 4 ? P.paintWhite : x >= 17 ? P.steelLight : y % 3 === 0 ? P.steelLight : P.paintWhite;
-      if (hash2(x, Math.floor(y / 4), 312) < 0.12 && y > 16) c = P.rustLight;
+      if (hash2(x, y, 312) < 0.06 && y > 16) c = P.rustLight;
       s.set(x, y, c);
     }
   }
@@ -298,19 +426,39 @@ export function radioHut(): Sprite {
     s.set(x, 13, P.steelDark);
   }
   for (let y = 18; y <= 26; y++) for (let x = 6; x <= 9; x++) s.set(x, y, x === 6 || y === 18 ? P.steelDeep : P.steelDark);
-  for (let y = 16; y <= 19; y++) for (let x = 12; x <= 15; x++) s.set(x, y, P.glass);
-  s.set(13, 17, P.waterGlint);
-  // The aerial: a mast that bends over near the top.
-  for (let y = 4; y <= 11; y++) {
+  // The window: dark until the radio works, then warm light inside.
+  for (let y = 16; y <= 19; y++) for (let x = 12; x <= 15; x++) s.set(x, y, stage === 'ready' ? (y === 16 ? P.flame : P.flameCore) : P.glass);
+  if (stage !== 'ready') s.set(13, 17, P.waterGlint);
+  // The aerial: a mast with cross bars, bent over at the top until it is mended.
+  for (let y = fixed ? 1 : 4; y <= 11; y++) {
     s.set(16, y, P.steelDark);
     if (y % 3 === 0) {
       s.set(15, y, P.steelDeep);
       s.set(17, y, P.steelDeep);
     }
   }
-  for (const [x, y] of [[17, 3], [18, 2], [19, 2], [20, 3]]) s.set(x, y, P.steelDark);
-  s.set(21, 4, P.paintRed);
-  return s.outline().shadow(11, 27, 9.5, 1.3);
+  if (!fixed) for (const [x, y] of [[17, 3], [18, 2], [19, 2], [20, 3]]) s.set(x, y, P.steelDark);
+  if (stage === 'power' || stage === 'ready') {
+    // A yellow generator next to the cabin.
+    for (let y = 20; y <= 26; y++) {
+      for (let x = 19; x <= 23; x++) s.set(x, y, y === 20 ? P.hazard : x === 23 ? P.hazardDark : y % 2 && x > 19 && x < 23 ? P.steelDeep : P.hazard);
+    }
+  }
+  s.outline().shadow(12, 27, 10.5, 1.3);
+  // The light on top: red, and bright when the working radio blinks.
+  const tip: [number, number] = fixed ? [16, 0] : [21, 4];
+  s.set(tip[0], tip[1], stage === 'ready' && frame === 1 ? P.flameCore : P.paintRed);
+  return s;
+}
+
+export function radioHut(): Sprite[] {
+  return [
+    radioRoom('radio_hut', 'site'),
+    radioRoom('radio_aerial', 'aerial'),
+    radioRoom('radio_power', 'power'),
+    radioRoom('radio_ready', 'ready', 0),
+    radioRoom('radio_ready_2', 'ready', 1),
+  ];
 }
 
 /** The crew cabin: a blue steel block with windows, the camp on the rig. */
@@ -367,7 +515,8 @@ export function fishingBoatWreck(): Sprite {
 
 export function rigSprites(): Sprite[] {
   return [
-    ...deck(), ...deckSide(), ...deckRims(), ...helipad(), ...gangway(), ...gangwayEnds(),
-    container(), dieselDrums(), scrapPile(), lifeRing(), derrick(), crane(), radioHut(), crewCabin(), fishingBoatWreck(),
+    ...deck(), ...deckSide(), ...helipad(), ...gangway(), ...gangwayEnds(),
+    container(), ...dieselDrums(), scrapPile(), lifeRing(), derrick(), crane(), ...radioHut(), crewCabin(), fishingBoatWreck(),
+    pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(),
   ];
 }

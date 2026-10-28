@@ -27,7 +27,8 @@ export interface WikiWords {
   percent: (p: number) => string;
   /** Names for the items, as table entries. */
   items: Record<ItemId, string>;
-  ground: Record<Ground, string>;
+  /** Where things grow and animals live: the scatter grounds, and the decks of the oil rig. */
+  ground: Record<Ground | 'deck', string>;
 
   start: { title: string; intro: string; steps: string[] };
   needs: {
@@ -140,6 +141,7 @@ export interface WikiWords {
     one: { title: string; paras: string[] };
     two: { title: string; paras: string[] };
     three: { title: string; paras: string[] };
+    four: { title: string; paras: string[] };
     goalTitle: string;
     goalIntro: string;
     stageCols: { stage: string; cost: string };
@@ -164,9 +166,9 @@ const en: WikiWords = {
     coconut: 'Coconut', berries: 'Berries', mushroom: 'Mushroom', cooked_fish: 'Cooked fish', apple: 'Apple',
     wood: 'Wood', log: 'Logs', leaves: 'Big leaves', stone: 'Stone', fish: 'Raw fish', rope: 'Rope',
     axe: 'Stone axe', fishing_rod: 'Fishing rod', tar: 'Tar', resin: 'Resin', sulphur: 'Sulphur',
-    glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern',
+    glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern', scrap: 'Scrap metal', diesel: 'Diesel', mussels: 'Mussels',
   },
-  ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash' },
+  ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash', deck: 'rig decks' },
 
   start: {
     title: 'Your first day',
@@ -381,9 +383,18 @@ const en: WikiWords = {
       title: 'Island 3: Ember Isle',
       paras: [
         'A storm puts you ashore on a warm volcano island. Palms and a jungle grow on the low slopes; higher up is grey **ash** between black basalt cliffs. The ash is hot in the sun: out there in the day you get thirsty faster. Springs are few, but **hot springs** on the ash give water and warm you like a fire.',
-        'A **lava flow** takes the place of the river. You cannot walk on lava: lay **stepping stones** (8 stones) across it. An old **balloon** lies on the crater rim, next to the lake of lava. Fix its basket and cloth, and build a burner. The burner needs **sulphur** from the steam vents near the crater. Then fly home!',
+        'A **lava flow** takes the place of the river. You cannot walk on lava: lay **stepping stones** (8 stones) across it. An old **balloon** lies on the crater rim, next to the lake of lava. Fix its basket and cloth, and build a burner. The burner needs **sulphur** from the steam vents near the crater. Then fly away!',
         'Coconuts, berries, mushrooms, fish and glowcaps from the **two deep caves** are the food. Crabs, turtles, monkeys, bats, shy **lizards** and cheeky **gulls** that snatch food live here. Far from camp live boars, wasps, snakes and **scorpions** that sting.',
-        'This is the last island for now. The balloon takes you home, and the game ends. Then you can stay on Ember Isle or start a new island.',
+        'When the balloon is ready, fly away over the sea. You keep your bag, XP, skills, stars and your dog.',
+      ],
+    },
+    four: {
+      title: 'Island 4: the old oil rig',
+      paras: [
+        'The wind drives your balloon far out to sea, and it comes down on an **old oil rig**. There is no land here: steel **platforms** stand on legs in the sea, joined by **gangways**. Gulls live on the decks.',
+        'Some gangways are **broken** in the middle. Gather **scrap metal** from the scrap piles and build “Mend gangway” next to a broken end (6 scrap). Then you can cross.',
+        'There are no trees and no springs. Drink at the **rain water tanks**. Fish from the decks, and pick **mussels** off the rig legs at the waterline. Old pallets give wood, and old fishing nets give rope. The **crew cabin** is your camp: sleep in its bed, and cook fish at its stove.',
+        'The **radio room** stands on the platform furthest away. Mend its aerial, give its generator **diesel** from the old fuel drums, and fix the radio set. Then call for help. This is the end of the story for now.',
       ],
     },
     goalTitle: 'Goal stages',
@@ -401,7 +412,8 @@ const en: WikiWords = {
       { title: 'Opening up the island', steps: ['Wood, stones, a leaf', 'Make a stone axe', 'Chop through the brambles', 'Chop logs from trees', 'Build a bridge', 'Reach the far side and the boat'] },
       { title: 'A warm, safe home', steps: ['Campfire and lean-to', 'Collect for the hut (logs and rope)', 'Build the hut: your camp', 'Full rest in its bed', 'Add a workshop, hearth and rain barrel', 'Cook, drink and heal at home'] },
       { title: 'Rope for the goals', steps: ['Gather big leaves', 'Twist rope (2 leaves)', 'Rope maker: 2 ropes for 2 leaves', 'Mast, sail, beacon and balloon', 'Ladders and climbing ropes'] },
-      { title: 'Up the volcano', steps: ['Gather stones', 'Lay stepping stones over the lava', 'Climb the hot ash (drink at the hot springs)', 'Scrape sulphur off the steam vents', 'Fix the old balloon', 'Fly home'] },
+      { title: 'Up the volcano', steps: ['Gather stones', 'Lay stepping stones over the lava', 'Climb the hot ash (drink at the hot springs)', 'Scrape sulphur off the steam vents', 'Fix the old balloon', 'Fly away'] },
+      { title: 'Across the rig', steps: ['Gather scrap from the piles', 'Mend a broken gangway (6 scrap)', 'Reach the next platform', 'Pour diesel out of the old drums', 'Repair the radio room', 'Call for help'] },
       { title: 'Into the deep caves', steps: ['Find a cave in the rocky hills', 'It is dark inside, even in the day', 'Pick glowcaps: food with lots of Energy', 'Break off crystals', 'Make a crystal lantern', 'See further in caves and at night'] },
       { title: 'Staying safe from wild animals', steps: ['Eat and drink well (above 50)', 'Health comes back', 'Wild sense shows danger', 'Animal friend: they notice you later', 'Your dog barks snakes away'] },
     ],
@@ -435,9 +447,9 @@ const de: WikiWords = {
     coconut: 'Kokosnuss', berries: 'Beeren', mushroom: 'Pilz', cooked_fish: 'Gebratener Fisch', apple: 'Apfel',
     wood: 'Holz', log: 'Holzstämme', leaves: 'Große Blätter', stone: 'Stein', fish: 'Roher Fisch', rope: 'Seil',
     axe: 'Steinaxt', fishing_rod: 'Angelrute', tar: 'Teer', resin: 'Harz', sulphur: 'Schwefel',
-    glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne',
+    glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne', scrap: 'Schrott', diesel: 'Diesel', mussels: 'Muscheln',
   },
-  ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche' },
+  ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche', deck: 'Decks der Bohrinsel' },
 
   start: {
     title: 'Dein erster Tag',
@@ -652,9 +664,18 @@ const de: WikiWords = {
       title: 'Insel 3: Glutinsel',
       paras: [
         'Ein Sturm setzt dich auf einer warmen Vulkaninsel an Land. Unten wachsen Palmen und ein Dschungel; weiter oben liegt graue **Asche** zwischen schwarzen Basaltfelsen. Die Asche ist heiß in der Sonne: Dort bekommst du am Tag schneller Durst. Es gibt nur wenige Quellen, aber **heiße Quellen** auf der Asche geben Wasser und wärmen dich wie ein Feuer.',
-        'Ein **Lavastrom** ersetzt den Fluss. Auf Lava kannst du nicht laufen: Leg **Trittsteine** (8 Steine) darüber. Ein alter **Ballon** liegt am Kraterrand, neben dem Lavasee. Repariere Korb und Hülle und bau einen Brenner. Der Brenner braucht **Schwefel** von den Dampflöchern am Krater. Dann flieg nach Hause!',
+        'Ein **Lavastrom** ersetzt den Fluss. Auf Lava kannst du nicht laufen: Leg **Trittsteine** (8 Steine) darüber. Ein alter **Ballon** liegt am Kraterrand, neben dem Lavasee. Repariere Korb und Hülle und bau einen Brenner. Der Brenner braucht **Schwefel** von den Dampflöchern am Krater. Dann flieg davon!',
         'Kokosnüsse, Beeren, Pilze, Fisch und Leuchtpilze aus den **zwei tiefen Höhlen** sind das Essen. Hier leben Krabben, Schildkröten, Affen, Fledermäuse, scheue **Eidechsen** und freche **Möwen**, die dir Essen klauen. Weit weg vom Lager leben Wildschweine, Wespen, Schlangen und **Skorpione**, die stechen.',
-        'Das ist vorerst die letzte Insel. Der Ballon bringt dich nach Hause, und das Spiel ist zu Ende. Danach kannst du auf der Glutinsel bleiben oder eine neue Insel beginnen.',
+        'Wenn der Ballon fertig ist, flieg über das Meer davon. Du behältst deine Tasche, EP, Fähigkeiten, Sterne und deinen Hund.',
+      ],
+    },
+    four: {
+      title: 'Insel 4: die alte Bohrinsel',
+      paras: [
+        'Der Wind treibt deinen Ballon weit aufs Meer hinaus, und er landet auf einer **alten Bohrinsel**. Hier gibt es kein Land: **Plattformen** aus Stahl stehen auf Beinen im Meer, verbunden durch **Stege**. Auf den Decks leben Möwen.',
+        'Manche Stege sind in der Mitte **kaputt**. Sammle **Schrott** von den Schrotthaufen und bau „Steg reparieren“ neben einem kaputten Ende (6 Schrott). Dann kommst du hinüber.',
+        'Es gibt keine Bäume und keine Quellen. Trink an den **Regenwassertanks**. Angle von den Decks aus, und pflück **Muscheln** von den Beinen der Bohrinsel. Alte Paletten geben Holz, und alte Fischernetze geben Seil. Die **Mannschaftskabine** ist dein Lager: Schlaf in ihrem Bett und brate Fisch auf ihrem Herd.',
+        'Der **Funkraum** steht auf der Plattform, die am weitesten weg ist. Richte seine Antenne auf, gib seinem Generator **Diesel** aus den alten Ölfässern und repariere das Funkgerät. Dann ruf Hilfe. Hier endet die Geschichte vorerst.',
       ],
     },
     goalTitle: 'Schritte zum Ziel',
@@ -672,7 +693,8 @@ const de: WikiWords = {
       { title: 'Die Insel öffnen', steps: ['Holz, Steine, ein Blatt', 'Steinaxt bauen', 'Durch das Dornengestrüpp', 'Holzstämme von Bäumen schlagen', 'Brücke bauen', 'Zur anderen Seite und zum Boot'] },
       { title: 'Ein warmes, sicheres Zuhause', steps: ['Lagerfeuer und Unterstand', 'Für die Hütte sammeln (Holzstämme und Seile)', 'Hütte bauen: dein Lager', 'Im Bett ganz ausschlafen', 'Werkstatt, Kamin und Regentonne anbauen', 'Zu Hause braten, trinken und heilen'] },
       { title: 'Seile für die Inselziele', steps: ['Große Blätter sammeln', 'Seil drehen (2 Blätter)', 'Seilmacher: 2 Seile für 2 Blätter', 'Mast, Segel, Leuchtfeuer und Ballon', 'Leitern und Kletterseile'] },
-      { title: 'Auf den Vulkan', steps: ['Steine sammeln', 'Trittsteine über die Lava legen', 'Über die heiße Asche steigen (trink an den heißen Quellen)', 'Schwefel von den Dampflöchern kratzen', 'Den alten Ballon reparieren', 'Nach Hause fliegen'] },
+      { title: 'Auf den Vulkan', steps: ['Steine sammeln', 'Trittsteine über die Lava legen', 'Über die heiße Asche steigen (trink an den heißen Quellen)', 'Schwefel von den Dampflöchern kratzen', 'Den alten Ballon reparieren', 'Davonfliegen'] },
+      { title: 'Über die Bohrinsel', steps: ['Schrott von den Haufen sammeln', 'Einen kaputten Steg reparieren (6 Schrott)', 'Zur nächsten Plattform', 'Diesel aus den alten Fässern füllen', 'Den Funkraum reparieren', 'Hilfe rufen'] },
       { title: 'In die tiefen Höhlen', steps: ['Finde eine Höhle in den Felshügeln', 'Drinnen ist es dunkel, auch am Tag', 'Pflück Leuchtpilze: Essen mit viel Energie', 'Brich Kristalle ab', 'Bau eine Kristalllaterne', 'Sieh weiter in Höhlen und nachts'] },
       { title: 'Sicher vor wilden Tieren', steps: ['Gut essen und trinken (über 50)', 'Leben kommt zurück', 'Spürsinn zeigt die Gefahr', 'Tierfreund: Sie bemerken dich später', 'Dein Hund verbellt Schlangen'] },
     ],
