@@ -1,6 +1,6 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Dog, type Player } from './actors';
 import { CAVE_FLOOR, caveMask, findCaves, type Cave } from './caves';
-import { daylight, isLowTide, isNight, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
+import { daylight, isLowTide, isNight, minuteOfDay, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
 import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId, type StarId } from './defs/levels';
@@ -299,6 +299,59 @@ export class Game {
       game.dogToPlayer();
     }
     return game;
+  }
+
+  // ---- Testing aids (the cheat panel of preview builds, see src/cheats.ts) ----
+
+  /** Go straight to a new island of this level, as if you had sailed there. Keeps the bag, XP, skills and dog. */
+  jumpToIsland(level: LevelId): void {
+    this.sailed = false;
+    this.landOn(level);
+  }
+
+  /**
+   * Put the explorer (and the dog) on the free cell nearest to cell `i`, and
+   * mark that cell explored. Returns false when there is no free cell near it.
+   */
+  teleportNear(i: number): boolean {
+    const tx = i % this.map.width;
+    const ty = (i - tx) / this.map.width;
+    let best: { x: number; y: number } | null = null;
+    for (let r = 0; r <= 6 && !best; r++) {
+      for (let dy = -r; dy <= r && !best; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = tx + dx;
+          const y = ty + dy;
+          if (!this.isPassable(x, y) || this.animalAt(x, y) || this.dogAt(x, y)) continue;
+          best = { x, y };
+          break;
+        }
+      }
+    }
+    if (!best) return false;
+    this.emit({ type: 'fade' });
+    this.player.x = best.x;
+    this.player.y = best.y;
+    this.map.explored[i] = 1;
+    this.dogToPlayer();
+    this.updateFov();
+    return true;
+  }
+
+  /** Jump the clock forward to the next time it is `hour` o'clock. */
+  skipToHour(hour: number): void {
+    for (let i = 0; i < TURNS_PER_DAY; i++) {
+      this.turn++;
+      if (minuteOfDay(this.turn) === hour * 60) break;
+    }
+    this.emit({ type: 'fade' });
+    this.updateFov();
+  }
+
+  /** Mark the whole island as explored. */
+  revealMap(): void {
+    this.map.explored.fill(1);
   }
 
   /** The sandbar cells of this island (none on island 2 and on islands from before the tide islet). */

@@ -37,6 +37,10 @@ npm run preview   # serve the build (service worker is only active here)
   git push
   ```
 
+- The preview (and `npm run dev`) has a **Cheats** button in the Bag panel
+  for testing: jump to any island, go to the goal and other places, fill
+  the bag and needs, reveal the map, skip the clock. The game on `main`
+  does not show it.
 - Do not change `main` directly. If it changes, merge `main` into `preview`
   so the two stay in step.
 
