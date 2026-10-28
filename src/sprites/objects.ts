@@ -454,3 +454,113 @@ export function crystalCluster(): Sprite {
   for (const [x, y] of [[7, 3], [7, 4], [3, 8], [12, 7]]) s.set(x, y, P.crystalShine);
   return s.outline().shadow(8, 14.8, 6.5, 1.2);
 }
+
+// ---- Island 3: the volcano -----------------------------------------------------------
+
+/**
+ * Flat basalt stones laid across a lava cell, 16×16, along the walking way
+ * (`ns` north–south, `ew` east–west). The lava shows in the gaps.
+ */
+export function lavaStones(dir: 'ns' | 'ew'): Sprite {
+  const s = new Sprite(`lava_stones_${dir}`);
+  // Three slabs; the period is 16, so neighbouring cells line up.
+  const slabs: [number, number, number, number][] = [[0, 3, 4, 11], [5, 10, 3, 12], [12, 15, 4, 11]];
+  for (const [a0, a1, b0, b1] of slabs) {
+    for (let a = a0; a <= a1; a++) {
+      for (let b = b0; b <= b1; b++) {
+        // a runs along the walking direction, b across it.
+        const [x, y] = dir === 'ns' ? [b, a] : [a, b];
+        const n = hash2(x, y, 140);
+        const lit = a === a0 || b === b0;
+        const dark = a === a1 || b === b1;
+        s.set(x, y, dark ? P.basaltDeep : lit ? P.basaltLight : n < 0.2 ? P.basaltDark : P.basalt);
+      }
+    }
+  }
+  return s;
+}
+
+/** A small cone of dark rock round a vent hole, crusted with sulphur (or bare when `spent`). */
+function drawVentMound(s: Sprite, spent: boolean): void {
+  for (let y = 7; y <= 14; y++) {
+    // Flat on top, wider towards the ground.
+    const half = 2.5 + (y - 7) * 0.75;
+    for (let x = 0; x < 16; x++) {
+      const side = (x + 0.5 - 8) / half;
+      if (Math.abs(side) > 1) continue;
+      const n = hash2(x, y, 141);
+      s.set(x, y, side < -0.4 ? P.basaltLight : side > 0.5 ? P.basaltDeep : n < 0.25 ? P.basaltDark : P.basalt);
+    }
+  }
+  // The hole at the top.
+  for (let x = 6; x <= 9; x++) s.set(x, 7, P.basaltDeep);
+  if (spent) return;
+  // Yellow sulphur round the hole and running down the sides.
+  for (const [x, y, c] of [
+    [5, 7, P.sulphurLight], [10, 7, P.sulphur], [5, 8, P.sulphur], [6, 8, P.sulphurLight], [9, 8, P.sulphur], [10, 8, P.sulphurDark],
+    [4, 9, P.sulphurLight], [5, 9, P.sulphur], [10, 9, P.sulphur], [11, 9, P.sulphurDark], [4, 10, P.sulphur], [11, 10, P.sulphurDark],
+    [3, 11, P.sulphur], [7, 9, P.sulphur], [8, 9, P.sulphurDark], [7, 10, P.sulphurDark], [12, 12, P.sulphurDark], [3, 12, P.sulphurDark],
+  ] as const) s.set(x, y, c);
+}
+
+/** Puffs of steam rising from (cx, bottom); `frame` moves them up and sideways. */
+function drawSteam(s: Sprite, cx: number, bottom: number, frame: 0 | 1, puffs: number): void {
+  for (let i = 0; i < puffs; i++) {
+    const y = bottom - 2 - i * 2.5 - frame;
+    const x = cx + (i % 2 === frame ? -1 : 1);
+    const r = 1.2 + Math.min(i, 2) * 0.6;
+    for (let py = Math.floor(y - r); py <= Math.ceil(y + r); py++) {
+      for (let px = Math.floor(x - r); px <= Math.ceil(x + r); px++) {
+        if (Math.hypot(px - x, py - y) > r) continue;
+        s.set(px, py, px <= x && py <= y ? P.steamLight : P.steam);
+      }
+    }
+  }
+}
+
+function ventSprite(name: string, frame: 0 | 1, spent: boolean): Sprite {
+  const s = new Sprite(name);
+  drawVentMound(s, spent);
+  s.outline();
+  // The steam goes over the outline, soft and without one.
+  drawSteam(s, 7.5, 7, frame, spent ? 1 : 3);
+  return s.shadow(8, 15, 7, 1.2);
+}
+
+/** A steaming vent near the crater with yellow sulphur round it; 2 frames for the steam. */
+export function steamVent(): Sprite[] {
+  return [ventSprite('steam_vent', 0, false), ventSprite('steam_vent_2', 1, false)];
+}
+
+/** The vent after the sulphur is scraped off: bare ash, a thin wisp of steam. */
+export function steamVentSpent(): Sprite {
+  return ventSprite('steam_vent_spent', 0, true);
+}
+
+function hotSpringSprite(name: string, frame: 0 | 1): Sprite {
+  const s = new Sprite(name);
+  for (let y = 6; y <= 14; y++) {
+    for (let x = 1; x <= 14; x++) {
+      const d = Math.hypot((x + 0.5 - 8) / 6.5, (y + 0.5 - 10.5) / 4.2);
+      if (d > 1) continue;
+      if (d > 0.72) {
+        // A rim of pale mineral crust, stained yellow in places.
+        const n = hash2(x, y, 142);
+        s.set(x, y, n < 0.2 ? P.sulphur : y < 10 ? P.stoneLight : n < 0.6 ? P.stone : P.stoneDark);
+      } else {
+        s.set(x, y, y < 9 ? P.water : hash2(x, y, 143 + frame) < 0.15 ? P.waterGlint : P.waterShallow);
+      }
+    }
+  }
+  // Bubbles that move between the frames.
+  s.set(frame ? 9 : 6, 11, P.foam);
+  s.set(frame ? 6 : 10, 10, P.foam);
+  s.outline();
+  drawSteam(s, frame ? 6 : 9, 9, frame, 2);
+  return s.shadow(8, 15, 7, 1.2);
+}
+
+/** A warm pool: you can drink from it, and it warms you like a fire. 2 frames for the steam. */
+export function hotSpring(): Sprite[] {
+  return [hotSpringSprite('hot_spring', 0), hotSpringSprite('hot_spring_2', 1)];
+}
