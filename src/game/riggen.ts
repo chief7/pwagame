@@ -269,7 +269,8 @@ function tryRig(rng: Rng, width: number, height: number): World | null {
   const dock = [crew, 0].map(dockOn).find((k) => k >= 0);
   if (dock === undefined) return null;
   objects.set(dock, { kind: 'fishing_boat_wreck' });
-  reserved.add(dock);
+  // The boat is 3 cells wide: nothing else in the sea next to it.
+  for (let d = -2; d <= 2; d++) reserved.add(dock + d);
 
   // Enough scrap for every broken gangway, the radio, the derrick and the boat, some of it within reach at the start.
   const repairs = ways.filter((w) => w.broken).length * (RECIPES.gangway.cost.scrap ?? 0);

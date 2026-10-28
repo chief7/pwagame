@@ -1833,7 +1833,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 - The crew cabin is not a hut: it has no rooms and no map wall, and the
   player can still build a hut on the rig (with logs from elsewhere).
 - A deck's safety line also runs across the end of a gangway.
-- The derrick is 32 × 48 pixels, larger than other tall sprites (24 × 32).
+- The derrick is 32 × 48 pixels and the fishing boat 48 × 28, larger than
+  other tall sprites (24 × 32). The boat covers part of the explorer when they
+  stand on the land cell above it.
 - The crater lake and the lava flow repeat the same lava pattern, so a big
   lake looks a little like a grid.
 - Lava stepping stones have no edge drawing of their own: lava shows round
