@@ -24,7 +24,8 @@ Write all messages to the user in the style from `CLAUDE.md` (ASD-STE100).
    similar content (`src/sprites/*.ts`).
 3. Make sure the working tree is clean (`git status`). Create a branch from
    `main`: `git checkout -b content/<slug>` (for example `content/fishing-rod`).
-   All work for this content stays on that branch until phase 2 ends.
+   All work for this content stays on that branch until the user approves
+   the merge into `main`. You can merge it into `preview` at any time.
 
 ## Phase 1: proposal
 
@@ -135,7 +136,9 @@ Rules for this step:
 
 - Do not add the registry entries, world placement or tests yet. Only the
   sprites exist at this point.
-- Do not commit.
+- You can commit the sprites on the branch and merge the branch into
+  `preview`, so the user can see them in `<site>/preview/sprites.html`.
+  Follow the rules for `preview` in `CLAUDE.md`. Never touch `main`.
 
 ### 1.5 Refine
 
@@ -183,9 +186,17 @@ different (a number, a new engine change), stop and ask before you continue.
 6. **Docs.** Update `docs/OVERVIEW.md`: the "Current content" table (§6), and
    every section the content changes (mechanics, tuning values, known
    limits). Update `README.md` only if the player-facing rules change.
-7. **Commit and push.**
+7. **Commit and push to the preview.**
    - Commit on the branch with a message that says what was added.
-   - Merge into `main` with a fast-forward (`git checkout main && git merge
-     --ff-only content/<slug>`), push `main`, and delete the branch.
+   - Push the branch (`git push -u origin content/<slug>`).
+   - Merge the branch into `preview` (`git checkout preview && git merge
+     --no-ff content/<slug>`) and push `preview`. Do not ask first.
 8. **Report** to the user: what was added, the final preview screenshot, the
-   test and build results, and what you could not check.
+   test and build results, what you could not check, and that the build is
+   in `<site>/preview/`. Ask: "Merge into main?" Then stop and wait.
+9. **Merge into main (only after the user approves it).**
+   - Merge the branch into `main` (`git checkout main && git merge
+     --ff-only content/<slug>`; use `--no-ff` if a fast-forward is not
+     possible), push `main`, and delete the branch.
+   - Do not merge all of `preview` into `main` unless the user asks for
+     that. `preview` can contain other work that is not approved.

@@ -33,3 +33,20 @@ music, text and code made by other people.
   `src/fonts/OFL.txt`) and give credit where the license requires it.
 - If the license is unclear or missing, do not add the material. Ask the
   user first.
+
+## Commits: preview and main
+
+The `preview` branch is for the user to check work. A push to `preview`
+runs "Preview checks" and then deploys the build to `<site>/preview/`.
+
+- You can commit and push to `preview` without approval. This includes
+  proposals: commit the work in progress so the user can see it there.
+- Before you push to `preview`, run `npx tsc --noEmit`, `npx vitest run`
+  and `npm run build`. Fix every failure first.
+- Merge work branches into `preview` with a merge commit. Do not rebase or
+  force-push `preview`.
+- Never commit, merge or push to `main` without explicit approval from the
+  user for that step. Approval of a proposal or of a preview is not approval
+  for `main`. Ask: "Merge into main?"
+- After a push to `preview`, tell the user what changed and where to look,
+  then wait for approval for `main`.
