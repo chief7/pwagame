@@ -32,7 +32,9 @@ const MUSSEL_BEDS = 8;
 /** What stands on the rig, for the compendium (the gangways and the goal aside). */
 export const RIG_OBJECTS: ObjectKind[] = [
   'scrap_pile', 'rig_container', 'diesel_drums', 'pallet', 'old_net', 'water_tank', 'mussel_bed', 'life_ring',
-  'derrick', 'crane', 'crew_cabin', 'balloon_crashed', 'chest_closed',
+  'derrick', 'crane', 'crew_cabin', 'balloon_crashed', 'chest_closed', 'fishing_boat_wreck',
+  // Not there at first: the derrick becomes it once the explorer repairs it.
+  'derrick_working',
 ];
 
 /** A leg of the rig stands under every third cell of a deck's south edge. */
@@ -253,10 +255,27 @@ function tryRig(rng: Rng, width: number, height: number): World | null {
   ];
   for (const [kind, n, not] of counts) for (let k = 0; k < n; k++) if (!anywhere(kind, not)) return null;
 
-  // Enough scrap for every broken gangway and the radio, some of it within reach at the start.
+  // The old fishing boat lies in the sea at the south edge of the crew platform (or the main deck).
+  const dockOn = (i: number) => {
+    const p = platforms[i];
+    const y = p.y1 + 1;
+    const xs = [];
+    for (let x = p.x0 + 1; x < p.x1; x++) {
+      const k = map.idx(x, y);
+      if (!rigLegAt(x) && !objects.has(k) && !reserved.has(k) && !objects.has(map.idx(x, y + 1))) xs.push(x);
+    }
+    return xs.length ? map.idx(rng.pick(xs), y) : -1;
+  };
+  const dock = [crew, 0].map(dockOn).find((k) => k >= 0);
+  if (dock === undefined) return null;
+  objects.set(dock, { kind: 'fishing_boat_wreck' });
+  reserved.add(dock);
+
+  // Enough scrap for every broken gangway, the radio, the derrick and the boat, some of it within reach at the start.
   const repairs = ways.filter((w) => w.broken).length * (RECIPES.gangway.cost.scrap ?? 0);
   const radioScrap = levelDef(4).stages.reduce((n, s) => n + (s.cost.scrap ?? 0), 0);
-  const piles = Math.ceil((repairs + radioScrap + SPARE_SCRAP) / 2);
+  const siteScrap = (['derrick', 'fishing_boat_wreck'] as ObjectKind[]).reduce((n, k) => n + (OBJECTS[k].siteCost?.scrap ?? 0), 0);
+  const piles = Math.ceil((repairs + radioScrap + siteScrap + SPARE_SCRAP) / 2);
   const near = platforms.map((_, i) => i).filter((i) => i === 0 || reachableWhole(ways, i));
   for (let k = 0; k < piles; k++) {
     const ok = k < START_PILES ? anywhere('scrap_pile', platforms.map((_, i) => i).filter((i) => !near.includes(i))) : anywhere('scrap_pile');
@@ -271,7 +290,7 @@ function tryRig(rng: Rng, width: number, height: number): World | null {
       if (rigLegAt(x) && !objects.has(k) && !reserved.has(k)) legs.push({ x, y: p.y1 + 1 });
     }
   }
-  for (const { x, y } of rng.shuffle(legs).slice(0, MUSSEL_BEDS)) put(x, y, 'mussel_bed');
+  for (const { x, y } of rng.shuffle(legs).slice(0, MUSSEL_BEDS)) if (!objects.has(map.idx(x, y))) put(x, y, 'mussel_bed');
 
   if (!allReachable(map, objects, start)) return null;
   const region = new Uint8Array(width * height).fill(NO_REGION);

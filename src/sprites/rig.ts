@@ -343,8 +343,11 @@ export function lifeRing(): Sprite {
 }
 
 /** The old drilling tower in the middle of the rig: a tall steel lattice on a deck house. */
-export function derrick(): Sprite {
-  const s = new Sprite('derrick', 32, 48);
+/** How the derrick is: broken, repaired and resting (its pump refills), or pumping diesel (2 frames). */
+type DerrickState = 'broken' | 'idle' | 'on';
+
+function derrickSprite(name: string, state: DerrickState, frame: 0 | 1 = 0): Sprite {
+  const s = new Sprite(name, 32, 48);
   const top = 4;
   const foot = 40;
   const left = (y: number) => 4 + ((foot - y) / (foot - top)) * 8;
@@ -364,8 +367,6 @@ export function derrick(): Sprite {
   }
   // The crown block on top, with a red warning light.
   for (let y = 1; y <= 4; y++) for (let x = 11; x <= 20; x++) s.set(x, y, y === 1 ? P.steelLight : x === 20 ? P.steelDeep : P.steelDark);
-  s.set(15, 0, P.paintRed);
-  s.set(16, 0, P.paintRed);
   // The deck house it stands on.
   for (let y = 39; y <= 46; y++) {
     for (let x = 1; x <= 30; x++) {
@@ -373,7 +374,31 @@ export function derrick(): Sprite {
     }
   }
   for (let y = 42; y <= 46; y++) for (let x = 14; x <= 17; x++) s.set(x, y, P.interior);
-  return s.outline().shadow(16, 47, 15, 1.4);
+  if (state !== 'broken') {
+    // A yellow pump next to the door, with a red valve wheel.
+    for (let y = 41; y <= 46; y++) for (let x = 20; x <= 26; x++) s.set(x, y, y === 41 ? P.hazard : x === 26 ? P.hazardDark : y % 2 ? P.hazard : P.hazardDark);
+    for (const [x, y] of [[22, 39], [23, 38], [24, 39], [23, 40]]) s.set(x, y, P.paintRed);
+  }
+  s.outline().shadow(16, 47, 15, 1.4);
+  // The light on top: dark while broken, red when repaired, and it blinks bright while the pump works.
+  const lamp = state === 'broken' ? P.steelDeep : state === 'on' && frame === 1 ? P.flameCore : P.paintRed;
+  s.set(15, 0, lamp);
+  s.set(16, 0, lamp);
+  if (state === 'on') {
+    // A puff from the pump's exhaust.
+    const puff = frame === 0 ? [[27, 37], [28, 36]] : [[28, 35], [29, 34], [28, 34]];
+    for (const [x, y] of puff) s.set(x, y, P.steam);
+  }
+  return s;
+}
+
+export function derrick(): Sprite[] {
+  return [
+    derrickSprite('derrick', 'broken'),
+    derrickSprite('derrick_idle', 'idle'),
+    derrickSprite('derrick_working', 'on', 0),
+    derrickSprite('derrick_working_2', 'on', 1),
+  ];
 }
 
 /** A yellow deck crane with its arm out over the sea and a hook on a cable. */
@@ -487,36 +512,45 @@ export function crewCabin(): Sprite {
 }
 
 /** An old fishing boat tied up at the rig, with a hole in its side. */
-export function fishingBoatWreck(): Sprite {
-  const s = new Sprite('fishing_boat_wreck', 24, 24);
+function fishingBoatSprite(name: string, repaired: boolean): Sprite {
+  const s = new Sprite(name, 24, 24);
   for (let y = 13; y <= 20; y++) {
     const inset = y > 17 ? (y - 17) * 2 : 0;
     for (let x = 1 + inset; x <= 22 - Math.max(0, inset - 1); x++) {
-      s.set(x, y, y <= 14 ? P.paintWhite : y === 15 ? P.paintRed : y <= 18 ? (x < 5 ? P.paintBlue : P.paintBlueDark) : P.rustDark);
+      let c: string = y <= 14 ? P.paintWhite : y === 15 ? P.paintRed : y <= 18 ? (x < 5 ? P.paintBlue : P.paintBlueDark) : P.rustDark;
+      // The old boat is rusty and patchy; the repaired one has fresh paint.
+      if (!repaired && y > 15 && hash2(x, y, 317) < 0.15) c = P.rust;
+      s.set(x, y, c);
     }
   }
   // The raised bow on the right.
   for (const [x, y] of [[21, 12], [22, 12], [22, 11], [23, 11]]) s.set(x, y, P.paintWhite);
-  // A hole to repair.
-  for (const [x, y] of [[6, 16], [7, 16], [8, 17], [7, 17], [6, 17]]) s.set(x, y, P.interior);
+  // A hole to repair, or the plate bolted over it.
+  for (const [x, y] of [[6, 16], [7, 16], [8, 17], [7, 17], [6, 17]]) s.set(x, y, repaired ? P.steel : P.interior);
   // Wheelhouse.
   for (let y = 6; y <= 12; y++) {
     for (let x = 12; x <= 18; x++) s.set(x, y, y === 6 ? P.paintRed : y === 7 ? P.paintRedDark : x === 18 ? P.steelLight : P.paintWhite);
   }
   for (let y = 9; y <= 10; y++) for (let x = 13; x <= 17; x++) s.set(x, y, P.glass);
-  // Mast.
+  // Mast, with a little flag once it can sail.
   for (let y = 1; y <= 12; y++) s.set(7, y, P.steelDark);
   for (let x = 5; x <= 9; x++) s.set(x, 4, P.steelDark);
+  if (repaired) for (const [x, y] of [[8, 1], [9, 1], [10, 1], [8, 2], [9, 2]]) s.set(x, y, P.hazard);
   s.outline();
   // Foam where the hull meets the sea.
   for (let x = 2; x <= 21; x++) if (hash2(x, 21, 314) < 0.6) s.set(x, 21, P.foam);
   return s;
 }
 
+/** The old fishing boat at the rig's dock, with a hole in its side; and repaired, ready to sail. */
+export function fishingBoat(): Sprite[] {
+  return [fishingBoatSprite('fishing_boat_wreck', false), fishingBoatSprite('fishing_boat', true)];
+}
+
 export function rigSprites(): Sprite[] {
   return [
     ...deck(), ...deckSide(), ...helipad(), ...gangway(), ...gangwayEnds(),
-    container(), ...dieselDrums(), scrapPile(), lifeRing(), derrick(), crane(), ...radioHut(), crewCabin(), fishingBoatWreck(),
+    container(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
     pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(),
   ];
 }

@@ -6,7 +6,7 @@ import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { ROOM_IDS, type RoomId } from './game/defs/rooms';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
-import { Game, type SaveData } from './game/game';
+import { Game, HOLD_LOAD, VOYAGE_DIESEL, type SaveData } from './game/game';
 import { Tile } from './game/map';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
@@ -285,11 +285,13 @@ function afterTurn(): void {
   updateHud();
   saveSoon();
   // Walking into the finished boat asks whether to leave (or shows the end again).
-  if (game.takeSailRequest()) openSheet(game.sailed ? 'end' : 'sail');
+  if (game.takeSailRequest()) openSheet(game.goalUsed ? 'end' : 'sail');
   // Walking into the hut goes inside.
   if (game.takeHutRequest()) openSheet('hut');
   // Walking into a store crate opens it.
   if (game.takeStoreRequest()) openSheet('store');
+  // Walking into the fishing boat opens the sea chart and the hold.
+  if (game.takeChartRequest()) openSheet('chart');
 }
 
 function run(cmd: Command): void {
@@ -358,7 +360,7 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'store' | 'sail' | 'end' | 'cheats';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'store' | 'chart' | 'sail' | 'end' | 'cheats';
 let sheetKind: SheetKind = 'bag';
 /** Flickers the hearth in the Hut panel while it is open. */
 let hearthTimer: number | undefined;
@@ -402,7 +404,7 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, store: words.ui.store, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
     cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
@@ -411,6 +413,8 @@ function renderSheet(): void {
     renderHut(rows);
   } else if (sheetKind === 'store') {
     renderStore(rows);
+  } else if (sheetKind === 'chart') {
+    renderChart(rows);
   } else if (sheetKind === 'sail' || sheetKind === 'end') {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
@@ -532,14 +536,13 @@ function siteOf(kind: string): Partial<Record<ItemId, number>> | null {
   return null;
 }
 
-/** The Store panel: the bag and the store crate side by side, with buttons to move things. */
-function renderStore(rows: HTMLElement): void {
+/**
+ * The bag and a container (the store crate or the boat's hold) one under
+ * the other, with buttons to move things between them. Moving takes no time.
+ */
+function renderStock(rows: HTMLElement, title: string, empty: string, stock: Partial<Record<ItemId, number>>,
+  put: (id: ItemId, n: number) => boolean, take: (id: ItemId, n: number) => boolean): void {
   const words = t();
-  const store = game.storeNear();
-  if (!store) {
-    rows.append(el('p', { className: 'empty', textContent: words.ui.notAtStore }));
-    return;
-  }
   const act = (fn: () => boolean) => () => {
     fn();
     updateHud();
@@ -554,21 +557,61 @@ function renderStore(rows: HTMLElement): void {
     }
     return box;
   };
-  rows.append(loadRow());
+  const heavy = (id: ItemId) => el('span', { className: 'row-note', textContent: ITEMS[id].heavy ? words.ui.heavy : '' });
+  rows.append(el('h3', { className: 'path', textContent: title }));
+  const kept = (Object.entries(stock) as [ItemId, number][]).filter(([, n]) => n > 0);
+  if (!kept.length) rows.append(el('p', { className: 'empty', textContent: empty }));
+  for (const [id, count] of kept) {
+    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), heavy(id),
+      buttons([[words.ui.takeOne, () => take(id, 1)], [words.ui.takeAll, () => take(id, count)]])));
+  }
   rows.append(el('h3', { className: 'path', textContent: words.ui.inBag }));
   const bag = game.inventory.entries();
   if (!bag.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmptyShort }));
   for (const [id, count] of bag) {
-    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: ITEMS[id].heavy ? words.ui.heavy : '' }),
-      buttons([[words.ui.putOne, () => game.storeItem(id, 1)], [words.ui.putAll, () => game.storeItem(id, count)]])));
+    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), heavy(id),
+      buttons([[words.ui.putOne, () => put(id, 1)], [words.ui.putAll, () => put(id, count)]])));
   }
-  rows.append(el('h3', { className: 'path', textContent: words.ui.inStore }));
-  const kept = (Object.entries(store.store ?? {}) as [ItemId, number][]).filter(([, n]) => n > 0);
-  if (!kept.length) rows.append(el('p', { className: 'empty', textContent: words.ui.storeEmpty }));
-  for (const [id, count] of kept) {
-    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: ITEMS[id].heavy ? words.ui.heavy : '' }),
-      buttons([[words.ui.takeOne, () => game.takeItem(id, 1)], [words.ui.takeAll, () => game.takeItem(id, count)]])));
+}
+
+/** The Store panel: the store crate and the bag. */
+function renderStore(rows: HTMLElement): void {
+  const words = t();
+  const store = game.storeNear();
+  if (!store) {
+    rows.append(el('p', { className: 'empty', textContent: words.ui.notAtStore }));
+    return;
   }
+  rows.append(loadRow());
+  renderStock(rows, words.ui.inStore, words.ui.storeEmpty, store.store ?? {}, (id, n) => game.storeItem(id, n), (id, n) => game.takeItem(id, n));
+}
+
+/** The sea chart: where the fishing boat can sail, then its hold and the bag. */
+function renderChart(rows: HTMLElement): void {
+  const words = t();
+  if (!game.boatNear()) {
+    rows.append(el('p', { className: 'empty', textContent: words.message({ key: 'noBoat' }) }));
+    return;
+  }
+  rows.append(el('p', { className: 'empty', textContent: words.ui.chartNote(VOYAGE_DIESEL, game.dieselAboard) }));
+  for (const level of LEVELS.map((l) => l.level)) {
+    if (level === game.level) continue;
+    const problem = game.voyageProblem(level);
+    const go = el('button', { type: 'button', textContent: words.ui.sailTo, disabled: !!problem, className: problem ? '' : 'primary' });
+    go.addEventListener('click', () => {
+      closeSheet();
+      if (game.voyage(level)) afterTurn();
+      else updateHud();
+    });
+    const note = el('span', { className: 'row-note', textContent: game.visited(level) ? words.ui.beenThere : words.ui.newPlace });
+    rows.append(row(icon(levelDef(level).site), words.ui.islandName(level), note, go));
+  }
+  rows.append(row(icon('ui_load'), words.ui.hold, el('div', {}, [
+    el('div', { className: `row-note${game.holdLoad >= HOLD_LOAD ? ' locked' : ''}`, textContent: words.ui.loadOf(game.holdLoad, HOLD_LOAD) }),
+    el('div', { className: 'row-note', textContent: words.ui.holdNote }),
+  ])));
+  rows.append(loadRow());
+  renderStock(rows, words.ui.inHold, words.ui.holdEmpty, game.hold, (id, n) => game.loadItem(id, n), (id, n) => game.unloadItem(id, n));
 }
 
 /** The Cheats panel of preview builds: each row does one cheat, then closes the panel. */
@@ -696,7 +739,7 @@ function starsCard(): HTMLElement {
 function goalDone(): string {
   const kind = levelDef(game.level).stages.at(-1)!.becomes;
   const done = OBJECTS[kind].done;
-  return game.sailed && done ? done.icon ?? done.frames[0] : kind;
+  return game.goalUsed && done ? done.icon ?? done.frames[0] : kind;
 }
 
 /**
@@ -713,7 +756,7 @@ function setSail(): void {
     renderer.departure = null;
     if (!game.sail()) return;
     afterTurn();
-    if (game.sailed) openSheet('end');
+    if (game.goalUsed) openSheet('end');
   };
   if (!trip) return leave();
   stopAuto();

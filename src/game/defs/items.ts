@@ -64,7 +64,7 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   // Island 4, the oil rig: scrap metal to repair gangways and the radio, diesel
   // from old drums for its generator, and mussels from the rig's legs.
   scrap: { id: 'scrap', heavy: true },
-  diesel: { id: 'diesel', heavy: true, rareFrom: ['diesel_drums', 'diesel_drums_empty'] },
+  diesel: { id: 'diesel', heavy: true, rareFrom: ['diesel_drums', 'diesel_drums_empty', 'derrick', 'derrick_working'] },
   mussels: { id: 'mussels', eat: { food: 12, water: 2 } },
   // A wooden frame on your back: you carry more heavy things (see Game.loadLimit).
   pack_frame: { id: 'pack_frame', tool: true },
