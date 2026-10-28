@@ -1,4 +1,5 @@
 import './style.css';
+import { cheats } from './cheats';
 import { ITEMS, type ItemId } from './game/defs/items';
 import { LEVELS, levelDef } from './game/defs/levels';
 import { OBJECTS } from './game/defs/objects';
@@ -39,6 +40,8 @@ const LANG_KEY = `${STORE}.lang`;
 const SAVE_KEY = `${STORE}.save`;
 
 if (PREVIEW) document.title = `pwagame · ${PREVIEW}`;
+/** Preview builds and the dev server have a Cheats panel for testing (see cheats.ts). */
+const CHEATS = !!PREVIEW || import.meta.env.DEV;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -353,7 +356,7 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'sail' | 'end';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'sail' | 'end' | 'cheats';
 let sheetKind: SheetKind = 'bag';
 /** Flickers the hearth in the Hut panel while it is open. */
 let hearthTimer: number | undefined;
@@ -398,6 +401,7 @@ function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
     bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
   clearInterval(hearthTimer);
@@ -407,6 +411,8 @@ function renderSheet(): void {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
     renderSkills(rows);
+  } else if (sheetKind === 'cheats') {
+    renderCheats(rows);
   } else if (sheetKind === 'map') {
     renderMap(rows);
   } else if (sheetKind === 'bag') {
@@ -487,8 +493,32 @@ function renderSheet(): void {
     const reset = confirmButton('reset', words.ui.resetProgress, resetProgress);
     reset.classList.add('wide');
     foot.append(change, fresh, lang, reset);
+    if (CHEATS) {
+      const open = el('button', { type: 'button', className: 'wide', textContent: 'Cheats (preview only)' });
+      open.addEventListener('click', () => openSheet('cheats'));
+      foot.append(open);
+    }
   }
   ui.sheetBody.replaceChildren(rows, foot);
+}
+
+/** The Cheats panel of preview builds: each row does one cheat, then closes the panel. */
+function renderCheats(rows: HTMLElement): void {
+  for (const group of cheats(game)) {
+    rows.append(el('p', { className: 'empty', textContent: group.title }));
+    for (const cheat of group.cheats) {
+      const use = el('button', { type: 'button', className: 'primary', textContent: 'Use' });
+      use.addEventListener('click', () => {
+        stopAuto();
+        if (!cheat.run(game)) return;
+        renderer.departure = null;
+        closeSheet();
+        afterTurn();
+        saveNow();
+      });
+      rows.append(row(icon(cheat.icon), cheat.label, el('span', { className: 'row-note', textContent: cheat.note }), use));
+    }
+  }
 }
 
 /** A button that asks for a second tap before it does something that can't be undone. */

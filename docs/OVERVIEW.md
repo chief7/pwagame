@@ -1326,6 +1326,18 @@ Auto-walk (travel and hold) stops when:
   stays 9. A save with `sailed` on a level that now has a next level loads
   with `sailed` false (see 4.12).
 
+**Cheats (preview builds only).** A preview build (`VITE_PREVIEW`) and the
+dev server (`npm run dev`) show a "Cheats (preview only)" button in the Bag
+panel; the published game on `main` does not. The panel (`src/cheats.ts`,
+English only like the other developer tools) can: go to island 1, 2 or 3
+(`game.jumpToIsland()`, keeps the bag, XP, skills and dog); go to the island
+goal, the river or lava flow, a steam vent, a hot spring, the sandbar, the
+tar barrels or a deep cave (`game.teleportNear()`; tap again for the next
+one); give a starter kit, the goal materials for every stage left, or 5 of
+every item; fill all needs; give 50 XP; reveal the map
+(`game.revealMap()`); and skip to 7:00, 12:00 or 22:00
+(`game.skipToHour()`). A cheat saves at once.
+
 **Test a special situation in the browser.** You can start the game in any
 state: edit a save and load it before the game starts. The game saves on
 `pagehide`, so do not edit `localStorage` and then reload the same page (the
@@ -1358,6 +1370,7 @@ Run `npm test`. The tests are in:
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each set of hut rooms has its hut sprites (both smoke frames), and each room its inside sprite. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching, cave signs |
+| `src/cheats.test.ts` | The cheats: a picture for each, jumping to island 3, going to the goal and finishing it with the goal materials, going to the lava, vents and hot springs, needs, map and clock |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
 
 To add content, use the `add-content` skill (`.claude/skills/add-content/`).
