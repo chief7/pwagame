@@ -242,6 +242,12 @@ stars.
   Then walk into it to call for help. This is the end of the game for now:
   you can stay on the rig or start a new island.
 - **Stars:** open every chest, catch 5 fish, explore most of the rig.
+- **The derrick and the fishing boat:** repair the old drilling tower (12
+  scrap, 2 rope): its pump gives 2 diesel every half day. Repair the old
+  fishing boat at the dock (10 scrap, 6 wood, 4 rope), then walk into it to
+  open the sea chart. Sail to islands 1, 2 or 3 and back: a trip takes 6
+  hours and 2 diesel. The boat's hold carries 60 heavy things. Every island
+  stays as you left it.
 
 ## Controls
 

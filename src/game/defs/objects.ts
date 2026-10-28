@@ -24,7 +24,8 @@ export type ObjectKind =
   | 'gangway_ns' | 'gangway_ew' | 'gangway_end_n' | 'gangway_end_s' | 'gangway_end_e' | 'gangway_end_w'
   | 'scrap_pile' | 'rig_container' | 'diesel_drums' | 'diesel_drums_empty' | 'pallet' | 'old_net' | 'water_tank'
   | 'mussel_bed' | 'life_ring' | 'derrick' | 'crane' | 'crew_cabin' | 'balloon_crashed'
-  | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready';
+  | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready'
+  | 'derrick_working' | 'fishing_boat_wreck' | 'fishing_boat';
 
 export interface Yield {
   item: ItemId;
@@ -79,6 +80,10 @@ export interface ObjectDef {
    * it still needs (its `siteCost`), and then it becomes this object.
    */
   site?: ObjectKind;
+  /** What a site placed by world generation (an old wreck to repair) takes; a built site takes its recipe's `siteCost`. */
+  siteCost?: Partial<Record<ItemId, number>>;
+  /** The fishing boat: walking into it opens the sea chart and the cargo hold. */
+  boat?: true;
   /** A store: walking into it opens the Store panel (see Game.storeItem). */
   store?: true;
   /** Walkable over the sea: a gangway between the platforms of the oil rig. */
@@ -293,7 +298,15 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     gather: { yields: [{ item: 'mussels', min: 2, max: 3 }], after: { regrow: 200 } },
   }),
   life_ring: def({ kind: 'life_ring' }),
-  derrick: def({ kind: 'derrick', blocksSight: true }),
+  // The old drilling tower: repaired, its pump brings up diesel again and again.
+  derrick: def({ kind: 'derrick', blocksSight: true, site: 'derrick_working', siteCost: { scrap: 12, rope: 2 } }),
+  derrick_working: def({
+    kind: 'derrick_working', blocksSight: true, depletedSprite: 'derrick_idle', frames: ['derrick_working', 'derrick_working_2'],
+    gather: { yields: [{ item: 'diesel', min: 2, max: 2 }], after: { regrow: 120 } },
+  }),
+  // An old fishing boat at the rig's dock: repaired, it sails between the rig and the islands.
+  fishing_boat_wreck: def({ kind: 'fishing_boat_wreck', site: 'fishing_boat', siteCost: { scrap: 10, wood: 6, rope: 4 } }),
+  fishing_boat: def({ kind: 'fishing_boat', boat: true }),
   crane: def({ kind: 'crane', blocksSight: true }),
   // The camp on the rig: a bed for a full rest, and a little stove to cook on.
   crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),

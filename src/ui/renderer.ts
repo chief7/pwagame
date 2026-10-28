@@ -266,7 +266,7 @@ export class Renderer {
         const obj = game.objectAt(x, y);
         if (!obj || (trip && trip.x === x && trip.y === y)) continue;
         const def = OBJECTS[obj.kind];
-        const frames = game.sailed && def.done ? def.done.frames : def.frames;
+        const frames = game.goalUsed && def.done ? def.done.frames : def.frames;
         // A picked plant shows its bare sprite, not its animation (picked glowcaps don't glow).
         const regrowing = obj.readyAt !== undefined && obj.readyAt > game.turn;
         const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj, fireFrame);

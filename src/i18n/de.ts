@@ -174,6 +174,9 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   radio_aerial: { g: 'm', word: 'Funkraum' },
   radio_power: { g: 'm', word: 'Funkraum' },
   radio_ready: { g: 'm', word: 'Funkraum' },
+  derrick_working: { g: 'm', word: 'Bohrturm', gather: 'Du füllst Diesel aus der Pumpe ab' },
+  fishing_boat_wreck: { g: 'n', word: 'Fischerboot', adj: 'alt' },
+  fishing_boat: { g: 'n', word: 'Fischerboot' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -292,7 +295,7 @@ export const de: Strings = {
     goalStep: (index, count, stage) => `Schritt ${index + 1} von ${count}: ${de.stages[stage]}`,
     notYet: 'Noch nicht',
     endTitle: 'Geschafft!',
-    endText: 'Eine Stimme antwortet im Funkgerät! Hilfe ist unterwegs. Hier endet die Geschichte vorerst. Du kannst auf der Bohrinsel bleiben oder eine neue Insel starten.',
+    endText: 'Eine Stimme antwortet im Funkgerät! Hilfe ist unterwegs. Du kannst auf der Bohrinsel bleiben: Repariere den Bohrturm und das Fischerboot und fahr zu den Inseln. Oder starte eine neue Insel.',
     stay: 'Hierbleiben',
     yourDog: 'Dein Hund',
     dogNeeds: (food, water) => `Essen ${food} · Wasser ${water}`,
@@ -336,6 +339,16 @@ export const de: Strings = {
     takeAll: 'Alle nehmen',
     siteNote: 'Zuerst baust du das Gerüst. Dann lauf dagegen, um ihm diese Dinge zu geben, so oft du willst.',
     siteLeft: 'Das Gerüst braucht noch:',
+    chart: 'Seekarte',
+    chartNote: (diesel, aboard) => `Eine Fahrt dauert 6 Stunden und braucht ${diesel} Diesel. Du hast ${aboard} Diesel in Tasche und Laderaum.`,
+    islandName: (level) => ({ 1: 'Insel 1: die Tropeninsel', 2: 'Insel 2: Kiefernkamm', 3: 'Insel 3: Glutinsel', 4: 'Die Bohrinsel' })[level],
+    sailTo: 'Losfahren',
+    beenThere: 'Hier warst du schon. Alles ist so, wie du es verlassen hast.',
+    newPlace: 'Hier warst du noch nicht mit dem Boot. Eine neue Insel wartet.',
+    hold: 'Laderaum',
+    holdNote: 'Der Laderaum fährt mit dem Boot. Schwere Dinge zählen, der Rest nicht.',
+    inHold: 'Im Laderaum',
+    holdEmpty: 'Der Laderaum ist leer.',
   },
   rooms: {
     workshop: { name: 'Werkstatt', description: 'Eine Werkbank. Seile, die du in der Hütte drehst, geben 1 mehr.' },
@@ -470,7 +483,19 @@ export const de: Strings = {
       case 'oneStore': return 'Du hast schon eine Vorratskiste auf dieser Insel.';
       case 'siteNeeds': return `${cap(obj(msg.obj, 'nom', 'the'))} braucht noch ${itemList(msg.left)}.`;
       case 'siteGive': return `Du gibst ${obj(msg.obj, 'dat', 'the')} ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;
-      case 'siteDone': return `${cap(obj(msg.obj, 'nom', 'the'))} ist fertig! Lauf hinein.`;
+      case 'siteDone': return msg.obj === 'fishing_boat'
+        ? 'Das Fischerboot ist repariert! Lauf dagegen, um den Laderaum zu füllen und loszufahren.'
+        : msg.obj === 'derrick_working'
+          ? 'Der Bohrturm läuft wieder! Seine Pumpe holt Diesel herauf. Lauf dagegen, um abzufüllen.'
+          : `${cap(obj(msg.obj, 'nom', 'the'))} ist fertig! Lauf hinein.`;
+      case 'openChart': return 'Du steigst an Bord und rollst die Seekarte aus.';
+      case 'noBoat': return 'Stell dich neben das Fischerboot.';
+      case 'hereAlready': return 'Hier bist du schon.';
+      case 'needDiesel': return `Das Boot braucht ${msg.n} Diesel für die Fahrt. Trag ihn in der Tasche oder im Laderaum.`;
+      case 'holdFull': return 'Der Laderaum ist voll mit schweren Dingen.';
+      case 'voyage': return msg.level === 4
+        ? 'Nach sechs Stunden auf See machst du das Boot wieder an der Bohrinsel fest.'
+        : `Nach sechs Stunden auf See landest du auf ${{ 1: 'der Tropeninsel', 2: 'dem Kiefernkamm', 3: 'der Glutinsel' }[msg.level]}.`;
       case 'gangwayBroken': return 'Dieser Steg ist in der Mitte kaputt. Repariere ihn mit Schrott: Bau „Steg reparieren“ daneben.';
       case 'gangwayMended': return 'Du schraubst Schrott über die Lücke. Der Steg ist wieder ganz!';
       case 'lavaHot': return 'Viel zu heiß! Auf Lava kannst du nicht laufen. Leg Trittsteine über den Lavastrom.';

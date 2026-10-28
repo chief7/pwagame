@@ -112,6 +112,9 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   radio_aerial: { name: 'radio room' },
   radio_power: { name: 'radio room' },
   radio_ready: { name: 'radio room' },
+  derrick_working: { name: 'drilling tower', gather: 'You fill diesel from the pump' },
+  fishing_boat_wreck: { name: 'old fishing boat' },
+  fishing_boat: { name: 'fishing boat' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -216,7 +219,7 @@ export const en: Strings = {
     goalStep: (index, count, stage) => `Step ${index + 1} of ${count}: ${en.stages[stage]}`,
     notYet: 'Not yet',
     endTitle: 'You did it!',
-    endText: 'A voice answers on the radio! Help is on its way. That is the end of the story for now. You can stay on the rig or start a new island.',
+    endText: 'A voice answers on the radio! Help is on its way. You can stay on the rig: repair the derrick and the fishing boat, and sail to the islands. Or start a new island.',
     stay: 'Stay here',
     yourDog: 'Your dog',
     dogNeeds: (food, water) => `Food ${food} · Water ${water}`,
@@ -260,6 +263,16 @@ export const en: Strings = {
     takeAll: 'Take all',
     siteNote: 'First you build the frame. Then walk into it to give it these materials, in as many trips as you like.',
     siteLeft: 'The frame still needs:',
+    chart: 'Sea chart',
+    chartNote: (diesel, aboard) => `A trip takes 6 hours and ${diesel} diesel. You have ${aboard} diesel in your bag and the hold.`,
+    islandName: (level) => ({ 1: 'Island 1: the tropical island', 2: 'Island 2: Pine Ridge', 3: 'Island 3: Ember Isle', 4: 'The oil rig' })[level],
+    sailTo: 'Sail',
+    beenThere: 'You were here before. Everything is as you left it.',
+    newPlace: 'You have not been here with the boat. A new island waits.',
+    hold: 'Cargo hold',
+    holdNote: 'The hold goes with the boat. Heavy things count; the rest does not.',
+    inHold: 'In the hold',
+    holdEmpty: 'The hold is empty.',
   },
   rooms: {
     workshop: { name: 'Workshop', description: 'A workbench. Rope you make in your hut gives 1 more.' },
@@ -394,7 +407,19 @@ export const en: Strings = {
       case 'oneStore': return 'You already have a store crate on this island.';
       case 'siteNeeds': return `The ${obj(msg.obj)} still needs ${itemList(msg.left)}.`;
       case 'siteGive': return `You give the ${obj(msg.obj)} ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;
-      case 'siteDone': return `The ${obj(msg.obj)} is finished! Walk into it to go inside.`;
+      case 'siteDone': return msg.obj === 'fishing_boat'
+        ? 'The fishing boat is repaired! Walk into it to load the hold and set sail.'
+        : msg.obj === 'derrick_working'
+          ? 'The drilling tower works again! Its pump brings up diesel. Walk into it to fill up.'
+          : `The ${obj(msg.obj)} is finished! Walk into it to go inside.`;
+      case 'openChart': return 'You climb on board and unroll the sea chart.';
+      case 'noBoat': return 'Stand next to the fishing boat.';
+      case 'hereAlready': return 'You are here already.';
+      case 'needDiesel': return `The boat needs ${msg.n} diesel for the trip. Carry it in your bag or the hold.`;
+      case 'holdFull': return 'The hold is full of heavy things.';
+      case 'voyage': return msg.level === 4
+        ? 'After six hours at sea, you tie up the boat at the oil rig again.'
+        : `After six hours at sea, you land on ${en.ui.islandName(msg.level).replace(/^Island \d: /, '')}.`;
       case 'gangwayBroken': return 'This gangway is broken in the middle. Mend it with scrap metal: build “Mend gangway” next to it.';
       case 'gangwayMended': return 'You bolt scrap metal over the gap. The gangway is whole again!';
       case 'lavaHot': return "Too hot! You can't walk on lava. Lay stepping stones across the lava flow.";

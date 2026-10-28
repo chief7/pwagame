@@ -50,6 +50,16 @@ export type Msg =
   | { key: 'siteNeeds'; obj: ObjectKind; left: [ItemId, number][] }
   | { key: 'siteGive'; obj: ObjectKind; given: [ItemId, number][]; left: [ItemId, number][] }
   | { key: 'siteDone'; obj: ObjectKind }
+  /** Walked into the fishing boat: the sea chart and the hold open. */
+  | { key: 'openChart' }
+  /** The boat cannot sail: no boat here, already on that island, not enough diesel. */
+  | { key: 'noBoat' }
+  | { key: 'hereAlready' }
+  | { key: 'needDiesel'; n: number }
+  /** The boat's hold is full of heavy things. */
+  | { key: 'holdFull' }
+  /** Arrived by boat on this island (or the rig). */
+  | { key: 'voyage'; level: LevelId }
   /** Walked into a broken gangway end on the oil rig: mend it with scrap. */
   | { key: 'gangwayBroken' }
   | { key: 'gangwayMended' }

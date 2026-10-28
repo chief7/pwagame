@@ -9,7 +9,7 @@ import { LEVELS } from './defs/levels';
 import { RECIPES } from './defs/recipes';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
-import { BAG_LOAD, Game, PACK_FRAME_LOAD, SAVE_VERSION, STRONG_BACK_LOAD } from './game';
+import { BAG_LOAD, Game, HOLD_LOAD, PACK_FRAME_LOAD, SAVE_VERSION, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
 import { distanceMap, reachWithBridges } from './pathing';
@@ -2718,6 +2718,153 @@ describe('Game: the carry limit, the store crate and the hut frame', () => {
     const game = sandbox(135);
     const old = { ...game.toSave(), v: 9 };
     expect(Game.fromSave(old).turn).toBe(game.turn);
+  });
+});
+
+describe('Game: the fishing boat, voyages and kept islands', () => {
+  /** A fresh rig, with the explorer next to its repaired fishing boat. */
+  function atBoat(seed: number): { game: Game; dock: number } {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    const dock = [...game.objects].find(([, o]) => o.kind === 'fishing_boat_wreck')![0];
+    game.objects.get(dock)!.kind = 'fishing_boat';
+    const x = dock % game.map.width;
+    game.player.x = x;
+    game.player.y = (dock - x) / game.map.width - 1;
+    game.takeEvents();
+    return { game, dock };
+  }
+
+  it('has an old fishing boat at a dock of the rig, and a derrick to repair', () => {
+    for (let seed = 1; seed <= 8; seed++) {
+      const game = new Game(seed);
+      (game as unknown as { landOn(level: number): void }).landOn(4);
+      const dock = [...game.objects].find(([, o]) => o.kind === 'fishing_boat_wreck')![0];
+      const x = dock % game.map.width;
+      const y = (dock - x) / game.map.width;
+      expect(game.map.get(x, y)).toBe(Tile.Water);
+      expect(game.map.get(x, y - 1)).toBe(Tile.Deck);
+      expect([...game.objects.values()].filter((o) => o.kind === 'derrick')).toHaveLength(1);
+    }
+  });
+
+  it('repairs the derrick, which then pumps diesel again and again', () => {
+    const game = sandbox(140);
+    place(game, 1, 0, 'derrick');
+    give(game, { scrap: 12, rope: 2 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('derrick_working');
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'siteDone', obj: 'derrick_working' });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('diesel')).toBe(2);
+    expect(game.move(1, 0)).toBe(false);
+    game.turn += 121;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('diesel')).toBe(4);
+  });
+
+  it('repairs the old fishing boat; walking into it opens the sea chart', () => {
+    const game = sandbox(141);
+    place(game, 1, 0, 'fishing_boat_wreck');
+    give(game, { scrap: 10, wood: 6, rope: 4 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('fishing_boat');
+    const turn = game.turn;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.takeChartRequest()).toBe(true);
+    expect(game.boatNear()).toBe(true);
+  });
+
+  it('needs diesel to sail, takes it from the hold first, and the trip takes hours', () => {
+    const { game } = atBoat(142);
+    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: VOYAGE_DIESEL });
+    expect(game.voyageProblem(4)).toEqual({ key: 'hereAlready' });
+    game.inventory.add('diesel', 1);
+    game.hold = { diesel: 1, stone: 10 };
+    const turn = game.turn;
+    expect(game.voyage(1)).toBe(true);
+    expect(game.level).toBe(1);
+    expect(game.turn).toBe(turn + VOYAGE_TURNS);
+    expect(game.inventory.count('diesel')).toBe(0);
+    expect(game.hold).toEqual({ stone: 10 });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'voyage', level: 1 });
+    // The boat lies next to the explorer, in the sea.
+    expect(game.boatNear()).toBe(true);
+    expect(game.visited(4)).toBe(true);
+  });
+
+  it('keeps the islands as they were left, and moors at the same dock again', () => {
+    const { game, dock } = atBoat(143);
+    const rig = game.map;
+    const mark = game.map.idx(game.player.x - 1, game.player.y);
+    game.objects.set(mark, { kind: 'campfire' });
+    game.inventory.add('diesel', 4);
+    game.voyage(2);
+    expect(game.level).toBe(2);
+    expect(game.map).not.toBe(rig);
+    // The island is kept: save and load it, then sail back to the rig.
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.visited(4)).toBe(true);
+    expect(loaded.voyage(4)).toBe(true);
+    expect(loaded.level).toBe(4);
+    expect(loaded.objects.get(mark)?.kind).toBe('campfire');
+    expect(loaded.objects.get(dock)?.kind).toBe('fishing_boat');
+    expect(loaded.visited(2)).toBe(true);
+    expect(loaded.map.get(loaded.player.x, loaded.player.y)).toBe(Tile.Deck);
+  });
+
+  it('loads and unloads the hold, up to its limit for heavy things', () => {
+    const { game } = atBoat(144);
+    game.inventory.add('scrap', HOLD_LOAD + 5);
+    game.inventory.add('mussels', 4);
+    expect(game.loadItem('scrap', HOLD_LOAD + 5)).toBe(true);
+    expect(game.hold.scrap).toBe(HOLD_LOAD);
+    expect(game.loadItem('scrap', 1)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'holdFull' });
+    expect(game.loadItem('mussels', 4)).toBe(true);
+    expect(game.holdLoad).toBe(HOLD_LOAD);
+    expect(game.unloadItem('scrap', HOLD_LOAD)).toBe(true);
+    expect(game.inventory.count('scrap')).toBe(BAG_LOAD);
+    expect(game.hold.scrap).toBe(HOLD_LOAD - BAG_LOAD + 5);
+  });
+
+  it('remembers islands left on their goal: their goals are used up', () => {
+    const game = sandbox(145);
+    boatNextTo(game);
+    for (const stage of LEVELS[0].stages) give(game, game.stageCost(stage));
+    for (let k = 0; k < 4; k++) game.move(1, 0);
+    expect(game.goal()).toEqual({ state: 'ready' });
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(2);
+    expect(game.left.has(1)).toBe(true);
+    // Back on island 1 (as with the boat), the goal is used and the old boat is gone.
+    game.jumpToIsland(1);
+    expect(game.goal()).toEqual({ state: 'sailed' });
+    expect([...game.objects.values()].some((o) => o.kind.startsWith('boat_'))).toBe(false);
+  });
+
+  it('after the radio call, only the rig counts as used', () => {
+    const { game } = atBoat(147);
+    game.sailed = true;
+    expect(game.goalUsed).toBe(true);
+    game.inventory.add('diesel', 2);
+    game.voyage(2);
+    expect(game.goalUsed).toBe(false);
+    expect(game.goal().state).not.toBe('sailed');
+  });
+
+  it('loads a version 10 save on the rig: the islands before are left, and come back new', () => {
+    const { game } = atBoat(146);
+    const old = { ...game.toSave(), v: 10 } as Partial<ReturnType<Game['toSave']>>;
+    delete old.islands;
+    delete old.left;
+    delete old.hold;
+    const loaded = Game.fromSave(old as ReturnType<Game['toSave']>);
+    expect([...loaded.left].sort()).toEqual([1, 2, 3]);
+    expect(loaded.visited(1)).toBe(false);
+    expect(loaded.hold).toEqual({});
   });
 });
 

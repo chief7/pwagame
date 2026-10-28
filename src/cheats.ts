@@ -80,9 +80,11 @@ export function cheats(game: Game): { title: string; cheats: Cheat[] }[] {
   const spots: [ObjectKind, string][] = [
     ['steam_vent', 'a steam vent'], ['hot_spring', 'a hot spring'], ['sandbar_ns', 'the sandbar'], ['barrel', 'the tar barrels'],
     ['gangway_end_e', 'a broken gangway'], ['crew_cabin', 'the crew cabin'], ['diesel_drums', 'the fuel drums'],
+    ['fishing_boat_wreck', 'the fishing boat'], ['derrick', 'the derrick'],
   ];
   for (const [kind, name] of spots) {
-    const same = (k: ObjectKind) => k === kind || (kind === 'sandbar_ns' && k === 'sandbar_ew') || (kind === 'gangway_end_e' && !!OBJECTS[k].broken);
+    const same = (k: ObjectKind) => k === kind || (kind === 'sandbar_ns' && k === 'sandbar_ew') || (kind === 'gangway_end_e' && !!OBJECTS[k].broken)
+      || (kind === 'fishing_boat_wreck' && k === 'fishing_boat') || (kind === 'derrick' && k === 'derrick_working');
     if (has(same)) places.push({ icon: kind, label: `Go to ${name}`, note: 'Tap again for the next one.', run: (g) => goTo(g, objectIs(g, same)) });
   }
   if (game.caves().length) {

@@ -125,6 +125,17 @@ export interface Strings {
     /** A building that goes up in trips (the hut): how it works, and what its site still needs. */
     siteNote: string;
     siteLeft: string;
+    /** The sea chart of the fishing boat, and its hold. */
+    chart: string;
+    chartNote(diesel: number, aboard: number): string;
+    islandName(level: LevelId): string;
+    sailTo: string;
+    beenThere: string;
+    newPlace: string;
+    hold: string;
+    holdNote: string;
+    inHold: string;
+    holdEmpty: string;
   };
   /** Rooms the explorer can add to the hut. */
   rooms: Record<RoomId, { name: string; description: string }>;
