@@ -1,6 +1,7 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
 import type { LevelId, StageId, StarId } from './defs/levels';
+import type { OrderId } from './game';
 import type { ObjectKind } from './defs/objects';
 import type { RoomId } from './defs/rooms';
 import type { SkillId } from './defs/skills';
@@ -50,6 +51,16 @@ export type Msg =
   | { key: 'siteNeeds'; obj: ObjectKind; left: [ItemId, number][] }
   | { key: 'siteGive'; obj: ObjectKind; given: [ItemId, number][]; left: [ItemId, number][] }
   | { key: 'siteDone'; obj: ObjectKind }
+  /** The radio after the call for help: the Radio panel opens; orders, and the crate on the helipad. */
+  | { key: 'openRadio' }
+  | { key: 'noRadio' }
+  | { key: 'onTheWay' }
+  | { key: 'orderedToday' }
+  | { key: 'ordered'; order: OrderId }
+  | { key: 'delivered'; order: OrderId }
+  /** A new platform cell; or no place for one in front of the explorer. */
+  | { key: 'platformBuilt' }
+  | { key: 'noDeckSpot' }
   /** Walked into the fishing boat: the sea chart and the hold open. */
   | { key: 'openChart' }
   /** The boat cannot sail: no boat here, already on that island, not enough diesel. */

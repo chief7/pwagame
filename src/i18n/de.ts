@@ -177,6 +177,8 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   derrick_working: { g: 'm', word: 'Bohrturm', gather: 'Du füllst Diesel aus der Pumpe ab' },
   fishing_boat_wreck: { g: 'n', word: 'Fischerboot', adj: 'alt' },
   fishing_boat: { g: 'n', word: 'Fischerboot' },
+  supply_crate: { g: 'f', word: 'Versorgungskiste' },
+  platform_deck: { g: 'f', word: 'Plattform' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -349,6 +351,10 @@ export const de: Strings = {
     holdNote: 'Der Laderaum fährt mit dem Boot. Schwere Dinge zählen, der Rest nicht.',
     inHold: 'Im Laderaum',
     holdEmpty: 'Der Laderaum ist leer.',
+    radio: 'Funkgerät',
+    radioNote: 'Bestell jeden Tag eine Kiste. Etwa 2 Stunden später wirft ein Hubschrauber sie auf dem Landeplatz ab.',
+    order: 'Bestellen',
+    orders: { food: 'Essenskiste', build: 'Baukiste', fuel: 'Treibstoffkiste' },
   },
   rooms: {
     workshop: { name: 'Werkstatt', description: 'Eine Werkbank. Seile, die du in der Hütte drehst, geben 1 mehr.' },
@@ -426,6 +432,8 @@ export const de: Strings = {
     ladder: { name: 'Leiter', description: 'Bringt dich über eine Felsstufe in den Bergen. Stell dich neben die Stufe, um sie zu bauen.' },
     climbing_rope: { name: 'Kletterseil', description: 'Bringt dich über eine Eiswand nahe am Gipfel. Stell dich neben die Wand, um es zu bauen.' },
     lantern: { name: 'Kristalllaterne', description: 'Höhlenkristalle leuchten in einem kleinen Holzrahmen. Du siehst weiter in dunklen Höhlen und in der Nacht.' },
+    platform: { name: 'Plattform', description: 'Legt ein neues Stück Deck an den Rand der Mannschaftsplattform. Stell dich an den Rand und schau aufs Meer.' },
+    rain_tank: { name: 'Regentank', description: 'Ein Stahltank, der Regenwasser auffängt. Trink daraus.' },
     gangway: { name: 'Steg reparieren', description: 'Repariert einen kaputten Steg der Bohrinsel mit Schrott. Stell dich neben ein kaputtes Ende, um ihn zu bauen.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
@@ -488,6 +496,14 @@ export const de: Strings = {
         : msg.obj === 'derrick_working'
           ? 'Der Bohrturm läuft wieder! Seine Pumpe holt Diesel herauf. Lauf dagegen, um abzufüllen.'
           : `${cap(obj(msg.obj, 'nom', 'the'))} ist fertig! Lauf hinein.`;
+      case 'openRadio': return 'Das Funkgerät summt. Du kannst Vorräte bestellen.';
+      case 'noRadio': return 'Stell dich neben das Funkgerät, nachdem du Hilfe gerufen hast.';
+      case 'onTheWay': return 'Deine Kiste ist unterwegs. Hör auf den Hubschrauber.';
+      case 'orderedToday': return 'Du hast heute schon eine Kiste bestellt. Versuch es morgen wieder.';
+      case 'ordered': return `„Eine ${de.ui.orders[msg.order]}, bitte!“ Das Funkgerät knistert: „Ist unterwegs!“`;
+      case 'delivered': return `Ein Hubschrauber donnert über die Bohrinsel und wirft eine ${de.ui.orders[msg.order]} auf dem Landeplatz ab!`;
+      case 'platformBuilt': return 'Du schraubst ein neues Stück Deck an die Plattform.';
+      case 'noDeckSpot': return 'Stell dich an den Rand der Mannschaftsplattform und schau aufs Meer. Neues Deck muss nahe an der Kabine bleiben, weg von Stegen und anderen Plattformen.';
       case 'openChart': return 'Du steigst an Bord und rollst die Seekarte aus.';
       case 'noBoat': return 'Stell dich neben das Fischerboot.';
       case 'hereAlready': return 'Hier bist du schon.';

@@ -248,6 +248,12 @@ stars.
   open the sea chart. Sail to islands 1, 2 or 3 and back: a trip takes 6
   hours and 2 diesel. The boat's hold carries 60 heavy things. Every island
   stays as you left it.
+- **Supply drops:** after the call for help, walk into the radio to order
+  one crate each day: food, building materials or fuel. About 2 hours later
+  a helicopter drops it on the helipad.
+- **New platforms:** build "Platform" (6 scrap, 2 wood) at the edge of the
+  crew platform to add a piece of deck, and "Rain tank" (6 scrap) for
+  water. New deck stays near the cabin and away from gangways.
 
 ## Controls
 

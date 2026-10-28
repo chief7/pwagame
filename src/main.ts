@@ -6,7 +6,7 @@ import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { ROOM_IDS, type RoomId } from './game/defs/rooms';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
-import { Game, HOLD_LOAD, VOYAGE_DIESEL, type SaveData } from './game/game';
+import { Game, HOLD_LOAD, ORDER_IDS, RADIO_ORDERS, VOYAGE_DIESEL, type SaveData } from './game/game';
 import { Tile } from './game/map';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
@@ -292,6 +292,8 @@ function afterTurn(): void {
   if (game.takeStoreRequest()) openSheet('store');
   // Walking into the fishing boat opens the sea chart and the hold.
   if (game.takeChartRequest()) openSheet('chart');
+  // Walking into the working radio (after the call for help) opens the Radio panel.
+  if (game.takeRadioRequest()) openSheet('radio');
 }
 
 function run(cmd: Command): void {
@@ -360,7 +362,7 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'store' | 'chart' | 'sail' | 'end' | 'cheats';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'store' | 'chart' | 'radio' | 'sail' | 'end' | 'cheats';
 let sheetKind: SheetKind = 'bag';
 /** Flickers the hearth in the Hut panel while it is open. */
 let hearthTimer: number | undefined;
@@ -404,7 +406,7 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, radio: words.ui.radio, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
     cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
@@ -415,6 +417,8 @@ function renderSheet(): void {
     renderStore(rows);
   } else if (sheetKind === 'chart') {
     renderChart(rows);
+  } else if (sheetKind === 'radio') {
+    renderRadio(rows);
   } else if (sheetKind === 'sail' || sheetKind === 'end') {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
@@ -584,6 +588,30 @@ function renderStore(rows: HTMLElement): void {
   }
   rows.append(loadRow());
   renderStock(rows, words.ui.inStore, words.ui.storeEmpty, store.store ?? {}, (id, n) => game.storeItem(id, n), (id, n) => game.takeItem(id, n));
+}
+
+/** The Radio panel: order one supply crate each day; the helicopter drops it on the helipad. */
+function renderRadio(rows: HTMLElement): void {
+  const words = t();
+  if (!game.atRadio) {
+    rows.append(el('p', { className: 'empty', textContent: words.message({ key: 'noRadio' }) }));
+    return;
+  }
+  rows.append(el('p', { className: 'empty', textContent: words.ui.radioNote }));
+  const problem = game.orderProblem();
+  if (problem) rows.append(el('p', { className: 'empty locked', textContent: words.message(problem) }));
+  for (const id of ORDER_IDS) {
+    const button = el('button', { type: 'button', textContent: words.ui.order, disabled: !!problem, className: problem ? '' : 'primary' });
+    button.addEventListener('click', () => {
+      if (game.order(id)) saveSoon();
+      updateHud();
+    });
+    const contents = el('div', { className: 'costs' });
+    for (const [item, n] of Object.entries(RADIO_ORDERS[id]) as [ItemId, number][]) {
+      contents.append(el('span', { className: 'cost', title: words.itemCount(item, n) }, [el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, n) }), `${n}`]));
+    }
+    rows.append(row(icon('supply_crate'), words.ui.orders[id], contents, button));
+  }
 }
 
 /** The sea chart: where the fishing boat can sail, then its hold and the bag. */

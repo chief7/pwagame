@@ -1,6 +1,6 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Dog, type Player } from './actors';
 import { CAVE_FLOOR, caveMask, findCaves, type Cave } from './caves';
-import { daylight, isLowTide, isNight, minuteOfDay, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
+import { daylight, dayNumber, isLowTide, isNight, minuteOfDay, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
 import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId, type StarId } from './defs/levels';
@@ -112,7 +112,19 @@ export const HOLD_LOAD = 60;
 /** A boat trip between the rig and an island: how long it takes (6 hours), and the diesel it burns. */
 export const VOYAGE_TURNS = 60;
 export const VOYAGE_DIESEL = 2;
-export const SAVE_VERSION = 11;
+/** What the radio can order: a crate the helicopter drops on the helipad, one each day. */
+export type OrderId = 'food' | 'build' | 'fuel';
+export const RADIO_ORDERS: Record<OrderId, Partial<Record<ItemId, number>>> = {
+  food: { cooked_fish: 3, coconut: 4, apple: 3 },
+  build: { log: 10, wood: 6, leaves: 12, stone: 6 },
+  fuel: { diesel: 4, rope: 4 },
+};
+export const ORDER_IDS = Object.keys(RADIO_ORDERS) as OrderId[];
+/** How long after an order the helicopter comes (2 hours). */
+export const DELIVERY_TURNS = 20;
+/** A new platform cell must be this close to the crew cabin. */
+export const PLATFORM_RANGE = 6;
+export const SAVE_VERSION = 12;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -285,6 +297,9 @@ export interface SaveData {
   left: LevelId[];
   /** What the fishing boat's hold carries. */
   hold: Items;
+  /** The crate ordered on the radio and the turn it comes, and the day of the last order. */
+  delivery: { order: OrderId; at: number } | null;
+  orderDay: number;
 }
 
 export class Game {
@@ -312,6 +327,10 @@ export class Game {
   hold: Items = {};
   /** The other islands the explorer has been to, as they left them. */
   private islands = new Map<LevelId, Island>();
+  /** The crate ordered on the radio, and the turn the helicopter brings it. */
+  delivery: { order: OrderId; at: number } | null = null;
+  /** The day of the last order (0: none yet). */
+  orderDay = 0;
   /** The adopted dog, or null before you find one. */
   dog: Dog | null = null;
   /** Cells where the explorer saw a cave bear on this island, at least BEAR_SPOT_GAP apart. */
@@ -335,6 +354,8 @@ export class Game {
   private storeAsked = false;
   /** The explorer walked into the fishing boat: the UI shows the sea chart and the hold. */
   private chartAsked = false;
+  /** The explorer walked into the working radio after calling for help: the UI shows the Radio panel. */
+  private radioAsked = false;
   /** climberDist() of this turn. */
   private climbDist: { turn: number; dist: Int32Array } | null = null;
   /** The deep caves of this map (found from its tiles, which never change). */
@@ -362,6 +383,8 @@ export class Game {
       }
       this.left = new Set(save.left);
       this.hold = save.hold;
+      this.delivery = save.delivery;
+      this.orderDay = save.orderDay;
       this.animals = save.animals;
       this.player = save.player;
       this.home = save.home;
@@ -559,17 +582,23 @@ export class Game {
 
   /** This island already has a store crate: there is only one. */
   hasStore(): boolean {
-    for (const obj of this.objects.values()) if (OBJECTS[obj.kind].store) return true;
+    for (const obj of this.objects.values()) if (OBJECTS[obj.kind].store && !OBJECTS[obj.kind].dropped) return true;
     return false;
   }
 
-  /** The store crate next to the explorer, or null. */
-  storeNear(): WorldObject | null {
+  /** The cell of the store (a store crate or a dropped supply crate) next to the explorer, or -1. */
+  private storeCell(): number {
     for (const [dx, dy] of DIRS) {
       const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
-      if (obj && OBJECTS[obj.kind].store) return obj;
+      if (obj && OBJECTS[obj.kind].store) return this.map.idx(this.player.x + dx, this.player.y + dy);
     }
-    return null;
+    return -1;
+  }
+
+  /** The store next to the explorer, or null. */
+  storeNear(): WorldObject | null {
+    const i = this.storeCell();
+    return i < 0 ? null : this.objects.get(i)!;
   }
 
   /** How many heavy things the explorer carries (see ITEMS `heavy`). */
@@ -776,7 +805,7 @@ export class Game {
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
       if (recipe.onto) return { key: 'noStep', obj: recipe.onto[0] };
       const built = OBJECTS[recipe.builds];
-      return built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
+      return built.deck ? { key: 'noDeckSpot' } : built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
     return null;
   }
@@ -1039,6 +1068,17 @@ export class Game {
       return true;
     }
     const spot = this.buildSpot(recipe.builds, recipe.onto)!;
+    if (OBJECTS[spot.kind].deck) {
+      // A new cell of deck: the tile changes, nothing stands on it.
+      const [cell] = spot.cells;
+      this.map.change(cell.x, cell.y, Tile.Deck);
+      this.emit({ type: 'sparkle', x: cell.x, y: cell.y });
+      this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: cell.x, targetY: cell.y });
+      this.message({ key: 'platformBuilt' }, 'good');
+      this.gainXp(xp, cell.x, cell.y);
+      this.endTurn();
+      return true;
+    }
     const mends = !!OBJECTS[this.objectAt(spot.cells[0].x, spot.cells[0].y)?.kind ?? spot.kind].broken;
     for (const cell of spot.cells) {
       this.objects.set(this.map.idx(cell.x, cell.y), { kind: spot.kind });
@@ -1116,7 +1156,65 @@ export class Game {
     if (left > 0) rest[id] = left;
     else delete rest[id];
     store.store = rest;
+    // An empty supply crate is folded up and gone.
+    if (OBJECTS[store.kind].dropped && !Object.keys(rest).length) this.objects.delete(this.storeCell());
     return true;
+  }
+
+  // ---- The radio ---------------------------------------------------------------------
+
+  /** True once after the explorer walked into the working radio: the UI then shows the Radio panel. */
+  takeRadioRequest(): boolean {
+    const asked = this.radioAsked;
+    this.radioAsked = false;
+    return asked;
+  }
+
+  /** The explorer stands at the working radio and has called for help: they can order crates. */
+  get atRadio(): boolean {
+    if (!this.sailed || this.level !== 4) return false;
+    return DIRS.some(([dx, dy]) => this.objectAt(this.player.x + dx, this.player.y + dy)?.kind === 'radio_ready');
+  }
+
+  /** Why a crate cannot be ordered now, or null if it can. */
+  orderProblem(): Msg | null {
+    if (!this.atRadio) return { key: 'noRadio' };
+    if (this.delivery) return { key: 'onTheWay' };
+    if (this.orderDay === dayNumber(this.turn)) return { key: 'orderedToday' };
+    return null;
+  }
+
+  /** Order a crate on the radio: the helicopter drops it on the helipad a little later. Takes no time. */
+  order(id: OrderId): boolean {
+    const problem = this.orderProblem();
+    if (problem) {
+      this.message(problem, 'info');
+      return false;
+    }
+    this.delivery = { order: id, at: this.turn + DELIVERY_TURNS };
+    this.orderDay = dayNumber(this.turn);
+    this.message({ key: 'ordered', order: id }, 'good');
+    return true;
+  }
+
+  /** The helicopter drops the ordered crate on a free cell of the helipad (the middle if it can). */
+  private deliver(): void {
+    if (!this.delivery || this.turn < this.delivery.at || this.level !== 4) return;
+    const pad: number[] = [];
+    for (let i = 0; i < this.map.tiles.length; i++) {
+      if (this.map.tiles[i] !== Tile.Helipad || this.objects.has(i)) continue;
+      // Not on anyone's head.
+      const someone = [this.player, ...this.animals, ...(this.dog ? [this.dog] : [])].some((a) => this.map.idx(a.x, a.y) === i);
+      if (!someone) pad.push(i);
+    }
+    const middle = (i: number) => [1, -1, this.map.width, -this.map.width].every((d) => this.map.tiles[i + d] === Tile.Helipad);
+    const at = pad.find(middle) ?? pad[0];
+    if (at === undefined) return;
+    this.objects.set(at, { kind: 'supply_crate', store: { ...RADIO_ORDERS[this.delivery.order] } });
+    const x = at % this.map.width;
+    this.emit({ type: 'sparkle', x, y: (at - x) / this.map.width });
+    this.message({ key: 'delivered', order: this.delivery.order }, 'good');
+    this.delivery = null;
   }
 
   /** True once after the explorer walked into a hut: the UI then shows its inside. */
@@ -1448,6 +1546,11 @@ export class Game {
       return this.drink(def.drink, msg);
     }
     if (def.goal) {
+      if (this.atRadio && obj.kind === 'radio_ready') {
+        this.radioAsked = true;
+        this.message({ key: 'openRadio' }, 'info');
+        return false;
+      }
       if (!this.left.has(this.level)) return this.workOnGoal(x, y, obj);
       this.message({ key: 'look', obj: obj.kind }, 'info');
       return false;
@@ -1720,6 +1823,10 @@ export class Game {
   private buildSpot(kind: ObjectKind, onto?: ObjectKind[]): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
     const p = this.player;
     const [fx, fy] = facingDelta(p.facing);
+    if (OBJECTS[kind].deck) {
+      const cell = this.deckSpot(fx, fy);
+      return cell ? { kind, cells: [cell] } : null;
+    }
     if (OBJECTS[kind].bridge) {
       const lava = !!OBJECTS[kind].onLava;
       const cells = this.riverAhead(p.x, p.y, fx, fy, lava ? Tile.Lava : Tile.River);
@@ -1753,6 +1860,58 @@ export class Game {
       if (ok) return { kind, cells: [{ x, y }] };
     }
     return null;
+  }
+
+  /**
+   * Where a new platform cell goes: the sea cell in front of the explorer
+   * (else next to them) that touches the deck of the crew platform, near the
+   * crew cabin, away from gangways and from other platforms. So new decks
+   * make room at the camp, but never a way past a broken gangway.
+   */
+  private deckSpot(fx: number, fy: number): { x: number; y: number } | null {
+    const cabin = [...this.objects].find(([, o]) => o.kind === 'crew_cabin')?.[0];
+    if (cabin === undefined) return null;
+    const w = this.map.width;
+    const cx = cabin % w;
+    const cy = (cabin - cx) / w;
+    const isDeck = (x: number, y: number) => {
+      const t = this.map.get(x, y);
+      return t === Tile.Deck || t === Tile.Helipad;
+    };
+    // The crew platform: every deck cell joined to the cabin's (not over gangways).
+    const own = new Set([cabin]);
+    const queue = [cabin];
+    for (let head = 0; head < queue.length; head++) {
+      const x = queue[head] % w;
+      const y = (queue[head] - x) / w;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const n = this.map.idx(x + dx, y + dy);
+        if (this.map.inBounds(x + dx, y + dy) && isDeck(x + dx, y + dy) && !own.has(n)) {
+          own.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    const ok = (x: number, y: number) => {
+      if (this.map.get(x, y) !== Tile.Water || this.objectAt(x, y) || this.animalAt(x, y) || this.dogAt(x, y)) return false;
+      if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) > PLATFORM_RANGE) return false;
+      if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => own.has(this.map.idx(x + dx, y + dy)))) return false;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const ox = x + dx;
+          const oy = y + dy;
+          if (!this.map.inBounds(ox, oy)) continue;
+          const obj = this.objectAt(ox, oy);
+          if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1 && obj && (OBJECTS[obj.kind].overSea || OBJECTS[obj.kind].broken)) return false;
+          if (isDeck(ox, oy) && !own.has(this.map.idx(ox, oy))) return false;
+        }
+      }
+      return true;
+    };
+    const p = this.player;
+    const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
+    const at = order.find(([dx, dy]) => ok(p.x + dx, p.y + dy));
+    return at ? { x: p.x + at[0], y: p.y + at[1] } : null;
   }
 
   /** The broken gangway ends in a row with (x, y), along the way the gangway runs. */
@@ -1833,6 +1992,7 @@ export class Game {
     for (const a of this.animals) this.animalAct(a, playerDist);
     this.animalsActing = false;
     if (this.turn % RESPAWN_EVERY === 0) this.topUpAnimals();
+    this.deliver();
 
     if (this.needs.health <= 0) this.faint();
     const goal = this.goalCell();
@@ -2392,6 +2552,8 @@ export class Game {
       })),
       left: [...this.left],
       hold: { ...this.hold },
+      delivery: this.delivery && { ...this.delivery },
+      orderDay: this.orderDay,
     };
   }
 
@@ -2439,7 +2601,11 @@ export class Game {
       // Version 10 kept only the island the explorer is on. The islands before
       // it are new when the explorer sails back to them; their goals are used.
       const left = ([1, 2, 3] as LevelId[]).filter((l) => l < data.level);
-      data = { ...data, v: SAVE_VERSION, islands: [], left, hold: {} };
+      data = { ...data, v: 11, islands: [], left, hold: {} };
+    }
+    if (data.v === 11) {
+      // Version 11 had no radio orders.
+      data = { ...data, v: SAVE_VERSION, delivery: null, orderDay: 0 };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

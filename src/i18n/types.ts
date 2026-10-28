@@ -5,6 +5,7 @@ import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
 import type { RoomId } from '../game/defs/rooms';
 import type { PathId, SkillId } from '../game/defs/skills';
+import type { OrderId } from '../game/game';
 import type { FloatWhat, Msg } from '../game/messages';
 import type { NeedId } from '../game/needs';
 
@@ -136,6 +137,11 @@ export interface Strings {
     holdNote: string;
     inHold: string;
     holdEmpty: string;
+    /** The Radio panel: supply crates by helicopter. */
+    radio: string;
+    radioNote: string;
+    order: string;
+    orders: Record<OrderId, string>;
   };
   /** Rooms the explorer can add to the hut. */
   rooms: Record<RoomId, { name: string; description: string }>;

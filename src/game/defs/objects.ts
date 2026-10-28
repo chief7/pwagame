@@ -25,7 +25,8 @@ export type ObjectKind =
   | 'scrap_pile' | 'rig_container' | 'diesel_drums' | 'diesel_drums_empty' | 'pallet' | 'old_net' | 'water_tank'
   | 'mussel_bed' | 'life_ring' | 'derrick' | 'crane' | 'crew_cabin' | 'balloon_crashed'
   | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready'
-  | 'derrick_working' | 'fishing_boat_wreck' | 'fishing_boat';
+  | 'derrick_working' | 'fishing_boat_wreck' | 'fishing_boat'
+  | 'supply_crate' | 'platform_deck';
 
 export interface Yield {
   item: ItemId;
@@ -84,6 +85,10 @@ export interface ObjectDef {
   siteCost?: Partial<Record<ItemId, number>>;
   /** The fishing boat: walking into it opens the sea chart and the cargo hold. */
   boat?: true;
+  /** A crate the helicopter dropped: a store that goes away when it is empty. */
+  dropped?: true;
+  /** Not an object: building it lays a new deck cell on the sea (a platform on the rig). */
+  deck?: true;
   /** A store: walking into it opens the Store panel (see Game.storeItem). */
   store?: true;
   /** Walkable over the sea: a gangway between the platforms of the oil rig. */
@@ -307,6 +312,10 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   // An old fishing boat at the rig's dock: repaired, it sails between the rig and the islands.
   fishing_boat_wreck: def({ kind: 'fishing_boat_wreck', site: 'fishing_boat', siteCost: { scrap: 10, wood: 6, rope: 4 } }),
   fishing_boat: def({ kind: 'fishing_boat', boat: true }),
+  // A supply crate from the radio, on the helipad: take out what you need.
+  supply_crate: def({ kind: 'supply_crate', store: true, dropped: true }),
+  // Only for the recipe: the platform recipe lays a deck cell, not an object.
+  platform_deck: def({ kind: 'platform_deck', deck: true }),
   crane: def({ kind: 'crane', blocksSight: true }),
   // The camp on the rig: a bed for a full rest, and a little stove to cook on.
   crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),

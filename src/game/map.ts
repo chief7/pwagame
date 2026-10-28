@@ -26,6 +26,8 @@ export class GameMap {
   readonly width: number;
   readonly height: number;
   readonly tiles: Uint8Array;
+  /** Goes up when a tile changes during play (a new platform), so drawings of the tiles are made again. */
+  version = 0;
   /** Cells the player has ever seen. */
   readonly explored: Uint8Array;
   /** Cells the player can see this turn. */
@@ -53,6 +55,12 @@ export class GameMap {
 
   set(x: number, y: number, tile: Tile): void {
     if (this.inBounds(x, y)) this.tiles[this.idx(x, y)] = tile;
+  }
+
+  /** Change a tile during play: the renderer draws the terrain again. */
+  change(x: number, y: number, tile: Tile): void {
+    this.set(x, y, tile);
+    this.version++;
   }
 
   /** Anything that isn't sea or river (rock and lava count as land). */

@@ -79,7 +79,7 @@ export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly sprites = new Map<string, Baked>();
   /** Terrain sprite per cell, worked out once per island ('~' is animated sea, '≈' the river). */
-  private readonly terrain = new WeakMap<GameMap, string[]>();
+  private readonly terrain = new WeakMap<GameMap, { version: number; names: string[] }>();
   private scale = 2;
   private dpr = 1;
   body: Body = 'male';
@@ -457,15 +457,15 @@ export class Renderer {
   }
 
   private terrainFor(map: GameMap, volcano: boolean): string[] {
-    let names = this.terrain.get(map);
-    if (names) return names;
-    names = [];
+    const cached = this.terrain.get(map);
+    if (cached && cached.version === map.version) return cached.names;
+    const names: string[] = [];
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         names.push(this.terrainName(map, x, y, volcano));
       }
     }
-    this.terrain.set(map, names);
+    this.terrain.set(map, { version: map.version, names });
     return names;
   }
 
