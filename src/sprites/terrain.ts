@@ -456,3 +456,154 @@ export function mixedTile(name: string): Sprite | null {
     return bands[kind][1](best, x, y);
   });
 }
+
+// ---- Island 3: the volcano: ash, basalt and lava ------------------------------------
+
+function ashPixel(x: number, y: number, seed: number): Color {
+  // Fine volcanic ash: soft grains with a few darker clumps.
+  if (hash2(x >> 1, y >> 1, seed) < 0.06) return P.ashDeep;
+  const n = hash2(x, y, seed + 1);
+  if (n < 0.12) return P.ashDark;
+  if (n > 0.93) return P.ashLight;
+  return P.ash;
+}
+
+/** Walkable volcano ground: grey ash, hot by day. */
+export function ash(): Sprite {
+  return new Sprite('ash').paint((x, y) => ashPixel(x, y, 120));
+}
+
+export function ashPumice(): Sprite {
+  const s = new Sprite('ash_2').paint((x, y) => ashPixel(x, y, 121));
+  // Light lumps of pumice, full of little holes.
+  for (const [x, y, c] of [
+    [3, 4, P.stoneLight], [4, 4, P.stoneLight], [3, 5, P.stone], [4, 5, P.stoneDark],
+    [10, 10, P.stoneLight], [11, 10, P.stone], [12, 10, P.stoneLight], [10, 11, P.stone], [11, 11, P.stoneDark], [12, 11, P.stone],
+    [7, 13, P.stoneLight], [8, 13, P.stone],
+  ] as const) s.set(x, y, c);
+  return s;
+}
+
+function lavaPixel(x: number, y: number, phase: number): Color {
+  // Molten rock under drifting plates of dark crust. The plates come from
+  // waves with a period of 16, so lava cells join up; they move two pixels
+  // a frame.
+  const a = ((x + phase * 2) / TILE) * Math.PI * 2;
+  const b = (y / TILE) * Math.PI * 2;
+  const crust = Math.sin(a + Math.sin(b) * 1.3) * Math.cos(b + Math.cos(a)) + 0.45 * Math.sin(2 * a - b);
+  const n = hash2((x + phase * 2) % TILE, y, 61);
+  if (crust > 0.75) return n < 0.25 ? P.lavaCrustLight : P.lavaCrust;
+  if (crust > 0.55) return P.lavaDark;
+  if (crust < -0.85 || n < 0.04) return P.lavaGlow;
+  if (crust < -0.35 || n < 0.15) return P.lavaLight;
+  return P.lava;
+}
+
+/** The lava flow, 2 frames for a slow drift of the crust. */
+export function lava(): Sprite[] {
+  return [0, 1].map((phase) => new Sprite(phase ? 'lava_2' : 'lava').paint((x, y) => lavaPixel(x, y, phase)));
+}
+
+function basaltPixel(x: number, y: number): Color {
+  // The tops of basalt columns: 4px blocks, every other column shifted half
+  // a block, lit on top with dark seams between.
+  const col = x >> 2;
+  const yy = (y + (col % 2) * 2) % TILE;
+  const lx = x & 3;
+  const ly = yy & 3;
+  if (lx === 3 || ly === 3 || (lx === 0 && ly === 0)) return P.basaltDeep;
+  if (ly === 0) return hash2(x, y, 63) < 0.7 ? P.basaltLight : P.basalt;
+  if (lx === 0) return P.basalt;
+  return hash2(x, y, 64) < 0.2 ? P.basaltDark : P.basalt;
+}
+
+/** The top of the black basalt cliffs (rock on island 3). */
+export function basaltTop(): Sprite {
+  return new Sprite('basalt_top').paint(basaltPixel);
+}
+
+/** A basalt cliff face: tall columns with cracks across them. */
+export function basaltFace(): Sprite {
+  return new Sprite('basalt_face').paint((x, y) => {
+    if (y < 5) return basaltPixel(x, y);
+    if (y === 5) return P.basaltLight;
+    if (y === TILE - 1) return P.basaltDeep;
+    const band = x % 4;
+    if (band === 3) return P.basaltDeep;
+    // Each column cracks across at its own height.
+    if (y === 7 + (((x >> 2) * 5 + 3) % 7)) return P.basaltDark;
+    return band === 0 ? P.basaltLight : P.basalt;
+  });
+}
+
+/** Lava side of an edge: lava, a glowing rim, then dark crust where it cools. */
+function lavaSide(f: number, x: number, y: number, seed: number): Color {
+  if (f < -2) return lavaPixel(x, y, 0);
+  if (f < -1) return hash2(x, y, seed) < 0.4 ? P.lavaDark : P.lavaLight;
+  return hash2(x, y, seed + 1) < 0.3 ? P.lavaCrustLight : P.lavaCrust;
+}
+
+const grassAshBand: Band = (f, x, y) => {
+  if (f < 0) return ashPixel(x, y, 120);
+  if (f < 1) return hash2(x, y, 122) < 0.5 ? P.grassEdge : P.grassDark;
+  return grassPixel(x, y, 4);
+};
+
+/** Ash down to the lava: a scorched strip of dark ash. */
+const ashLavaBand: Band = (f, x, y) => {
+  if (f < 0) return lavaSide(f, x, y, 123);
+  if (f < 1) return hash2(x, y, 125) < 0.5 ? P.ashDeep : P.ashDark;
+  return ashPixel(x, y, 120);
+};
+
+/** Grass down to the lava: the grass is burnt to ash at the edge. */
+const grassLavaBand: Band = (f, x, y) => {
+  if (f < 0) return lavaSide(f, x, y, 126);
+  if (f < 1) return hash2(x, y, 128) < 0.5 ? P.ashDeep : P.ashDark;
+  if (f < 2) return hash2(x, y, 129) < 0.5 ? P.grassEdge : P.ashDark;
+  return grassPixel(x, y, 4);
+};
+
+/** Beach sand down to the lava: blackened sand at the edge. */
+const sandLavaBand: Band = (f, x, y) => {
+  if (f < 0) return lavaSide(f, x, y, 130);
+  if (f < 1) return hash2(x, y, 132) < 0.5 ? P.ashDark : P.sandDark;
+  return sandPixel(x, y, 1);
+};
+
+/** Cave floor down to the lava. */
+const caveLavaBand: Band = (f, x, y) => {
+  if (f < 0) return lavaSide(f, x, y, 133);
+  if (f < 1) return hash2(x, y, 135) < 0.4 ? P.basaltDeep : P.caveFloorDark;
+  return caveFloorPixel(x, y, 40);
+};
+
+/** Lava running into the sea: a black crust, then steam over the water. */
+function lavaMouthBand(phase: number): Band {
+  return (f, x, y) => {
+    if (f < -3) return waterPixel(x, y);
+    if (f < -1) return hash2(x, y, 136 + phase) < 0.45 ? P.steam : P.waterShallow;
+    if (f < 1) return hash2(x, y, 138) < 0.3 ? P.lavaCrustLight : P.lavaCrust;
+    return lavaPixel(x, y, phase);
+  };
+}
+
+/** Grass with volcano ash along its edges. */
+export function grassAshSet(): Sprite[] {
+  return transitionSet('grass_ash', grassAshBand);
+}
+
+/** Ash, grass, sand and cave floor with the lava along their edges. */
+export function lavaBankSets(): Sprite[] {
+  return [
+    ...transitionSet('ash_lava', ashLavaBand),
+    ...transitionSet('grass_lava', grassLavaBand),
+    ...transitionSet('sand_lava', sandLavaBand),
+    ...transitionSet('cave_lava', caveLavaBand),
+  ];
+}
+
+/** Lava cells next to the sea, 2 frames like the lava ('lava_mouth_…' and 'lava_mouth2_…'). */
+export function lavaMouthSet(): Sprite[] {
+  return [...transitionSet('lava_mouth', lavaMouthBand(0)), ...transitionSet('lava_mouth2', lavaMouthBand(1))];
+}
