@@ -61,4 +61,18 @@ describe('the Cartographer map', () => {
     const picture = drawMap(map, new Map(), { x: 8, y: 8 }, [], [map.idx(3, 3), map.idx(15, 12)]);
     expect(picture.markers.filter((m) => m.sign === 'cave')).toHaveLength(1);
   });
+
+  it('draws the gangways of the oil rig as ink lines, red where one is broken', () => {
+    const map = new GameMap(20, 10);
+    map.tiles.fill(Tile.Water);
+    for (let y = 3; y <= 6; y++) for (const x of [2, 3, 15, 16]) map.set(x, y, Tile.Deck);
+    map.explored.fill(1);
+    const objects = new Map<number, WorldObject>();
+    for (let x = 4; x <= 14; x++) objects.set(map.idx(x, 4), { kind: x === 9 ? 'gangway_end_e' : x === 10 ? 'gangway_end_w' : 'gangway_ew' });
+    const paper = drawMap(map, objects, { x: 2, y: 3 }).paper;
+    const row = Math.floor(4.5 * 1.5) + 6;
+    const inked = (x: number) => paper.get(Math.floor(x * 1.5) + 6, row);
+    expect(inked(5)).toBe(P.ink);
+    expect(inked(9)).toBe(P.inkRed);
+  });
 });

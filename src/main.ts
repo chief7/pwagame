@@ -213,7 +213,7 @@ function updateHud(): void {
   ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}${tide}`;
   const obj = game.objectAt(x, y);
   ui.shelter.textContent = game.hutHere()
-    ? words.ui.inShelter('hut')
+    ? words.ui.inShelter(game.hutHere()!.kind)
     : game.nearFire(x, y)
     ? words.ui.byFire
     : obj && OBJECTS[obj.kind].shelter
@@ -406,7 +406,7 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, radio: words.ui.radio, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: game.hutHere()?.kind === 'crew_cabin' ? words.ui.yourCabin : words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, radio: words.ui.radio, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
     cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });

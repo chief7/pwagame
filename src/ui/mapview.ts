@@ -151,6 +151,22 @@ export function drawMap(
     }
   }
 
+  // Gangways of the oil rig: thin ink lines over the sea, red where one is broken.
+  const scale = PATCH / MAP_BLOCK;
+  for (const [i, o] of objects) {
+    const def = OBJECTS[o.kind];
+    if (!def.overSea && !def.broken) continue;
+    const x = i % map.width;
+    const y = Math.floor(i / map.width);
+    if (!map.isExplored(x, y)) continue;
+    const across = (def.broken ?? (o.kind === 'gangway_ns' ? 'ns' : 'ew')) === 'ew';
+    const color = def.broken ? P.inkRed : P.ink;
+    const from = Math.floor((across ? x : y) * scale);
+    const to = Math.floor(((across ? x : y) + 1) * scale) - 1;
+    const mid = Math.floor(((across ? y : x) + 0.5) * scale);
+    for (let k = from; k <= to; k++) paper.set(MARGIN + (across ? k : mid), MARGIN + (across ? mid : k), color);
+  }
+
   // Bear country: red hatching on the known ground near each sighting.
   for (const spot of bearSpots) {
     const sx = spot % map.width;
