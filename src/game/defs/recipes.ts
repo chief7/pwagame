@@ -6,7 +6,7 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones';
 
 export type Recipe = {
   id: RecipeId;
@@ -28,6 +28,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   rope: { id: 'rope', makes: 'rope', cost: { leaves: 2 } },
   // Faces the way the explorer does; game.ts turns it into bridge_ew when needed.
   bridge: { id: 'bridge', builds: 'bridge_ns', cost: { log: 3, wood: 2, leaves: 3 } },
+  // Island 3: flat stones laid across the lava flow, like a bridge (and turned the same way).
+  lava_stones: { id: 'lava_stones', builds: 'lava_stones_ns', cost: { stone: 8 } },
   fishing_rod: { id: 'fishing_rod', makes: 'fishing_rod', cost: { wood: 3, leaves: 2 }, skill: 'fishing_rod' },
   cooked_fish: { id: 'cooked_fish', makes: 'cooked_fish', cost: { fish: 1 }, atFire: true },
   // Island 2: ways up the steep steps.

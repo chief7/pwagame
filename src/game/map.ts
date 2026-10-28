@@ -11,6 +11,10 @@ export const Tile = {
   Scree: 6,
   /** Island 2: snow on the high peaks. Walkable, but cold. */
   Snow: 7,
+  /** Island 3: volcanic ash on the high ground. Walkable, but hot by day. */
+  Ash: 8,
+  /** Island 3: molten rock (the lava flow and the crater lake). Blocks movement; stepping stones cross the flow. */
+  Lava: 9,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -47,7 +51,7 @@ export class GameMap {
     if (this.inBounds(x, y)) this.tiles[this.idx(x, y)] = tile;
   }
 
-  /** Anything that isn't sea or river (rock counts as land). */
+  /** Anything that isn't sea or river (rock and lava count as land). */
   isLand(x: number, y: number): boolean {
     return !this.isWet(x, y);
   }
@@ -57,10 +61,16 @@ export class GameMap {
     return t === Tile.Water || t === Tile.River;
   }
 
+  /** A band you cross with something built over it: the river (a bridge) or the lava flow (stepping stones). */
+  isFlow(x: number, y: number): boolean {
+    const t = this.get(x, y);
+    return t === Tile.River || t === Tile.Lava;
+  }
+
   /** Ground you can stand on, ignoring objects. */
   isFloor(x: number, y: number): boolean {
     const t = this.get(x, y);
-    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow;
+    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow || t === Tile.Ash;
   }
 
   isOpaque(x: number, y: number): boolean {

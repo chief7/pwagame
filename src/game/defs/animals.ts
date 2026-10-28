@@ -15,7 +15,8 @@ import { Tile } from '../map';
 
 export type AnimalKind =
   | 'crab' | 'turtle' | 'monkey' | 'piglet' | 'bat' | 'boar' | 'snake' | 'wasps' | 'bear'
-  | 'rabbit' | 'squirrel' | 'goat' | 'dog';
+  | 'rabbit' | 'squirrel' | 'goat' | 'dog'
+  | 'lizard' | 'gull' | 'scorpion';
 export type Temper = 'calm' | 'shy' | 'grumpy' | 'cheeky' | 'charger' | 'chaser' | 'stray';
 
 export interface AnimalDef {
@@ -53,22 +54,22 @@ export interface AnimalDef {
 }
 
 export const ANIMALS: Record<AnimalKind, AnimalDef> = {
-  crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6, damage: 4, islands: [1, 2], scaredByDog: true },
-  turtle: { kind: 'turtle', temper: 'calm', habitat: [Tile.Sand], notice: 0, wander: 0.15, population: 2 },
-  monkey: { kind: 'monkey', temper: 'cheeky', habitat: [Tile.Grass, Tile.Sand], notice: 5, wander: 0.5, population: 3, scaredByDog: true },
+  crab: { kind: 'crab', temper: 'grumpy', habitat: [Tile.Sand], notice: 2, wander: 0.4, population: 6, damage: 4, islands: [1, 2, 3], scaredByDog: true },
+  turtle: { kind: 'turtle', temper: 'calm', habitat: [Tile.Sand], notice: 0, wander: 0.15, population: 2, islands: [1, 3] },
+  monkey: { kind: 'monkey', temper: 'cheeky', habitat: [Tile.Grass, Tile.Sand], notice: 5, wander: 0.5, population: 3, islands: [1, 3], scaredByDog: true },
   piglet: { kind: 'piglet', temper: 'shy', habitat: [Tile.Grass], notice: 3, wander: 0.35, population: 3 },
-  bat: { kind: 'bat', temper: 'shy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.8, population: 4, islands: [1, 2] },
+  bat: { kind: 'bat', temper: 'shy', habitat: [Tile.CaveFloor], notice: 2, wander: 0.8, population: 4, islands: [1, 2, 3] },
   boar: {
     kind: 'boar', temper: 'charger', habitat: [Tile.Grass], notice: 4, wander: 0.3, population: 4,
-    damage: 12, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [1, 2],
+    damage: 12, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [1, 2, 3],
   },
   snake: {
     kind: 'snake', temper: 'grumpy', habitat: [Tile.Grass, Tile.Sand], notice: 1, wander: 0.1, population: 5,
-    damage: 8, hitChance: 0.7, wild: true, minHomeDistance: 25, scaredByDog: true,
+    damage: 8, hitChance: 0.7, wild: true, minHomeDistance: 25, islands: [1, 3], scaredByDog: true,
   },
   wasps: {
     kind: 'wasps', temper: 'chaser', habitat: [Tile.Grass], notice: 3, wander: 0.6, population: 3,
-    damage: 3, hitChance: 1, fleeAfter: 8, wild: true, minHomeDistance: 25, islands: [1, 2],
+    damage: 3, hitChance: 1, fleeAfter: 8, wild: true, minHomeDistance: 25, islands: [1, 2, 3],
   },
   bear: {
     kind: 'bear', temper: 'grumpy', habitat: [Tile.CaveFloor], notice: 3, wander: 0.05, population: 2,
@@ -81,8 +82,15 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
     kind: 'goat', temper: 'charger', habitat: [Tile.Scree, Tile.Snow], notice: 4, wander: 0.3, population: 3,
     damage: 10, hitChance: 1, fleeAfter: 10, wild: true, minHomeDistance: 25, islands: [2], climber: true,
   },
+  // Island 3: lizards on the warm ash, gulls on the beach, scorpions on the ash and in caves.
+  lizard: { kind: 'lizard', temper: 'shy', habitat: [Tile.Ash, Tile.Sand], notice: 3, wander: 0.4, population: 4, islands: [3] },
+  gull: { kind: 'gull', temper: 'cheeky', habitat: [Tile.Sand], notice: 5, wander: 0.5, population: 3, islands: [3], scaredByDog: true },
+  scorpion: {
+    kind: 'scorpion', temper: 'grumpy', habitat: [Tile.Ash, Tile.CaveFloor], notice: 1, wander: 0.15, population: 4,
+    damage: 6, hitChance: 0.5, wild: true, minHomeDistance: 25, islands: [3], scaredByDog: true,
+  },
   // A lost dog, one on each island, far from camp, until you adopt one.
-  dog: { kind: 'dog', temper: 'stray', habitat: [Tile.Grass], notice: 0, wander: 0.1, population: 1, minHomeDistance: 25, islands: [1, 2] },
+  dog: { kind: 'dog', temper: 'stray', habitat: [Tile.Grass], notice: 0, wander: 0.1, population: 1, minHomeDistance: 25, islands: [1, 2, 3] },
 };
 
 export const ANIMAL_KINDS = Object.keys(ANIMALS) as AnimalKind[];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSprites, grassScreeTileName, grassTileName, riverBankTileName, shoreTileName, snowTileName } from '../sprites';
+import { buildSprites, edgeTileName, grassScreeTileName, grassTileName, mixedTile, riverBankTileName, shoreTileName, snowTileName } from '../sprites';
 import { DEEP_CAVE_CELLS, findCaves } from './caves';
 import { daylight, isLowTide, isNight, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { computeFov } from './fov';
@@ -244,6 +244,111 @@ describe('generateWorld: island 2, forest and mountains', () => {
   });
 });
 
+describe('generateWorld: island 3, the volcano', () => {
+  const sprites = buildSprites();
+  const worlds = [1, 2, 3, 4].map((seed) => generateWorld(new Rng(seed), WORLD_WIDTH, WORLD_HEIGHT, 3));
+  const kinds = (objects: Map<number, { kind: string }>) => [...objects.values()].map((o) => o.kind);
+  const cellsOf = (objects: Map<number, { kind: string }>, kind: string) => [...objects].filter(([, o]) => o.kind === kind).map(([i]) => i);
+
+  it('has a beach, a jungle, ash, basalt cliffs and lava, and no snow or river', () => {
+    for (const { map, objects } of worlds) {
+      const count = (t: Tile) => map.tiles.filter((x) => x === t).length;
+      expect(count(Tile.Sand)).toBeGreaterThan(200);
+      expect(count(Tile.Grass)).toBeGreaterThan(800);
+      expect(count(Tile.Ash)).toBeGreaterThan(150);
+      expect(count(Tile.Rock)).toBeGreaterThan(50);
+      expect(count(Tile.Lava)).toBeGreaterThan(40);
+      expect(count(Tile.Snow) + count(Tile.Scree) + count(Tile.River)).toBe(0);
+      const k = kinds(objects);
+      for (const kind of ['tree_broadleaf', 'fern', 'spring', 'chest_closed', 'bramble']) expect(k).toContain(kind);
+      expect(k.some((kind) => kind.startsWith('palm'))).toBe(true);
+    }
+  });
+
+  it('can reach every bit of ground with stepping stones over the lava flow', () => {
+    for (const { map, start, objects } of worlds) {
+      const passable = (x: number, y: number) => {
+        const o = objects.get(map.idx(x, y));
+        return map.isFloor(x, y) && (!o || canBeOpened(o.kind));
+      };
+      const reach = reachWithBridges(map, start.x, start.y, passable, (x, y) => map.get(x, y) === Tile.Lava);
+      for (let i = 0; i < map.tiles.length; i++) {
+        const x = i % map.width;
+        if (passable(x, (i - x) / map.width)) expect(reach[i], `cell ${x},${(i - x) / map.width}`).toBe(1);
+      }
+      // Without crossing the lava, the far side stays out of reach.
+      const walk = reachWithBridges(map, start.x, start.y, passable, () => false);
+      expect([...walk].filter(Boolean).length).toBeLessThan([...reach].filter(Boolean).length);
+    }
+  });
+
+  it('puts the old balloon on the highest ash you can walk up to, next to the crater', () => {
+    for (const { map, start, objects } of worlds) {
+      const sites = cellsOf(objects, 'balloon_site');
+      expect(sites).toHaveLength(1);
+      const i = sites[0];
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      expect(map.get(x, y)).toBe(Tile.Ash);
+      expect(kinds(objects).some((k) => k.startsWith('boat_') || k.startsWith('beacon_') || k === 'ledge')).toBe(false);
+      const passable = (cx: number, cy: number) => {
+        const o = objects.get(map.idx(cx, cy));
+        return map.isFloor(cx, cy) && (!o || canBeOpened(o.kind));
+      };
+      const reach = reachWithBridges(map, start.x, start.y, passable, (cx, cy) => map.get(cx, cy) === Tile.Lava);
+      expect([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]].some(([dx, dy]) => reach[map.idx(x + dx, y + dy)])).toBe(true);
+      // The crater lake of lava is close by.
+      let lava = Infinity;
+      for (let j = 0; j < map.tiles.length; j++) {
+        if (map.tiles[j] === Tile.Lava) lava = Math.min(lava, Math.max(Math.abs((j % map.width) - x), Math.abs(Math.floor(j / map.width) - y)));
+      }
+      expect(lava).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('has steam vents high on the ash, hot springs, and fewer springs', () => {
+    for (const { map, objects, region } of worlds) {
+      const vents = cellsOf(objects, 'steam_vent');
+      expect(vents.length).toBeGreaterThanOrEqual(3);
+      for (const i of vents) expect(map.tiles[i]).toBe(Tile.Ash);
+      const hot = cellsOf(objects, 'hot_spring');
+      expect(hot).toHaveLength(3);
+      for (const i of hot) expect(map.tiles[i]).toBe(Tile.Ash);
+      const springs = cellsOf(objects, 'spring');
+      expect(springs).toHaveLength(4);
+      expect(springs.filter((i) => region[i] === 0).length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('only makes volcano edges the tiles can draw', () => {
+    // Which neighbours each kind of ground draws an edge against (as in the renderer).
+    const letter = (map: GameMap, own: Tile, x: number, y: number): string => {
+      const t = map.get(x, y);
+      if (own === Tile.Sand) return map.isWet(x, y) ? 'w' : t === Tile.Lava ? 'l' : t === Tile.Ash ? 'h' : '.';
+      if (own === Tile.Grass) return t === Tile.Sand ? 'a' : t === Tile.Ash ? 'h' : t === Tile.Lava ? 'l' : '.';
+      if (own === Tile.Lava) return t === Tile.Water ? 'w' : '.';
+      return t === Tile.Lava ? 'l' : '.';
+    };
+    const ground = { [Tile.Sand]: 'sand', [Tile.Grass]: 'grass', [Tile.Ash]: 'ash', [Tile.CaveFloor]: 'cave', [Tile.Lava]: 'lava' } as const;
+    for (const { map } of worlds) {
+      for (let y = 0; y < map.height; y++) {
+        for (let x = 0; x < map.width; x++) {
+          const t = map.get(x, y) as keyof typeof ground;
+          if (!(t in ground)) continue;
+          const at = (dx: number, dy: number) => letter(map, t, x + dx, y + dy);
+          const name = edgeTileName(ground[t], 'plain', at);
+          expect(name === 'plain' || sprites.has(name) || mixedTile(name) !== null, `${ground[t]} ${x},${y}: ${name}`).toBe(true);
+          // One kind of edge can't be on two opposite sides of a cell.
+          for (const k of ['w', 'l', 'h', 'a']) {
+            expect(at(0, -1) === k && at(0, 1) === k, `${ground[t]} ${x},${y}`).toBe(false);
+            expect(at(-1, 0) === k && at(1, 0) === k, `${ground[t]} ${x},${y}`).toBe(false);
+          }
+        }
+      }
+    }
+  });
+});
+
 describe('Game: sailing to island 2', () => {
   function sailFrom(seed: number): Game {
     const game = boatNextTo(sandbox(seed));
@@ -292,7 +397,7 @@ describe('Game: sailing to island 2', () => {
     expect(copy.goal()).toEqual({ state: 'find' });
   });
 
-  it('builds the beacon in three stages, and lighting it ends the game', () => {
+  it('builds the beacon in three stages, and lighting it takes you to island 3', () => {
     const game = sailFrom(42);
     game.sail();
     const at = game.map.idx(game.player.x + 1, game.player.y);
@@ -313,14 +418,31 @@ describe('Game: sailing to island 2', () => {
     game.move(1, 0);
     expect(game.takeSailRequest()).toBe(true);
     expect(game.log.at(-1)?.msg).toEqual({ key: 'goalReady', level: 2 });
-    const beaconLight = () => game.lights().some(([x, y]) => game.map.idx(x, y) === at);
-    expect(beaconLight()).toBe(false);
     expect(game.sail()).toBe(true);
-    expect(beaconLight()).toBe(true);
-    expect(game.level).toBe(2);
-    expect(game.sailed).toBe(true);
-    expect(game.goal()).toEqual({ state: 'sailed' });
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway', level: 2 });
+    expect(game.level).toBe(3);
+    expect(game.sailed).toBe(false);
+    expect(game.goal()).toEqual({ state: 'find' });
+    expect(game.map.tiles.includes(Tile.Lava)).toBe(true);
+    expect(game.log.slice(-2).map((e) => e.msg)).toEqual([{ key: 'sailAway', level: 2 }, { key: 'landIsland', level: 3 }]);
+    const kinds = new Set(game.animals.map((a) => a.kind));
+    for (const kind of kinds) expect(ANIMALS[kind].islands ?? [1]).toContain(3);
+    expect(kinds.has('gull') || kinds.has('lizard')).toBe(true);
+    expect(kinds.has('bear')).toBe(false);
+  });
+
+  it('loads a save that lit the beacon when island 2 was the last, so the beacon takes it to island 3', () => {
+    const game = sailFrom(46);
+    game.sail();
+    for (const [i, o] of game.objects) {
+      if (o.kind !== 'beacon_site') continue;
+      game.objects.set(i, { kind: 'beacon_ready' });
+      game.map.explored[i] = 1;
+    }
+    const old = { ...game.toSave(), sailed: true };
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(old)));
+    expect(copy.sailed).toBe(false);
+    expect(copy.sail()).toBe(true);
+    expect(copy.level).toBe(3);
   });
 
   it('gives apples from apple trees, and fern leaves', () => {
@@ -363,6 +485,152 @@ describe('Game: sailing to island 2', () => {
     expect(copy.goal()).toEqual({ state: 'ready' });
     expect(copy.sail()).toBe(true);
     expect(copy.level).toBe(2);
+  });
+});
+
+describe('Game: island 3, the volcano', () => {
+  /** A game on island 3 with a clear patch of sand round the explorer. */
+  function volcano(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(3);
+    const { map } = game;
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        map.set(game.player.x + dx, game.player.y + dy, Tile.Sand);
+        game.objects.delete(map.idx(game.player.x + dx, game.player.y + dy));
+      }
+    }
+    game.animals = [];
+    game.dog = null;
+    game.takeEvents();
+    return game;
+  }
+  /** A lava flow `width` cells wide just east of the explorer, running north–south. */
+  function lavaFlow(game: Game, width = 2): void {
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = 1; dx <= width; dx++) game.map.set(game.player.x + dx, game.player.y + dy, Tile.Lava);
+    }
+  }
+
+  it('lava is too hot to walk on, and no time passes', () => {
+    const game = volcano(60);
+    lavaFlow(game);
+    const { turn, player: { x } } = game;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.player.x).toBe(x);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'lavaHot' });
+  });
+
+  it('stepping stones cross the lava in front of you; a bridge does not, and stones do not cross a river', () => {
+    const game = volcano(61);
+    lavaFlow(game);
+    game.inventory.add('stone', 8);
+    game.inventory.add('log', 3);
+    game.inventory.add('wood', 2);
+    game.inventory.add('leaves', 3);
+    game.player.facing = 'up';
+    expect(game.buildProblem('lava_stones')).toEqual({ key: 'noLavaSpot' });
+    game.player.facing = 'right';
+    expect(game.buildProblem('bridge')).toEqual({ key: 'noBridgeSpot' });
+    expect(game.build('lava_stones')).toBe(true);
+    const { x, y } = game.player;
+    expect(game.objectAt(x + 1, y)?.kind).toBe('lava_stones_ew');
+    expect(game.objectAt(x + 2, y)?.kind).toBe('lava_stones_ew');
+    expect(game.inventory.count('stone')).toBe(0);
+    for (let i = 0; i < 3; i++) expect(game.move(1, 0)).toBe(true);
+    expect(game.player.x).toBe(x + 3);
+
+    const wet = sandbox(62);
+    river(wet);
+    wet.inventory.add('stone', 8);
+    wet.player.facing = 'right';
+    expect(wet.buildProblem('lava_stones')).toEqual({ key: 'noLavaSpot' });
+  });
+
+  it('the ash is hot by day: Water drops faster out in the open, but not at night or in a shelter', () => {
+    const open = { sleeping: false, shelter: 0, nearFire: false, daylight: 1 };
+    const drop = (c: Parameters<typeof tickNeeds>[1]) => 80 - tickNeeds({ ...freshNeeds(), water: 80 }, c).water;
+    expect(drop({ ...open, heat: 0.5 })).toBeCloseTo(drop(open) * 1.5, 5);
+    expect(drop({ ...open, heat: 0.5, shelter: 1 })).toBeCloseTo(drop(open), 5);
+
+    const game = volcano(63);
+    game.turn = 30; // 11:00, full daylight
+    game.map.set(game.player.x + 1, game.player.y, Tile.Ash);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'ashHot' });
+    game.needs.water = 80;
+    game.wait();
+    expect(80 - game.needs.water).toBeCloseTo(0.45 * 1.5, 5);
+    game.move(-1, 0);
+    game.needs.water = 80;
+    game.wait();
+    expect(80 - game.needs.water).toBeCloseTo(0.45, 5);
+  });
+
+  it('a hot spring gives water and warms you like a small fire', () => {
+    const game = volcano(64);
+    place(game, 1, 0, 'hot_spring');
+    game.needs.water = 40;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.needs.water).toBeGreaterThan(70);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'drink', warm: true });
+    expect(game.nearFire(game.player.x, game.player.y)).toBe(true);
+    expect(game.nearFire(game.player.x - 1, game.player.y)).toBe(false);
+  });
+
+  it('steam vents give sulphur and grow it back; the burner needs it', () => {
+    const game = volcano(65);
+    place(game, 1, 0, 'steam_vent');
+    expect(game.move(1, 0)).toBe(true);
+    const got = game.inventory.count('sulphur');
+    expect(got).toBeGreaterThanOrEqual(1);
+    expect(got).toBeLessThanOrEqual(2);
+    expect(game.objectSprite(game.objectAt(game.player.x + 1, game.player.y)!)).toBe('steam_vent_spent');
+    const burner = LEVELS[2].stages[2];
+    expect(game.stageCost(burner)).toEqual(burner.cost);
+    expect(burner.cost.sulphur).toBe(4);
+  });
+
+  it('builds the balloon in three stages, and flying away ends the game', () => {
+    const game = volcano(66);
+    const at = game.map.idx(game.player.x + 1, game.player.y);
+    for (const [i, o] of game.objects) if (o.kind === 'balloon_site') game.objects.delete(i);
+    game.objects.set(at, { kind: 'balloon_site' });
+    game.map.explored[at] = 1;
+    const [basket, envelope, burner] = LEVELS[2].stages;
+    expect(game.goal()).toMatchObject({ state: 'build', obj: 'balloon_site', index: 0, count: 3 });
+    for (const stage of [basket, envelope, burner]) {
+      for (const [item, n] of Object.entries(stage.cost)) game.inventory.add(item as keyof typeof stage.cost, n);
+      expect(game.move(1, 0)).toBe(true);
+      expect(game.objects.get(at)?.kind).toBe(stage.becomes);
+    }
+    expect(game.goal()).toEqual({ state: 'ready' });
+    game.move(1, 0);
+    expect(game.takeSailRequest()).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'goalReady', level: 3 });
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(3);
+    expect(game.sailed).toBe(true);
+    expect(game.goal()).toEqual({ state: 'sailed' });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway', level: 3 });
+    expect(OBJECTS.balloon_ready.done?.frames).toEqual(['balloon_gone']);
+  });
+
+  it('lava glows in the dark', () => {
+    const game = volcano(67);
+    lavaFlow(game);
+    const lit = game.lights().filter(([x, y]) => game.map.get(x, y) === Tile.Lava);
+    expect(lit.length).toBeGreaterThanOrEqual(14);
+    expect(lit.every(([, , r]) => r === 1)).toBe(true);
+  });
+
+  it('keeps island 3 through a save', () => {
+    const game = volcano(68);
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.level).toBe(3);
+    expect([...copy.map.tiles]).toEqual([...game.map.tiles]);
+    expect(copy.sailed).toBe(false);
   });
 });
 

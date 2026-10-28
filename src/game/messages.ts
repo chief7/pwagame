@@ -38,6 +38,12 @@ export type Msg =
   | { key: 'needMaterials' }
   | { key: 'noRoom' }
   | { key: 'noBridgeSpot' }
+  /** Tried to lay stepping stones without lava ahead. */
+  | { key: 'noLavaSpot' }
+  /** Walked into the lava: far too hot. */
+  | { key: 'lavaHot' }
+  /** Stepped onto the ash in the day: it is hot up here, and you get thirsty. */
+  | { key: 'ashHot' }
   | { key: 'haveTool'; item: ItemId }
   | { key: 'needTool'; obj: ObjectKind; item: ItemId }
   | { key: 'notSleepy' }
@@ -46,7 +52,8 @@ export type Msg =
   | { key: 'dozeOff' }
   | { key: 'wake'; reason: WakeReason; turn: number }
   | { key: 'notThirsty' }
-  | { key: 'drink' }
+  /** Drank at a spring; `warm` at a hot spring. */
+  | { key: 'drink'; warm?: true }
   | { key: 'drinkRiver' }
   | { key: 'look'; obj: ObjectKind }
   | { key: 'nothingLeft'; obj: ObjectKind }

@@ -47,7 +47,7 @@ export function findCaves(map: GameMap): Cave[] {
     // it (a bridge leads in), the way in is by the river.
     const outside = (x: number, y: number) => map.isFloor(x, y) && map.get(x, y) !== Tile.CaveFloor;
     let entrances = waysIn(map, cells, outside);
-    if (!entrances.length) entrances = waysIn(map, cells, (x, y) => map.get(x, y) === Tile.River);
+    if (!entrances.length) entrances = waysIn(map, cells, (x, y) => map.isFlow(x, y));
     if (entrances.length > MAX_WAYS_IN) continue;
     caves.push({ cells, entrances });
   }
