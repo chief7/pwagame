@@ -22,7 +22,8 @@ export type Recipe = {
 export const RECIPES: Record<RecipeId, Recipe> = {
   campfire: { id: 'campfire', builds: 'campfire', cost: { wood: 3, stone: 2 } },
   lean_to: { id: 'lean_to', builds: 'lean_to', cost: { wood: 4, leaves: 5 } },
-  hut: { id: 'hut', builds: 'hut', cost: { log: 6, wood: 2, leaves: 8, stone: 4 } },
+  // The camp: only one on each island, and it is big work.
+  hut: { id: 'hut', builds: 'hut', cost: { log: 24, wood: 12, leaves: 30, stone: 20, rope: 8 } },
   axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
   rope: { id: 'rope', makes: 'rope', cost: { leaves: 2 } },
   // Faces the way the explorer does; game.ts turns it into bridge_ew when needed.

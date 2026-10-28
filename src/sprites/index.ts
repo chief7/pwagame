@@ -4,7 +4,8 @@ import {
   berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
   treeSpruce, treeSpruceSnow,
 } from './forest';
-import { balloon, balloonAway, beacon, boat, boatAway, bridge, campfire, hut, leanTo } from './structures';
+import { balloon, balloonAway, beacon, boat, boatAway, bridge, campfire, huts, leanTo } from './structures';
+import { interiors } from './interiors';
 import {
   barrel, barrelEmpty, boulder, chestClosed, chestOpen, crystalCluster, driftwood, glowcap, glowcapPicked, hotSpring, iceWall, lavaStones, ledge, log, logPile,
   mossyStone, pebbles, sandbar, spring, stalagmite, steamVent, steamVentSpent,
@@ -40,7 +41,8 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Steep steps', sprites: [ledge(), ledge('ladder'), iceWall(), iceWall('rope')] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },
     { title: 'Deep caves', sprites: [...glowcap(), glowcapPicked(), crystalCluster()] },
-    { title: 'Shelter', sprites: [...campfire(), leanTo(), hut()] },
+    { title: 'Shelter', sprites: [...campfire(), leanTo(), ...huts()] },
+    { title: 'Inside the hut', sprites: interiors() },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
     { title: 'Tide islet', sprites: [sandbar('ns'), sandbar('ew'), sandbar('ns', true), sandbar('ew', true), barrel(), barrelEmpty()] },

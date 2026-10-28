@@ -6,6 +6,8 @@ import { computeFov } from './fov';
 import { ANIMALS } from './defs/animals';
 import { canBeOpened, OBJECTS, type ObjectKind } from './defs/objects';
 import { LEVELS } from './defs/levels';
+import { RECIPES } from './defs/recipes';
+import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import { Game, SAVE_VERSION } from './game';
 import { GameMap, Tile } from './map';
@@ -435,7 +437,7 @@ describe('Game: the dog', () => {
   it('lies down next to you while you sleep and gets up on your next turn', () => {
     const game = withDog(54);
     game.dog!.x = game.player.x + 3;
-    game.needs.energy = 50;
+    game.needs.energy = 40;
     game.sleep();
     expect(near(game)).toBe(1);
     expect(game.dog!.napping).toBe(true);
@@ -556,7 +558,7 @@ describe("Game: the Cartographer's map", () => {
     expect(game.canReadMap()).toBe(false);
     game.move(1, 0);
     expect(game.canReadMap()).toBe(false);
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'stepInto', obj: 'hut' });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'enterHut' });
     game.skills.add('cartographer');
     expect(game.canReadMap()).toBe(true);
     game.move(-1, 0);
@@ -566,7 +568,7 @@ describe("Game: the Cartographer's map", () => {
     game.move(1, 0);
     game.move(1, 0);
     expect(game.canReadMap()).toBe(true);
-    expect(game.log.slice(-2).map((e) => e.msg)).toEqual([{ key: 'stepInto', obj: 'hut' }, { key: 'mapHint' }]);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'enterHut' });
   });
 
   it('remembers where you saw cave bears, one place for each bear area', () => {
@@ -710,10 +712,7 @@ describe('Game: building and sleeping', () => {
 
   it('sleeping in a hut restores energy, keeps you warm and makes it home', () => {
     const game = sandbox(7);
-    game.inventory.add('log', 6);
-    game.inventory.add('wood', 2);
-    game.inventory.add('leaves', 8);
-    game.inventory.add('stone', 4);
+    give(game, RECIPES.hut.cost);
     game.player.facing = 'right';
     game.build('hut');
     game.move(1, 0);
@@ -1999,6 +1998,153 @@ describe('Game: islands from before the tide islet', () => {
     expect(fresh.goal()).toEqual({ state: 'find' });
   });
 });
+
+describe('Game: the camp (hut, bed and rooms)', () => {
+  /** A sandbox with a hut just east of the explorer, who walks into it. */
+  function inHut(seed: number, rooms: ('workshop' | 'hearth' | 'barrel')[] = []): Game {
+    const game = sandbox(seed);
+    game.objects.set(game.map.idx(game.player.x + 1, game.player.y), { kind: 'hut', rooms: rooms.length ? rooms : undefined });
+    game.move(1, 0);
+    game.takeEvents();
+    return game;
+  }
+
+  it('costs a lot, and there is only one on each island', () => {
+    const cost = Object.values(RECIPES.hut.cost).reduce((sum, n) => sum + (n ?? 0), 0);
+    expect(cost).toBeGreaterThanOrEqual(90);
+    const game = sandbox(110);
+    give(game, RECIPES.hut.cost);
+    give(game, RECIPES.hut.cost);
+    game.player.facing = 'right';
+    expect(game.hasHut()).toBe(false);
+    expect(game.build('hut')).toBe(true);
+    expect(game.hasHut()).toBe(true);
+    expect(game.buildProblem('hut')).toEqual({ key: 'oneHut' });
+    expect(game.build('hut')).toBe(false);
+  });
+
+  it('goes inside when you walk into it', () => {
+    const game = inHut(111);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'enterHut' });
+    expect(game.takeHutRequest()).toBe(true);
+    expect(game.takeHutRequest()).toBe(false);
+    expect(game.hutHere()?.kind).toBe('hut');
+  });
+
+  it('gives a full rest only in the hut bed', () => {
+    const rest = (game: Game) => {
+      game.turn = 20; // the morning: warm enough to sleep anywhere
+      game.needs.energy = 20;
+      game.needs.food = game.needs.water = game.needs.warmth = 100;
+      game.sleep();
+      return game.needs.energy;
+    };
+    const open = sandbox(112);
+    expect(rest(open)).toBe(50);
+    expect(open.log.at(-1)?.msg).toMatchObject({ key: 'wake', reason: 'restless' });
+    // At the limit, there is no more rest to get here.
+    expect(open.sleep()).toBe(false);
+    expect(open.log.at(-1)?.msg).toEqual({ key: 'restLimit', cap: 50 });
+
+    const cave = sandbox(113);
+    cave.map.set(cave.player.x, cave.player.y, Tile.CaveFloor);
+    expect(rest(cave)).toBe(60);
+
+    const leanTo = sandbox(114);
+    place(leanTo, 0, 0, 'lean_to');
+    expect(rest(leanTo)).toBe(75);
+
+    const hut = inHut(115);
+    expect(rest(hut)).toBeGreaterThanOrEqual(99);
+    expect(hut.log.at(-1)?.msg).toMatchObject({ key: 'wake', reason: 'rested' });
+    expect(hut.home).toEqual({ x: hut.player.x, y: hut.player.y });
+  });
+
+  it('heals you faster asleep in the bed, and faster still by the hearth', () => {
+    const night = (game: Game) => {
+      game.turn = nightTurn();
+      game.needs = { health: 40, food: 100, water: 100, energy: 20, warmth: 100 };
+      game.sleep();
+      return game.needs.health;
+    };
+    const leanTo = sandbox(116);
+    place(leanTo, 0, 0, 'lean_to');
+    const plain = night(inHut(116));
+    expect(plain).toBeGreaterThan(night(leanTo));
+    expect(night(inHut(116, ['hearth']))).toBeGreaterThan(plain);
+  });
+
+  it('adds rooms from inside, for their materials and XP; the hut looks different', () => {
+    const outside = sandbox(117);
+    give(outside, ROOMS.workshop.cost);
+    expect(outside.addRoom('workshop')).toBe(false);
+    expect(outside.log.at(-1)?.msg).toEqual({ key: 'notInHut' });
+
+    const game = inHut(117);
+    const hut = game.hutHere()!;
+    expect(game.objectSprite(hut)).toBe('hut');
+    expect(game.roomProblem('workshop')).toEqual({ key: 'needMaterials' });
+    give(game, ROOMS.workshop.cost);
+    const xp = game.xp;
+    expect(game.addRoom('workshop')).toBe(true);
+    expect(hut.rooms).toEqual(['workshop']);
+    expect(game.xp - xp).toBe(20);
+    expect(game.inventory.count('wood')).toBe(0);
+    expect(game.log.some((e) => e.msg.key === 'roomBuilt')).toBe(true);
+    expect(game.roomProblem('workshop')).toEqual({ key: 'notInHut' });
+
+    give(game, ROOMS.hearth.cost);
+    expect(game.addRoom('hearth')).toBe(true);
+    expect(game.objectSprite(hut)).toBe('hut_workshop_hearth');
+    expect(game.objectSprite(hut, 1)).toBe('hut_workshop_hearth_2');
+  });
+
+  it('makes one more rope at the workbench', () => {
+    const game = inHut(118, ['workshop']);
+    expect(game.recipeMakes('rope')).toBe(2);
+    game.skills.add('rope_maker');
+    expect(game.recipeMakes('rope')).toBe(3);
+    game.move(-1, 0);
+    expect(game.recipeMakes('rope')).toBe(2);
+    game.skills.delete('rope_maker');
+    expect(game.recipeMakes('rope')).toBe(1);
+  });
+
+  it('cooks fish at the hearth, but only inside', () => {
+    const game = inHut(119, ['hearth']);
+    game.inventory.add('fish', 2);
+    expect(game.nearFire(game.player.x, game.player.y)).toBe(true);
+    expect(game.build('cooked_fish')).toBe(true);
+    expect(game.inventory.count('cooked_fish')).toBe(1);
+    expect(game.lights().some(([x, y]) => x === game.player.x && y === game.player.y)).toBe(true);
+    game.move(-1, 0);
+    expect(game.buildProblem('cooked_fish')).toEqual({ key: 'needFire' });
+  });
+
+  it('gives water at the rain barrel', () => {
+    const game = inHut(120, ['barrel']);
+    game.needs.water = 40;
+    expect(game.drinkBarrel()).toBe(true);
+    expect(game.needs.water).toBeGreaterThan(74);
+    expect(game.log.some((e) => e.msg.key === 'drinkBarrel')).toBe(true);
+    game.move(-1, 0);
+    expect(game.drinkBarrel()).toBe(false);
+  });
+
+  it('keeps its rooms in the save, and old saves load without rooms', () => {
+    const game = inHut(121, ['barrel', 'hearth']);
+    const copy = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(copy.hutHere()?.rooms).toEqual(['barrel', 'hearth']);
+    const old = Game.fromSave(JSON.parse(JSON.stringify({ ...inHut(122).toSave(), v: 8 })));
+    expect(old.toSave().v).toBe(SAVE_VERSION);
+    expect(old.hutHere()?.rooms).toBeUndefined();
+  });
+});
+
+/** Put a recipe's (or room's) materials in the bag. */
+function give(game: Game, cost: Partial<Record<Parameters<Game['inventory']['add']>[0], number>>): void {
+  for (const [item, n] of Object.entries(cost)) game.inventory.add(item as Parameters<Game['inventory']['add']>[0], n);
+}
 
 function sandbox(seed: number): Game {
   const game = new Game(seed);

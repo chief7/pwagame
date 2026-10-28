@@ -188,6 +188,26 @@ export const en: Strings = {
     endStars: (n, of) => `Stars: ${n} of ${of}`,
     oldIsland: 'Your island is from an older version. A new island 1 has a little tide island with more to find. You keep your bag, XP, skills and dog.',
     keepProgress: 'New island, keep progress',
+    hut: 'Hut',
+    yourHut: 'Your hut',
+    bed: 'Bed',
+    bedNote: 'Sleep here for a full rest. Health comes back faster.',
+    lookAtMap: 'Look',
+    mapNote: 'Your map of everything you explored.',
+    noMap: 'An empty nail. Learn the Cartographer skill to hang a map of the island here.',
+    hutMapRemark: 'Learn the Cartographer skill, and a map of the island hangs on its wall.',
+    workbenchNote: (n) => `Make ${n} rope from 2 big leaves here.`,
+    makeRope: 'Make rope',
+    hearthNote: 'Cook fish here. Health comes back faster while you sleep.',
+    cook: 'Cook',
+    barrelNote: 'Fresh rain water from the roof. +35 water.',
+    drink: 'Drink',
+    addRoom: 'Add a room',
+  },
+  rooms: {
+    workshop: { name: 'Workshop', description: 'A workbench. Rope you make in your hut gives 1 more.' },
+    hearth: { name: 'Hearth', description: 'A fire inside. Cook fish at home, and heal faster in your sleep.' },
+    barrel: { name: 'Rain barrel', description: 'Catches rain from the roof, so you can drink at home.' },
   },
   stars: {
     chests: { name: 'Treasure hunter', task: 'Open every chest on this island.' },
@@ -225,8 +245,8 @@ export const en: Strings = {
   needs: NEEDS,
   recipes: {
     campfire: { name: 'Campfire', description: 'Keeps you warm and lights up the night.' },
-    lean_to: { name: 'Lean-to', description: 'A simple shelter. Sleep here to rest well and stay warmer.' },
-    hut: { name: 'Hut', description: 'A cosy home. Toasty nights and the best sleep.' },
+    lean_to: { name: 'Lean-to', description: 'A simple shelter for trips. Warmer nights, but only the bed in a hut gives a full rest.' },
+    hut: { name: 'Hut', description: 'Your camp. A bed for a full rest, and you can add rooms from inside. One on each island.' },
     axe: { name: 'Stone axe', description: 'Chops logs from trees and clears brambles.' },
     rope: { name: 'Rope', description: 'Twisted from big leaves. You need rope for the island goal.' },
     bridge: { name: 'Bridge', description: 'Crosses a river up to 3 steps wide. Face the water to build it.' },
@@ -267,6 +287,12 @@ export const en: Strings = {
       case 'seaSalty': return 'The sea is too salty to drink. Look for fresh water.';
       case 'mapHint': return 'Your map hangs on the hut wall. Tap Map to look at it.';
       case 'stepInto': return `You step into the ${obj(msg.obj)}. A good place to sleep.`;
+      case 'enterHut': return 'You go inside your hut.';
+      case 'oneHut': return 'You already have a hut on this island. Add rooms to it from inside.';
+      case 'roomBuilt': return `You add ${a(en.rooms[msg.room].name.toLowerCase())} to your hut.`;
+      case 'notInHut': return 'You can only do that inside your hut.';
+      case 'drinkBarrel': return 'You drink fresh rain water from the barrel. Lovely!';
+      case 'restLimit': return `You can't rest any more here (Energy ${msg.cap}). Only the bed in your hut gives a full rest.`;
       case 'tooFull': return "You're too full to eat that.";
       case 'eat': return `You eat ${itemCount(msg.item, 1)}. Yum!`;
       case 'build': return `You build ${a(obj(msg.obj))}.`;
@@ -277,11 +303,13 @@ export const en: Strings = {
       case 'haveTool': return `You already have ${a(ITEM[msg.item].one)}.`;
       case 'needTool': return `The ${obj(msg.obj)} is too thorny to clear by hand. You need ${a(ITEM[msg.item].one)}.`;
       case 'notSleepy': return "You're not sleepy right now.";
-      case 'fallAsleep': return `You curl up in the ${msg.obj ? obj(msg.obj) : 'cave'} and fall asleep.`;
+      case 'fallAsleep': if (msg.obj === 'hut') return 'You snuggle into your bed and fall asleep.';
+        return `You curl up in the ${msg.obj ? obj(msg.obj) : 'cave'} and fall asleep.`;
       case 'dozeOff': return 'You lie down on the ground and doze off.';
       case 'wake': {
         const text = {
           rested: 'You wake up feeling rested.',
+          restless: 'You wake up, but not fully rested. Only the bed in your hut gives a full rest.',
           cold: 'Brr! Too cold to sleep. A fire or a shelter would help.',
           hungry: 'Your rumbling tummy wakes you up.',
           thirsty: 'You wake up thirsty.',

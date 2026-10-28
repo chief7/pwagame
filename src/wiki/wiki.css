@@ -358,6 +358,31 @@ tr:last-child td {
 
 .mini-bar.need-food { background: var(--food); }
 .mini-bar.need-warmth { background: var(--warmth); }
+.mini-bar.need-energy { background: var(--energy); }
+
+/* ---- Camp ------------------------------------------------------------------------- */
+
+.camp-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.hut-inside {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+
+@media (max-width: 600px) {
+  .camp-head {
+    flex-direction: column;
+  }
+  .hut-inside .sprite {
+    width: 50%;
+    height: auto;
+  }
+}
 
 /* ---- Needs ------------------------------------------------------------------------ */
 

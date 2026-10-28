@@ -57,6 +57,18 @@ describe('sprites', () => {
     }
   });
 
+  it('has a hut sprite for every set of rooms, with both smoke frames', async () => {
+    const { hutSprite, ROOM_IDS } = await import('../game/defs/rooms');
+    const sprites = buildSprites();
+    for (let mask = 0; mask < 1 << ROOM_IDS.length; mask++) {
+      const rooms = ROOM_IDS.filter((_, i) => mask & (1 << i));
+      for (const frame of [0, 1]) expect(sprites.has(hutSprite(rooms, frame)), hutSprite(rooms, frame)).toBe(true);
+    }
+    for (const name of ['room_main', 'room_main_map', 'room_hearth_2', ...ROOM_IDS.map((r) => `room_${r}`)]) {
+      expect(sprites.has(name), name).toBe(true);
+    }
+  });
+
   it('has a fishing pose for every facing and the boat trip for both explorers', () => {
     const sprites = buildSprites();
     for (const body of ['male', 'female']) {

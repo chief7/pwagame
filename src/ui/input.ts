@@ -6,6 +6,7 @@ export type Command =
   | { type: 'build' }
   | { type: 'skills' }
   | { type: 'map' }
+  | { type: 'hut' }
   | { type: 'grill' };
 
 const KEY_DIRS: Record<string, [number, number]> = {
@@ -29,6 +30,7 @@ export function commandForKey(e: KeyboardEvent): Command | null {
     case 'p': return { type: 'skills' };
     case 'g': return { type: 'grill' };
     case 'm': return { type: 'map' };
+    case 'e': return { type: 'hut' };
   }
   return null;
 }

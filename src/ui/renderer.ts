@@ -129,6 +129,33 @@ export class Renderer {
     };
   }
 
+  /**
+   * The cell a tap means: a shelter whose picture covers the point (a hut's
+   * roof reaches up into the cell behind it), else the cell under the point.
+   */
+  tapCell(game: Game, cssX: number, cssY: number): { x: number; y: number } {
+    const under = this.cellAt(cssX, cssY);
+    const o = this.origin();
+    const px = cssX * this.dpr;
+    const py = cssY * this.dpr;
+    // Lower rows are drawn on top, so they win.
+    for (const dy of [1, 0]) {
+      for (const dx of [0, -1, 1]) {
+        const x = under.x + dx;
+        const y = under.y + dy;
+        const obj = game.objectAt(x, y);
+        if (!obj || !OBJECTS[obj.kind].shelter || !game.map.isExplored(x, y)) continue;
+        const baked = this.sprites.get(game.objectSprite(obj));
+        if (!baked) continue;
+        const { sprite } = baked;
+        const left = o.x + x * this.cell + this.cell / 2 - (sprite.width * this.scale) / 2;
+        const top = o.y + (y + 1) * this.cell - sprite.height * this.scale;
+        if (sprite.get(Math.floor((px - left) / this.scale), Math.floor((py - top) / this.scale))) return { x, y };
+      }
+    }
+    return under;
+  }
+
   /** Top centre of a world cell in CSS pixels relative to the canvas, as of the last frame. */
   cellTop(x: number, y: number): { x: number; y: number } {
     const o = this.origin();
@@ -235,7 +262,7 @@ export class Renderer {
         const frames = game.sailed && def.done ? def.done.frames : def.frames;
         // A picked plant shows its bare sprite, not its animation (picked glowcaps don't glow).
         const regrowing = obj.readyAt !== undefined && obj.readyAt > game.turn;
-        const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj);
+        const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj, fireFrame);
         this.drawStanding(name, o.x + x * cell, o.y + y * cell);
       }
       for (const a of actors) {
