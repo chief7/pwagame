@@ -262,7 +262,7 @@ export class Renderer {
         const frames = game.sailed && def.done ? def.done.frames : def.frames;
         // A picked plant shows its bare sprite, not its animation (picked glowcaps don't glow).
         const regrowing = obj.readyAt !== undefined && obj.readyAt > game.turn;
-        const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj);
+        const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj, fireFrame);
         this.drawStanding(name, o.x + x * cell, o.y + y * cell);
       }
       for (const a of actors) {

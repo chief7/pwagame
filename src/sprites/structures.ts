@@ -69,18 +69,34 @@ export function leanTo(): Sprite {
   return s.outline().shadow(10, 19, 9, 1.2);
 }
 
-/** Wooden hut with a thatched roof: the best home on the island. */
-export function hut(): Sprite {
-  const s = new Sprite('hut', 24, 28);
+/** Rooms a hut can grow: a workshop shed, a hearth (chimney) and a rain barrel. */
+export type HutRoom = 'workshop' | 'hearth' | 'barrel';
+export const HUT_ROOMS: HutRoom[] = ['workshop', 'hearth', 'barrel'];
+
+/** Sprite name of a hut with these rooms, e.g. `hut`, `hut_workshop_barrel`; a hearth smokes in two frames. */
+export function hutSpriteName(rooms: readonly HutRoom[], frame: 0 | 1 = 0): string {
+  const parts = HUT_ROOMS.filter((r) => rooms.includes(r));
+  return ['hut', ...parts].join('_') + (frame && parts.includes('hearth') ? '_2' : '');
+}
+
+/** The hut itself: plank walls on a stone footing, a door, a lit window and a thatched roof. */
+function drawHut(s: Sprite): void {
   // Plank walls.
-  for (let y = 14; y <= 26; y++) {
+  for (let y = 14; y <= 24; y++) {
     for (let x = 4; x <= 19; x++) {
       const seam = (y - 14) % 3 === 2;
       s.set(x, y, seam ? P.woodDark : x < 7 ? P.woodLight : x > 17 ? P.woodDark : P.wood);
     }
   }
+  // Stone footing.
+  for (let y = 25; y <= 26; y++) {
+    for (let x = 3; x <= 20; x++) {
+      const joint = (x + (y === 25 ? 0 : 2)) % 4 === 0;
+      s.set(x, y, joint ? P.stoneDark : y === 25 && x < 10 ? P.stoneLight : hash2(x, y, 74) < 0.3 ? P.stoneDark : P.stone);
+    }
+  }
   // Door and window.
-  for (let y = 18; y <= 26; y++) for (let x = 10; x <= 13; x++) s.set(x, y, y === 18 || x === 10 ? P.woodDeep : P.interior);
+  for (let y = 18; y <= 25; y++) for (let x = 10; x <= 13; x++) s.set(x, y, y === 18 || x === 10 ? P.woodDeep : P.interior);
   s.set(13, 22, P.gold);
   for (let y = 17; y <= 19; y++) for (let x = 15; x <= 17; x++) s.set(x, y, x === 16 || y === 18 ? P.woodDeep : P.flame);
   // Thatched roof overhanging the walls.
@@ -96,7 +112,80 @@ export function hut(): Sprite {
       s.set(x, y, c);
     }
   }
-  return s.outline().shadow(12, 27, 10, 1.3);
+}
+
+/** A workbench under a plank awning against the left wall, with a log on it. */
+function drawWorkshopShed(s: Sprite): void {
+  // Shade under the awning, so the bench stands out from the wall.
+  for (let y = 20; y <= 26; y++) for (let x = 1; x <= 6; x++) s.set(x, y, P.interior);
+  // Awning posts.
+  for (let y = 19; y <= 26; y++) {
+    s.set(0, y, P.woodDark);
+    s.set(7, y, P.woodDark);
+  }
+  // Plank roof sloping down to the left.
+  for (let x = 0; x <= 8; x++) {
+    const top = 16 + Math.floor((8 - x) / 3);
+    for (let y = top; y <= 19; y++) s.set(x, y, y === top ? P.woodLight : y === 19 ? P.woodDeep : P.wood);
+  }
+  // Bench top and legs.
+  for (let x = 1; x <= 6; x++) s.set(x, 23, x === 1 ? P.woodCut : P.woodLight);
+  for (let x = 1; x <= 6; x++) s.set(x, 24, P.woodDark);
+  for (let y = 25; y <= 26; y++) {
+    s.set(2, y, P.woodDeep);
+    s.set(5, y, P.woodDeep);
+  }
+  // A log on the bench, cut end showing.
+  for (let x = 2; x <= 5; x++) s.set(x, 22, P.wood);
+  s.set(2, 22, P.woodCut);
+  s.set(3, 21, P.woodLight);
+  s.set(4, 21, P.wood);
+}
+
+/** A stone chimney through the roof, with a puff of smoke that drifts in two frames. */
+function drawChimney(s: Sprite, frame: 0 | 1): void {
+  for (let y = 3; y <= 9; y++) {
+    for (let x = 16; x <= 18; x++) {
+      const joint = (y + (x === 17 ? 1 : 0)) % 3 === 0;
+      s.set(x, y, y === 3 ? P.stoneDeep : joint ? P.stoneDark : x === 16 ? P.stoneLight : P.stone);
+    }
+  }
+  // A small cloud: a 2×2 puff with a wisp that moves up and right.
+  const [px, py] = frame === 0 ? [17, 1] : [18, 0];
+  for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, frame === 0 ? -1 : 0]]) s.set(px + dx, py + dy, P.steam);
+}
+
+/** A rain barrel at the front right corner, full to the brim. */
+function drawRainBarrel(s: Sprite): void {
+  for (let y = 21; y <= 26; y++) {
+    for (let x = 18; x <= 22; x++) {
+      const hoop = y === 22 || y === 25;
+      s.set(x, y, hoop ? (x === 18 ? P.hoopLight : P.hoop) : x === 18 ? P.woodLight : x === 22 ? P.woodDark : P.wood);
+    }
+  }
+  for (let x = 18; x <= 22; x++) s.set(x, 20, x === 18 || x === 22 ? P.woodDark : P.waterShallow);
+  s.set(19, 20, P.waterGlint);
+}
+
+/** Wooden hut with a thatched roof, and the rooms built onto it: the best home on the island. */
+export function hut(rooms: readonly HutRoom[] = [], frame: 0 | 1 = 0): Sprite {
+  const s = new Sprite(hutSpriteName(rooms, frame), 24, 28);
+  drawHut(s);
+  if (rooms.includes('hearth')) drawChimney(s, frame);
+  if (rooms.includes('workshop')) drawWorkshopShed(s);
+  if (rooms.includes('barrel')) drawRainBarrel(s);
+  return s.outline().shadow(12, 27, 11, 1.3);
+}
+
+/** Every hut sprite: each set of rooms, with the second smoke frame where there is a hearth. */
+export function huts(): Sprite[] {
+  const out: Sprite[] = [];
+  for (let mask = 0; mask < 1 << HUT_ROOMS.length; mask++) {
+    const rooms = HUT_ROOMS.filter((_, i) => mask & (1 << i));
+    out.push(hut(rooms));
+    if (rooms.includes('hearth')) out.push(hut(rooms, 1));
+  }
+  return out;
 }
 
 /**

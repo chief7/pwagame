@@ -56,11 +56,22 @@ export interface WikiWords {
   warmth: {
     title: string;
     paras: string[];
-    cols: { place: string; target: string; sleep: string };
+    cols: { place: string; target: string; rest: string; sleep: string };
     open: string;
     cave: string;
     fire: string;
     tip: string;
+  };
+  camp: {
+    title: string;
+    paras: string[];
+    hutCost: string;
+    roomsTitle: string;
+    roomsIntro: string;
+    cols: { room: string; cost: string; effect: string };
+    workshop: (extra: number) => string;
+    hearth: (bed: number, hearth: number) => string;
+    barrel: (water: number) => string;
   };
   gather: {
     title: string;
@@ -163,7 +174,7 @@ const en: WikiWords = {
       '**Gather.** Walk into palms, bushes, logs and pebbles. Palms give coconuts (food and drink) and big leaves.',
       '**Drink.** Find a spring. Coconuts also give water, but the sea is too salty.',
       '**Build a campfire** (3 wood, 2 stones) before dark. It keeps you warm and lights the night.',
-      '**Build a shelter.** A lean-to is cheap; a hut is the best, but it needs logs, and logs need the stone axe. Sleep in it, and it becomes your home.',
+      '**Build a shelter.** A lean-to is cheap and quick. Sleep in it, and it becomes your home. Later, build a hut: your camp. It needs logs, and logs need the stone axe.',
       '**Sleep at night.** Nights are dark and cold. Sleep in your shelter next to your fire.',
       '**Grow.** Everything you gather and build gives XP. Spend skill points on skills, and learn the fishing rod first.',
     ],
@@ -174,10 +185,10 @@ const en: WikiWords = {
     fill: 'Fills up',
     drain: 'Goes down',
     cards: {
-      health: { fill: 'Slowly, while Food and Water are both above 50 and no need is empty. Twice as fast while you sleep.', drain: 'When another need is empty, and when wild animals hurt you.' },
+      health: { fill: 'Slowly, while Food and Water are both above 50 and no need is empty. Faster while you sleep, fastest in the hut bed.', drain: 'When another need is empty, and when wild animals hurt you.' },
       food: { fill: 'When you eat. Open the Bag and tap Eat.', drain: 'All the time: about 108 in a full day, half that while you sleep.' },
       water: { fill: 'At a spring or the river (+35 each sip), and from coconuts, apples and berries.', drain: 'As fast as Food.' },
-      energy: { fill: 'When you sleep. A shelter makes sleep much faster.', drain: 'Slowly while you are awake (about 60 in a day). Climbing ladders and ropes costs a little too.' },
+      energy: { fill: 'When you sleep. Only the bed in your hut fills it all the way.', drain: 'Slowly while you are awake (about 60 in a day). Climbing ladders and ropes costs a little too.' },
       warmth: { fill: 'Next to a campfire, in a shelter or a cave, and in the daylight.', drain: 'At night out in the open, and on snow even in the day.' },
     },
     foodTitle: 'Food and drink',
@@ -211,13 +222,28 @@ const en: WikiWords = {
     title: 'Warmth, fire and shelter',
     paras: [
       'Warmth always moves towards a target. The target depends on where you stand and how dark it is. It rises fast (+1.5 each turn) and falls slowly (−0.6 each turn).',
-      'Within 2 cells of a campfire, the target is always 100. A shelter also makes your sleep faster: the table shows the time to sleep from Energy 20 to 100.',
+      'Within 2 cells of a campfire, the target is always 100.',
+      'Where you sleep also matters. Only the **bed in your hut** gives a full rest. Everywhere else, you wake up when your Energy reaches the place’s limit. A shelter also makes sleep faster.',
     ],
-    cols: { place: 'Where you are', target: 'Warmth at night', sleep: 'Sleep 20 → 100 Energy' },
+    cols: { place: 'Where you are', target: 'Warmth at night', rest: 'Sleep fills Energy up to', sleep: 'Time from Energy 20' },
     open: 'Open ground',
     cave: 'Cave',
     fire: 'Next to a campfire',
     tip: 'On the snow of island 2 it is cold even in the day: open snow goes to 60 Warmth by day and to 0 at night. Bring wood for a fire.',
+  },
+  camp: {
+    title: 'Your camp: the hut and its rooms',
+    paras: [
+      'The hut is big work, and each island has only one. It is your **camp**: walk into it to go inside. The Hut panel shows the bed, the map wall and the rooms.',
+      'The **bed** is the only place for a full rest, and Health comes back faster while you sleep in it. With the Cartographer skill, your map hangs on the wall.',
+    ],
+    hutCost: 'The hut costs',
+    roomsTitle: 'Rooms',
+    roomsIntro: 'From inside the hut, add rooms. Each room gives 1 XP for each item it costs, and you can see it on the hut from outside.',
+    cols: { room: 'Room', cost: 'Costs', effect: 'What it does' },
+    workshop: (extra) => `With the Rope maker skill, 2 leaves give ${2 + extra} ropes here.`,
+    hearth: (bed, hearth) => `A fire on the hut’s own cell: cook fish there (also with the grill button), and it lights the night round the hut. Health comes back ${hearth}× as fast in your sleep, not ${bed}×.`,
+    barrel: (water) => `Drink rain water from the barrel in the Hut panel: +${water} Water.`,
   },
   gather: {
     title: 'Gathering',
@@ -251,7 +277,7 @@ const en: WikiWords = {
   },
   build: {
     title: 'Building',
-    intro: 'Open the Build panel. It lists every recipe and shows what you still need. Building gives 1 XP for each item it costs (a hut gives 22 XP).',
+    intro: 'Open the Build panel. It lists every recipe and shows what you still need. Building gives 1 XP for each item it costs (a campfire gives 5 XP).',
     cols: { what: 'What', cost: 'Costs', note: 'Good to know' },
     skill: (name) => `Learn the skill “${name}” first.`,
     atFire: 'Stand next to a campfire.',
@@ -267,7 +293,7 @@ const en: WikiWords = {
     xpTitle: 'How you earn XP',
     xpRows: [
       '**Gather** from a plant, a rock or a chest: 1 XP.',
-      '**Build or make** a recipe: 1 XP for each item it costs (campfire 5, hut 22, cook a fish 1).',
+      '**Build or make** a recipe, or add a room to your hut: 1 XP for each item it costs (campfire 5, cook a fish 1).',
       '**Catch a fish**: 2 XP.',
       '**Give an item** to the island goal: 1 XP for each item.',
       '**Earn an island star**: 5 XP.',
@@ -285,9 +311,9 @@ const en: WikiWords = {
     cost: (n) => `${n} ${n === 1 ? 'point' : 'points'}`,
     combo: {
       fishing_rod: 'The most important skill: fish is the best food, and the boat needs 3 cooked fish.',
-      handy_builder: 'Every recipe with wood costs 1 less: campfires, shelters, bridges, ladders.',
-      rope_maker: 'The goals need a lot of rope (9 on island 1, 4 on island 2, plus ladders and climbing ropes). This halves the leaves.',
-      cartographer: 'Needs a hut. The map shows huts, campfires, springs, the goal, the deep caves you found and where you saw cave bears.',
+      handy_builder: 'Every recipe and hut room with wood costs 1 less: campfires, shelters, bridges, ladders.',
+      rope_maker: 'The goals and the hut need a lot of rope. This halves the leaves. In a hut with a workshop, 2 leaves give 3 ropes.',
+      cartographer: 'The map hangs on the wall of your hut. It shows huts, campfires, springs, the goal, the deep caves you found and where you saw cave bears.',
       small_sips: 'Good for long trips far from springs.',
       thick_skin: 'Helps on the cold snow of island 2.',
       night_eyes: 'You see up to 2 cells further at night.',
@@ -359,7 +385,7 @@ const en: WikiWords = {
     chains: [
       { title: 'From fish to a full tummy', steps: ['Earn 10 XP', 'Learn “Fishing rod”', 'Make a fishing rod', 'Walk into the sea to fish', 'Cook the fish at a campfire', 'Best food, and supplies for the boat'] },
       { title: 'Opening up the island', steps: ['Wood, stones, a leaf', 'Make a stone axe', 'Chop through the brambles', 'Chop logs from trees', 'Build a bridge', 'Reach the far side and the boat'] },
-      { title: 'A warm, safe home', steps: ['Campfire by your camp', 'Lean-to, then a hut', 'Sleep there: it becomes home', 'Warm nights, fast sleep', 'You wake up here after fainting', 'Cartographer: a map on the hut wall'] },
+      { title: 'A warm, safe home', steps: ['Campfire and lean-to', 'Collect for the hut (logs and rope)', 'Build the hut: your camp', 'Full rest in its bed', 'Add a workshop, hearth and rain barrel', 'Cook, drink and heal at home'] },
       { title: 'Rope for the goals', steps: ['Gather big leaves', 'Twist rope (2 leaves)', 'Rope maker: 2 ropes for 2 leaves', 'Mast, sail and beacon', 'Ladders and climbing ropes'] },
       { title: 'Into the deep caves', steps: ['Find a cave in the rocky hills', 'It is dark inside, even in the day', 'Pick glowcaps: food with lots of Energy', 'Break off crystals', 'Make a crystal lantern', 'See further in caves and at night'] },
       { title: 'Staying safe from wild animals', steps: ['Eat and drink well (above 50)', 'Health comes back', 'Wild sense shows danger', 'Animal friend: they notice you later', 'Your dog barks snakes away'] },
@@ -368,7 +394,8 @@ const en: WikiWords = {
   tips: {
     title: 'Tips',
     list: [
-      'Build your camp near a spring, and put the campfire next to your shelter.',
+      'Build your first camp near a spring, and put the campfire next to your shelter.',
+      'Choose the place for your hut well: you can build only one on each island. Near the coast is good for fishing.',
       'Keep some coconuts or apples in your bag for long trips: they give food and water.',
       'Give the goal what you have whenever you pass it. It remembers what it already got.',
       'Learn “Fishing rod” with your first skill point.',
@@ -404,7 +431,7 @@ const de: WikiWords = {
       '**Sammle.** Lauf gegen Palmen, Büsche, Baumstämme und Kiesel. Palmen geben Kokosnüsse (Essen und Trinken) und große Blätter.',
       '**Trink.** Such eine Quelle. Kokosnüsse geben auch Wasser, aber das Meer ist zu salzig.',
       '**Bau ein Lagerfeuer** (3 Holz, 2 Steine), bevor es dunkel wird. Es hält dich warm und macht die Nacht hell.',
-      '**Bau einen Unterschlupf.** Ein Unterstand ist billig, eine Hütte ist am besten. Für sie brauchst du Holzstämme, und dafür die Steinaxt. Schlaf darin, dann wird er dein Zuhause.',
+      '**Bau einen Unterschlupf.** Ein Unterstand ist billig und schnell gebaut. Schlaf darin, dann wird er dein Zuhause. Später baust du eine Hütte: dein Lager. Für sie brauchst du Holzstämme, und dafür die Steinaxt.',
       '**Schlaf in der Nacht.** Nächte sind dunkel und kalt. Schlaf in deinem Unterschlupf neben deinem Feuer.',
       '**Werde besser.** Alles, was du sammelst und baust, gibt EP. Gib Talentpunkte für Talente aus. Lerne zuerst die Angelrute.',
     ],
@@ -415,10 +442,10 @@ const de: WikiWords = {
     fill: 'Steigt',
     drain: 'Sinkt',
     cards: {
-      health: { fill: 'Langsam, solange Essen und Wasser beide über 50 sind und nichts leer ist. Im Schlaf doppelt so schnell.', drain: 'Wenn ein anderes Bedürfnis leer ist, und wenn wilde Tiere dir wehtun.' },
+      health: { fill: 'Langsam, solange Essen und Wasser beide über 50 sind und nichts leer ist. Im Schlaf schneller, im Bett der Hütte am schnellsten.', drain: 'Wenn ein anderes Bedürfnis leer ist, und wenn wilde Tiere dir wehtun.' },
       food: { fill: 'Wenn du isst. Öffne die Tasche und tippe auf Essen.', drain: 'Die ganze Zeit: etwa 108 an einem ganzen Tag, im Schlaf nur halb so viel.' },
       water: { fill: 'An einer Quelle oder am Fluss (+35 je Schluck) und durch Kokosnüsse, Äpfel und Beeren.', drain: 'So schnell wie Essen.' },
-      energy: { fill: 'Wenn du schläfst. Ein Unterschlupf macht den Schlaf viel schneller.', drain: 'Langsam, solange du wach bist (etwa 60 am Tag). Klettern an Leitern und Seilen kostet auch etwas.' },
+      energy: { fill: 'Wenn du schläfst. Nur das Bett in deiner Hütte füllt sie ganz.', drain: 'Langsam, solange du wach bist (etwa 60 am Tag). Klettern an Leitern und Seilen kostet auch etwas.' },
       warmth: { fill: 'Neben einem Lagerfeuer, in einem Unterschlupf oder einer Höhle und bei Tageslicht.', drain: 'Nachts im Freien, und auf Schnee auch am Tag.' },
     },
     foodTitle: 'Essen und Trinken',
@@ -452,13 +479,28 @@ const de: WikiWords = {
     title: 'Wärme, Feuer und Unterschlupf',
     paras: [
       'Wärme bewegt sich immer auf ein Ziel zu. Das Ziel hängt davon ab, wo du stehst und wie dunkel es ist. Sie steigt schnell (+1,5 je Zug) und sinkt langsam (−0,6 je Zug).',
-      'Bis 2 Felder neben einem Lagerfeuer ist das Ziel immer 100. Ein Unterschlupf macht auch deinen Schlaf schneller: Die Tabelle zeigt, wie lange du von 20 auf 100 Energie schläfst.',
+      'Bis 2 Felder neben einem Lagerfeuer ist das Ziel immer 100.',
+      'Auch wo du schläfst, ist wichtig. Nur das **Bett in deiner Hütte** lässt dich ganz ausschlafen. Überall sonst wachst du auf, wenn deine Energie die Grenze des Ortes erreicht. Ein Unterschlupf macht den Schlaf auch schneller.',
     ],
-    cols: { place: 'Wo du bist', target: 'Wärme in der Nacht', sleep: 'Schlaf 20 → 100 Energie' },
+    cols: { place: 'Wo du bist', target: 'Wärme in der Nacht', rest: 'Schlaf füllt Energie bis', sleep: 'Dauer ab Energie 20' },
     open: 'Im Freien',
     cave: 'Höhle',
     fire: 'Neben einem Lagerfeuer',
     tip: 'Auf dem Schnee von Insel 2 ist es auch am Tag kalt: Auf offenem Schnee sinkt die Wärme am Tag auf 60 und nachts auf 0. Nimm Holz für ein Feuer mit.',
+  },
+  camp: {
+    title: 'Dein Lager: die Hütte und ihre Räume',
+    paras: [
+      'Die Hütte ist viel Arbeit, und auf jeder Insel gibt es nur eine. Sie ist dein **Lager**: Lauf hinein, um sie zu betreten. Das Hütten-Fenster zeigt das Bett, die Kartenwand und die Räume.',
+      'Nur im **Bett** schläfst du dich ganz aus, und dort kommt dein Leben im Schlaf schneller zurück. Mit dem Talent Kartograf hängt deine Karte an der Wand.',
+    ],
+    hutCost: 'Die Hütte kostet',
+    roomsTitle: 'Räume',
+    roomsIntro: 'In der Hütte baust du Räume an. Jeder Raum gibt 1 EP für jedes Teil, das er kostet, und du siehst ihn von außen an der Hütte.',
+    cols: { room: 'Raum', cost: 'Kostet', effect: 'Was er tut' },
+    workshop: (extra) => `Mit dem Talent Seilmacher geben 2 Blätter hier ${2 + extra} Seile.`,
+    hearth: (bed, hearth) => `Ein Feuer in der Hütte: Brate dort Fisch (auch mit dem Grill-Knopf), und es macht die Nacht um die Hütte hell. Im Schlaf kommt dein Leben ${hearth}-mal so schnell zurück, nicht nur ${bed}-mal.`,
+    barrel: (water) => `Trink im Hütten-Fenster aus der Tonne: +${water} Wasser.`,
   },
   gather: {
     title: 'Sammeln',
@@ -492,7 +534,7 @@ const de: WikiWords = {
   },
   build: {
     title: 'Bauen',
-    intro: 'Öffne das Bauen-Fenster. Es zeigt jedes Rezept und was dir noch fehlt. Bauen gibt 1 EP für jedes Teil, das es kostet (eine Hütte gibt 22 EP).',
+    intro: 'Öffne das Bauen-Fenster. Es zeigt jedes Rezept und was dir noch fehlt. Bauen gibt 1 EP für jedes Teil, das es kostet (ein Lagerfeuer gibt 5 EP).',
     cols: { what: 'Was', cost: 'Kostet', note: 'Gut zu wissen' },
     skill: (name) => `Lerne zuerst das Talent „${name}“.`,
     atFire: 'Stell dich neben ein Lagerfeuer.',
@@ -508,7 +550,7 @@ const de: WikiWords = {
     xpTitle: 'So bekommst du EP',
     xpRows: [
       '**Sammeln** an einer Pflanze, einem Stein oder einer Truhe: 1 EP.',
-      '**Bauen** eines Rezepts: 1 EP für jedes Teil, das es kostet (Lagerfeuer 5, Hütte 22, Fisch braten 1).',
+      '**Bauen** eines Rezepts oder eines Raums in der Hütte: 1 EP für jedes Teil, das es kostet (Lagerfeuer 5, Fisch braten 1).',
       '**Einen Fisch fangen**: 2 EP.',
       '**Dem Inselziel etwas geben**: 1 EP für jedes Teil.',
       '**Einen Inselstern verdienen**: 5 EP.',
@@ -526,9 +568,9 @@ const de: WikiWords = {
     cost: (n) => `${n} ${n === 1 ? 'Punkt' : 'Punkte'}`,
     combo: {
       fishing_rod: 'Das wichtigste Talent: Fisch ist das beste Essen, und das Boot braucht 3 gebratene Fische.',
-      handy_builder: 'Jedes Rezept mit Holz kostet 1 weniger: Lagerfeuer, Unterschlupf, Brücken, Leitern.',
-      rope_maker: 'Die Inselziele brauchen viele Seile (9 auf Insel 1, 4 auf Insel 2, dazu Leitern und Kletterseile). So brauchst du nur halb so viele Blätter.',
-      cartographer: 'Braucht eine Hütte. Die Karte zeigt Hütten, Lagerfeuer, Quellen, das Ziel, die tiefen Höhlen, die du gefunden hast, und wo du Höhlenbären gesehen hast.',
+      handy_builder: 'Jedes Rezept und jeder Hüttenraum mit Holz kostet 1 weniger: Lagerfeuer, Unterschlupf, Brücken, Leitern.',
+      rope_maker: 'Die Inselziele und die Hütte brauchen viele Seile. So brauchst du nur halb so viele Blätter. In einer Hütte mit Werkstatt geben 2 Blätter 3 Seile.',
+      cartographer: 'Die Karte hängt an der Wand deiner Hütte. Sie zeigt Hütten, Lagerfeuer, Quellen, das Ziel, die tiefen Höhlen, die du gefunden hast, und wo du Höhlenbären gesehen hast.',
       small_sips: 'Gut für lange Wege weit weg von Quellen.',
       thick_skin: 'Hilft auf dem kalten Schnee von Insel 2.',
       night_eyes: 'Du siehst nachts bis zu 2 Felder weiter.',
@@ -600,7 +642,7 @@ const de: WikiWords = {
     chains: [
       { title: 'Vom Fisch zum vollen Bauch', steps: ['10 EP sammeln', 'Talent „Angelrute“ lernen', 'Angelrute bauen', 'Ins Meer laufen und angeln', 'Fisch am Lagerfeuer braten', 'Bestes Essen und Vorräte für das Boot'] },
       { title: 'Die Insel öffnen', steps: ['Holz, Steine, ein Blatt', 'Steinaxt bauen', 'Durch das Dornengestrüpp', 'Holzstämme von Bäumen schlagen', 'Brücke bauen', 'Zur anderen Seite und zum Boot'] },
-      { title: 'Ein warmes, sicheres Zuhause', steps: ['Lagerfeuer beim Lager', 'Unterstand, dann Hütte', 'Dort schlafen: Es wird dein Zuhause', 'Warme Nächte, schneller Schlaf', 'Hier wachst du nach einer Ohnmacht auf', 'Kartograf: eine Karte an der Hüttenwand'] },
+      { title: 'Ein warmes, sicheres Zuhause', steps: ['Lagerfeuer und Unterstand', 'Für die Hütte sammeln (Holzstämme und Seile)', 'Hütte bauen: dein Lager', 'Im Bett ganz ausschlafen', 'Werkstatt, Kamin und Regentonne anbauen', 'Zu Hause braten, trinken und heilen'] },
       { title: 'Seile für die Inselziele', steps: ['Große Blätter sammeln', 'Seil drehen (2 Blätter)', 'Seilmacher: 2 Seile für 2 Blätter', 'Mast, Segel und Leuchtfeuer', 'Leitern und Kletterseile'] },
       { title: 'In die tiefen Höhlen', steps: ['Finde eine Höhle in den Felshügeln', 'Drinnen ist es dunkel, auch am Tag', 'Pflück Leuchtpilze: Essen mit viel Energie', 'Brich Kristalle ab', 'Bau eine Kristalllaterne', 'Sieh weiter in Höhlen und nachts'] },
       { title: 'Sicher vor wilden Tieren', steps: ['Gut essen und trinken (über 50)', 'Leben kommt zurück', 'Spürsinn zeigt die Gefahr', 'Tierfreund: Sie bemerken dich später', 'Dein Hund verbellt Schlangen'] },
@@ -609,7 +651,8 @@ const de: WikiWords = {
   tips: {
     title: 'Tipps',
     list: [
-      'Bau dein Lager nahe an einer Quelle, und stell das Lagerfeuer neben deinen Unterschlupf.',
+      'Bau dein erstes Lager nahe an einer Quelle, und stell das Lagerfeuer neben deinen Unterschlupf.',
+      'Wähl den Platz für deine Hütte gut: Auf jeder Insel kannst du nur eine bauen. Nahe an der Küste kannst du gut angeln.',
       'Nimm für lange Wege Kokosnüsse oder Äpfel mit: Sie geben Essen und Wasser.',
       'Gib dem Ziel, was du hast, wann immer du vorbeikommst. Es merkt sich, was es schon bekommen hat.',
       'Lerne mit deinem ersten Talentpunkt die „Angelrute“.',

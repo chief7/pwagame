@@ -3,6 +3,7 @@ import { ITEMS, type ItemId } from './game/defs/items';
 import { LEVELS, levelDef, nextLevel } from './game/defs/levels';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
+import { ROOM_IDS, type RoomId } from './game/defs/rooms';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
 import { Game, type SaveData } from './game/game';
 import { Tile } from './game/map';
@@ -26,9 +27,18 @@ const TRAVEL_STEP_MS = STEP_MS;
 /** Between animations the scene still redraws for the sea, fire and idle bobbing. */
 const AMBIENT_FRAME_MS = 100;
 const SAVE_DELAY_MS = 800;
-const BODY_KEY = 'pwagame.body';
-const LANG_KEY = 'pwagame.lang';
-const SAVE_KEY = 'pwagame.save';
+/**
+ * A preview build (VITE_PREVIEW=<name>, served next to the main game on the
+ * same site) keeps its own save and has no service worker, so it never
+ * touches the main game's save or offline cache.
+ */
+const PREVIEW: string = import.meta.env.VITE_PREVIEW ?? '';
+const STORE = PREVIEW ? `pwagame-${PREVIEW}` : 'pwagame';
+const BODY_KEY = `${STORE}.body`;
+const LANG_KEY = `${STORE}.lang`;
+const SAVE_KEY = `${STORE}.save`;
+
+if (PREVIEW) document.title = `pwagame · ${PREVIEW}`;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -53,7 +63,7 @@ const ui = {
   build: $<HTMLButtonElement>('btn-build'),
   skills: $<HTMLButtonElement>('btn-skills'),
   sleep: $<HTMLButtonElement>('btn-sleep'),
-  map: $<HTMLButtonElement>('btn-map'),
+  hut: $<HTMLButtonElement>('btn-hut'),
   grill: $<HTMLButtonElement>('btn-grill'),
   sheet: $('sheet'),
   sheetTitle: $('sheet-title'),
@@ -199,7 +209,9 @@ function updateHud(): void {
   const tide = game.tideKnown() ? ` · ${game.lowTide ? words.ui.lowTide : words.ui.highTide}` : '';
   ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}${tide}`;
   const obj = game.objectAt(x, y);
-  ui.shelter.textContent = game.nearFire(x, y)
+  ui.shelter.textContent = game.hutHere()
+    ? words.ui.inShelter('hut')
+    : game.nearFire(x, y)
     ? words.ui.byFire
     : obj && OBJECTS[obj.kind].shelter
       ? words.ui.inShelter(obj.kind)
@@ -217,7 +229,7 @@ function updateHud(): void {
     }),
   );
   updateSkillsButton();
-  updateMapButton();
+  updateHutButton();
   if (!ui.sheet.hidden) renderSheet();
 }
 
@@ -231,13 +243,14 @@ function updateSkillsButton(): void {
   ui.skills.setAttribute('aria-label', points > 0 ? `${t().ui.skills}: ${t().ui.skillPoints(points)}` : t().ui.skills);
 }
 
-/** The Map button shows only in a hut, once you are a Cartographer. */
-const mapIcon = ui.map.querySelector('img')!;
-function updateMapButton(): void {
-  ui.map.hidden = !game.canReadMap();
-  if (ui.map.hidden) return;
-  const src = icon('ui_map');
-  if (mapIcon.getAttribute('src') !== src) mapIcon.src = src;
+/** The Hut button shows while the explorer stands in a hut: it opens the inside. */
+const hutIcon = ui.hut.querySelector('img')!;
+function updateHutButton(): void {
+  const hut = game.hutHere();
+  ui.hut.hidden = !hut;
+  if (!hut) return;
+  const src = icon(game.objectSprite(hut));
+  if (hutIcon.getAttribute('src') !== src) hutIcon.src = src;
 }
 
 // ---- Render loop ------------------------------------------------------------------
@@ -270,6 +283,8 @@ function afterTurn(): void {
   saveSoon();
   // Walking into the finished boat asks whether to leave (or shows the end again).
   if (game.takeSailRequest()) openSheet(game.sailed ? 'end' : 'sail');
+  // Walking into the hut goes inside.
+  if (game.takeHutRequest()) openSheet('hut');
 }
 
 function run(cmd: Command): void {
@@ -282,6 +297,7 @@ function run(cmd: Command): void {
     case 'build': openSheet('build'); return;
     case 'skills': openSheet('skills'); return;
     case 'map': if (game.canReadMap()) openSheet('map'); return;
+    case 'hut': if (game.hutHere()) openSheet('hut'); return;
     case 'grill': grill(); return;
   }
   afterTurn();
@@ -337,8 +353,10 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'sail' | 'end';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'sail' | 'end';
 let sheetKind: SheetKind = 'bag';
+/** Flickers the hearth in the Hut panel while it is open. */
+let hearthTimer: number | undefined;
 /** The footer button that waits for a second tap before it starts over. */
 let confirming: 'island' | 'reset' | 'keep' | null = null;
 const icons = new Map<string, string>();
@@ -359,6 +377,7 @@ function openSheet(kind: SheetKind): void {
 
 function closeSheet(): void {
   ui.sheet.hidden = true;
+  clearInterval(hearthTimer);
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}, children: (Node | string)[] = []) {
@@ -378,10 +397,13 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
-  if (sheetKind === 'sail' || sheetKind === 'end') {
+  clearInterval(hearthTimer);
+  if (sheetKind === 'hut') {
+    renderHut(rows);
+  } else if (sheetKind === 'sail' || sheetKind === 'end') {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
     renderSkills(rows);
@@ -440,8 +462,12 @@ function renderSheet(): void {
       const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
-      if (problem && (problem.key === 'needSkill' || problem.key === 'needFire')) {
+      if (problem && (problem.key === 'needSkill' || problem.key === 'needFire' || problem.key === 'oneHut')) {
         note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
+      }
+      // The map on the hut wall needs the Cartographer skill: say so before the hut is built.
+      if (id === 'hut' && !game.hasHut() && !game.has('cartographer')) {
+        note.append(el('span', { className: 'row-note goal-hint', textContent: words.ui.hutMapRemark }));
       }
       rows.append(row(icon('builds' in recipe ? recipe.builds : `item_${recipe.makes}`), name, note, button));
     }
@@ -641,6 +667,120 @@ function renderVoyage(rows: HTMLElement): void {
   rows.append(foot);
 }
 
+// ---- The hut, inside ---------------------------------------------------------------
+//
+// The rooms stand side by side as one picture; under it, what each room is
+// for, and the rooms still to add.
+
+const HEARTH_FRAME_MS = 220;
+const bakedRooms = new Map<string, HTMLCanvasElement>();
+
+/** Sprite of a room inside the hut (frame 1 is the hearth's second flame). */
+function roomSprite(room: RoomId | 'main', frame = 0): string {
+  if (room === 'main') return game.canReadMap() ? 'room_main_map' : 'room_main';
+  return room === 'hearth' && frame % 2 ? 'room_hearth_2' : `room_${room}`;
+}
+
+/** Act from inside the hut: a turn passes, and the panel shows the result. */
+function hutAction(act: () => boolean): void {
+  // Either way the HUD update draws the panel again.
+  if (act()) afterTurn();
+  else updateHud();
+}
+
+function renderHut(rows: HTMLElement): void {
+  const words = t();
+  const hut = game.hutHere();
+  if (!hut) {
+    rows.append(el('p', { className: 'empty', textContent: words.message({ key: 'notInHut' }) }));
+    return;
+  }
+  const built = ROOM_IDS.filter((r) => hut.rooms?.includes(r));
+  rows.append(hutScene(['main', ...built]));
+
+  const button = (label: string, action: () => boolean, disabled = false) => {
+    const b = el('button', { type: 'button', textContent: label, disabled, className: disabled ? '' : 'primary' });
+    b.addEventListener('click', () => hutAction(action));
+    return b;
+  };
+  const note = (...texts: string[]) => el('div', {}, texts.map((text) => el('span', { className: 'row-note', textContent: text })));
+
+  // The bed: a full night's rest.
+  const bed = el('button', { type: 'button', textContent: words.ui.sleep, className: 'primary' });
+  bed.addEventListener('click', () => {
+    closeSheet();
+    run({ type: 'sleep' });
+  });
+  rows.append(row(icon('room_main'), words.ui.bed, note(words.ui.bedNote), bed));
+
+  // The map on the wall, or the empty nail.
+  if (game.canReadMap()) {
+    const look = el('button', { type: 'button', textContent: words.ui.lookAtMap, className: 'primary' });
+    look.addEventListener('click', () => openSheet('map'));
+    rows.append(row(icon('ui_map'), words.ui.map, note(words.ui.mapNote), look));
+  } else {
+    const nail = row(icon('ui_map'), words.ui.map, el('span', { className: 'row-note locked', textContent: words.ui.noMap }));
+    nail.classList.add('learned');
+    rows.append(nail);
+  }
+
+  for (const room of built) {
+    const name = words.rooms[room].name;
+    if (room === 'workshop') {
+      const problem = game.buildProblem('rope');
+      rows.append(row(icon(roomSprite(room)), name, el('div', {}, [
+        el('span', { className: 'row-note', textContent: words.ui.workbenchNote(game.recipeMakes('rope')) }), costList(game.recipeCost('rope')),
+      ]), button(words.ui.makeRope, () => game.build('rope'), !!problem)));
+    } else if (room === 'hearth') {
+      const fish = game.inventory.count('fish');
+      rows.append(row(icon(roomSprite(room)), name, el('div', {}, [
+        el('span', { className: 'row-note', textContent: words.ui.hearthNote }), costList(game.recipeCost('cooked_fish')),
+      ]), button(words.ui.cook, () => game.build('cooked_fish'), fish === 0)));
+    } else {
+      rows.append(row(icon(roomSprite(room)), name, note(words.ui.barrelNote), button(words.ui.drink, () => game.drinkBarrel(), game.needs.water >= 98)));
+    }
+  }
+
+  const missing = ROOM_IDS.filter((r) => !built.includes(r));
+  if (missing.length) rows.append(el('h3', { className: 'path', textContent: words.ui.addRoom }));
+  for (const room of missing) {
+    const problem = game.roomProblem(room);
+    rows.append(row(icon(roomSprite(room)), words.rooms[room].name, el('div', {}, [
+      el('span', { className: 'row-note', textContent: words.rooms[room].description }), costList(game.roomCost(room)),
+    ]), button(words.ui.build, () => game.addRoom(room), !!problem)));
+  }
+}
+
+/** The rooms of the hut side by side, at the largest whole scale that fits; the hearth flickers. */
+function hutScene(rooms: (RoomId | 'main')[]): HTMLElement {
+  const dpr = window.devicePixelRatio || 1;
+  const first = renderer.sprite(roomSprite('main'))!;
+  const width = first.width * rooms.length;
+  const room = Math.max(ui.sheetBody.clientWidth, 200) * dpr;
+  const scale = Math.max(1, Math.floor(room / width));
+  const view = el('canvas', { width: width * scale, height: first.height * scale });
+  view.style.width = `${view.width / dpr}px`;
+  view.setAttribute('role', 'img');
+  view.setAttribute('aria-label', t().ui.yourHut);
+  const ctx = view.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  const draw = (frame: number) => {
+    rooms.forEach((r, i) => {
+      const name = roomSprite(r, frame);
+      const s = renderer.sprite(name);
+      if (!s) return;
+      if (!bakedRooms.has(name)) bakedRooms.set(name, bake(s));
+      ctx.drawImage(bakedRooms.get(name)!, i * first.width * scale, 0, s.width * scale, s.height * scale);
+    });
+  };
+  draw(0);
+  if (rooms.includes('hearth') && !anim.reducedMotion) {
+    let frame = 0;
+    hearthTimer = window.setInterval(() => draw(++frame), HEARTH_FRAME_MS);
+  }
+  return el('div', { className: 'hut-scene' }, [view]);
+}
+
 /** The Cartographer's map of the explored island, at the largest whole scale that fits. */
 function renderMap(rows: HTMLElement): void {
   const words = t();
@@ -737,7 +877,8 @@ function autoMove(step: () => boolean, delay: number): void {
     afterTurn();
     const surprise = game.visibleAnimals().some((a) => !seen.has(a.id));
     const warned = game.log.slice(logBefore).some((m) => m.tone === 'warn');
-    autoTimer = keepGoing && !surprise && !warned ? window.setTimeout(tick, delay) : undefined;
+    // A panel that opened on the way (walking into the hut) also stops the walk.
+    autoTimer = keepGoing && !surprise && !warned && ui.sheet.hidden ? window.setTimeout(tick, delay) : undefined;
   };
   tick();
 }
@@ -850,7 +991,7 @@ function tap(x: number, y: number): void {
 ui.bag.addEventListener('click', () => run({ type: 'bag' }));
 ui.build.addEventListener('click', () => run({ type: 'build' }));
 ui.skills.addEventListener('click', () => run({ type: 'skills' }));
-ui.map.addEventListener('click', () => run({ type: 'map' }));
+ui.hut.addEventListener('click', () => run({ type: 'hut' }));
 ui.grill.addEventListener('click', grill);
 ui.sleep.addEventListener('click', () => {
   stopAuto();
@@ -864,7 +1005,7 @@ new ResizeObserver(() => {
 
 applyLang();
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !PREVIEW) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch((err) => {
       console.warn('Service worker registration failed', err);
