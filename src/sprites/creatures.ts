@@ -771,3 +771,30 @@ export function caveItemIcons(): Sprite[] {
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) moved.set(x + 1, y + 2, lantern.get(x, y));
   return [glowcap, crystal, moved.outline()];
 }
+
+/** The pack frame: two poles with a bundle of logs lashed across them with leaf cord. */
+export function carryItemIcons(): Sprite[] {
+  const frame = new Sprite('item_pack_frame');
+  // Two upright poles that stick out above and below the load.
+  for (let y = 0; y <= 15; y++) {
+    frame.set(4, y, P.woodLight);
+    frame.set(5, y, P.wood);
+    frame.set(10, y, P.woodLight);
+    frame.set(11, y, P.wood);
+  }
+  // Three logs across the poles, cut ends to the right.
+  for (const cy of [4, 8, 12]) {
+    for (let x = 1; x <= 12; x++) {
+      frame.set(x, cy - 1, P.woodLight);
+      frame.set(x, cy, hash2(x, cy, 33) < 0.3 ? P.woodDark : P.wood);
+      frame.set(x, cy + 1, P.woodDeep);
+    }
+    frame.set(13, cy - 1, P.woodDark);
+    frame.set(13, cy, P.woodCut);
+    frame.set(14, cy, P.woodDark);
+    frame.set(13, cy + 1, P.woodDark);
+  }
+  // Cord round the poles and the load.
+  for (const x of [4, 10]) for (let y = 2; y <= 14; y++) if (y % 4 !== 0) frame.set(x + 1, y, P.strawLight);
+  return [frame.outline()];
+}

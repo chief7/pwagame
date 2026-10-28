@@ -711,3 +711,77 @@ export function balloon(): Sprite[] {
     balloonSprite('balloon_crashed', 'site'),
   ];
 }
+
+/** A big slatted crate with a rope handle and logs stacked on its lid: the camp store. */
+export function storeCrate(): Sprite {
+  const s = new Sprite('store_crate');
+  // Plank body between two corner posts.
+  for (let y = 6; y <= 14; y++) {
+    for (let x = 2; x <= 13; x++) {
+      const post = x <= 3 || x >= 12;
+      const seam = (y - 6) % 3 === 2;
+      const c = post ? (x === 2 ? P.woodLight : x === 13 ? P.woodDeep : P.woodDark)
+        : y === 6 ? P.woodLight
+        : seam ? P.woodDeep
+        : x < 6 ? P.woodLight
+        : hash2(x, y, 81) < 0.2 ? P.woodDark : P.wood;
+      s.set(x, y, c);
+    }
+  }
+  // A dark lid band and a rope handle on the front.
+  for (let x = 4; x <= 11; x++) s.set(x, 7, P.woodDeep);
+  for (const [x, y] of [[6, 10], [7, 11], [8, 11], [9, 10]]) s.set(x, y, P.strawLight);
+  // Two log ends and a stone on the lid.
+  for (const cx of [5, 9]) {
+    for (let y = 2; y <= 5; y++) {
+      for (let x = cx - 2; x <= cx + 2; x++) {
+        const d = Math.hypot(x + 0.5 - (cx + 0.5), y + 0.5 - 3.8);
+        if (d <= 2.2) s.set(x, y, d < 0.9 ? P.woodRing : d < 1.6 ? P.woodCut : P.woodDark);
+      }
+    }
+  }
+  for (const [x, y, c] of [[12, 4, P.stoneLight], [13, 4, P.stone], [12, 5, P.stone], [13, 5, P.stoneDark]] as const) s.set(x, y, c);
+  return s.outline().shadow(8, 15, 7, 1.2);
+}
+
+/** The frame of a hut going up: posts, rafters, half a floor and a pile of stones. */
+export function hutSite(): Sprite {
+  const s = new Sprite('hut_site', 24, 28);
+  // Plank walls, built higher on the left than on the right; the dark inside shows above them.
+  for (let x = 6; x <= 17; x++) {
+    const top = x <= 9 ? 16 : x <= 13 ? 19 : 22;
+    for (let y = 12; y < top; y++) s.set(x, y, P.interior);
+    for (let y = top; y <= 26; y++) {
+      const seam = (y - 14) % 3 === 2;
+      s.set(x, y, y === top ? P.woodLight : seam ? P.woodDark : x < 8 ? P.woodLight : P.wood);
+    }
+  }
+  // Corner posts and the beam across them.
+  for (let y = 10; y <= 26; y++) {
+    for (const [x, c] of [[4, P.woodLight], [5, P.wood], [18, P.wood], [19, P.woodDark]] as const) s.set(x, y, c);
+  }
+  for (let x = 4; x <= 19; x++) {
+    s.set(x, 10, P.woodLight);
+    s.set(x, 11, P.woodDark);
+  }
+  // Rafters meeting at the ridge, lashed with rope.
+  for (let i = 0; i <= 7; i++) {
+    s.set(5 + i, 9 - i, P.wood);
+    s.set(18 - i, 9 - i, P.woodDark);
+  }
+  s.set(12, 2, P.wood);
+  for (const [x, y] of [[11, 2], [12, 3], [4, 10], [19, 10]]) s.set(x, y, P.strawLight);
+  // A pile of stones in front, ready for the hearth and the walls.
+  for (const [cx, cy, r] of [[16, 25, 2.2], [20, 25.5, 1.8], [18, 23, 1.8]] as const) {
+    for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+      for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+        const dx = x + 0.5 - cx;
+        const dy = y + 0.5 - cy;
+        if (Math.hypot(dx, dy) > r) continue;
+        const l = (-dx - dy) / r;
+        s.set(x, y, l > 0.5 ? P.stoneLight : l > -0.3 ? P.stone : P.stoneDark);
+      }
+    }
+  }
+  return s.outline().shadow(12, 27, 10, 1.3);
+}
