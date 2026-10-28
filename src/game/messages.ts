@@ -21,7 +21,7 @@ export type Msg =
   /** Stepped into a hut with Cartographer: the map hangs on its wall (old logs only; the Hut panel shows it now). */
   | { key: 'mapHint' }
   /** Walked into the hut: the explorer goes inside. */
-  | { key: 'enterHut' }
+  | { key: 'enterHut'; obj?: ObjectKind }
   /** Tried to build a second hut on this island. */
   | { key: 'oneHut' }
   /** Added a room to the hut. */

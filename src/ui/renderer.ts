@@ -44,6 +44,10 @@ const WATER_TILES = ['water', 'water_2', 'water_3'];
 const RIVER_TILES = ['river', 'river_2'];
 const LAVA_TILES = ['lava', 'lava_2'];
 const FIRE_FRAME_MS = 220;
+/** The helicopter flies in from this many cells to the side, hovers this high above the pad, and lets the crate go at this share of its flight. */
+const HELI_FLIGHT = 14;
+const HELI_HEIGHT = 3;
+const DROP_LET_GO = 0.55;
 /** Animals that flutter along with a little hop; the others walk with step frames. */
 const FLYERS = new Set(['bat', 'wasps']);
 /** Night tint; its alpha comes from how dark a cell is. */
@@ -265,6 +269,8 @@ export class Renderer {
         if (!map.isExplored(x, y)) continue;
         const obj = game.objectAt(x, y);
         if (!obj || (trip && trip.x === x && trip.y === y)) continue;
+        // A dropped crate hangs under the helicopter until it lets go.
+        if (anim.drops.some((d) => d.x === x && d.y === y && (now - d.start) / anim.dropMs < DROP_LET_GO)) continue;
         const def = OBJECTS[obj.kind];
         const frames = game.goalUsed && def.done ? def.done.frames : def.frames;
         // A picked plant shows its bare sprite, not its animation (picked glowcaps don't glow).
@@ -286,6 +292,7 @@ export class Renderer {
     }
 
     this.drawNight(game, o, x0, y0, x1, y1, playerPose);
+    this.drawHelicopters(anim, o, now, fireFrame);
 
     // Remembered cells dim; unknown cells stay hidden, even under overhanging crowns.
     for (let y = y0; y <= y1; y++) {
@@ -339,6 +346,31 @@ export class Renderer {
         ctx.fillStyle = `rgba(${NIGHT_RGB}, ${dark.toFixed(3)})`;
         ctx.fillRect(o.x + x * cell, o.y + y * cell, cell, cell);
       }
+    }
+  }
+
+  /**
+   * The helicopter flies in from the left, hovers over the helipad while the
+   * crate hangs below it, lets go, and flies off to the right.
+   */
+  private drawHelicopters(anim: Animator, o: { x: number; y: number }, now: number, frame: number): void {
+    const { cell } = this;
+    for (const d of anim.drops) {
+      const p = (now - d.start) / anim.dropMs;
+      if (p < 0 || p >= 1) continue;
+      const ease = (t: number) => t * t * (3 - 2 * t);
+      const dx = p < 0.35 ? -HELI_FLIGHT * (1 - ease(p / 0.35)) : p > 0.65 ? HELI_FLIGHT * ease((p - 0.65) / 0.35) : 0;
+      const hx = Math.round(o.x + (d.x + dx) * cell);
+      const hy = Math.round(o.y + (d.y - HELI_HEIGHT) * cell);
+      if (p < DROP_LET_GO) {
+        // The crate on its rope, coming down as the helicopter hovers.
+        const lower = p < 0.35 ? 0 : Math.min(1, (p - 0.35) / (DROP_LET_GO - 0.35));
+        const cy = Math.round(o.y + (d.y - HELI_HEIGHT + 1 + lower * (HELI_HEIGHT - 1)) * cell);
+        this.ctx.fillStyle = '#3a2a1a';
+        this.ctx.fillRect(hx + cell / 2 - this.scale / 2, hy + cell - 2 * this.scale, this.scale, cy - hy - cell / 2);
+        this.drawStanding('supply_crate', hx, cy);
+      }
+      this.drawStanding(`helicopter${frame % 2 ? '_2' : ''}`, hx, hy);
     }
   }
 

@@ -253,6 +253,7 @@ export const en: Strings = {
     keepProgress: 'New island, keep progress',
     hut: 'Hut',
     yourHut: 'Your hut',
+    yourCabin: 'Your crew cabin',
     bed: 'Bed',
     bedNote: 'Sleep here for a full rest. Health comes back faster.',
     lookAtMap: 'Look',
@@ -422,7 +423,7 @@ export const en: Strings = {
       case 'seaSalty': return 'The sea is too salty to drink. Look for fresh water.';
       case 'mapHint': return 'Your map hangs on the hut wall. Tap Map to look at it.';
       case 'stepInto': return `You step into the ${obj(msg.obj)}. A good place to sleep.`;
-      case 'enterHut': return 'You go inside your hut.';
+      case 'enterHut': return msg.obj ? `You go inside the ${obj(msg.obj)}.` : 'You go inside your hut.';
       case 'oneHut': return 'You already have a hut on this island. Add rooms to it from inside.';
       case 'roomBuilt': return `You add ${a(en.rooms[msg.room].name.toLowerCase())} to your hut.`;
       case 'notInHut': return 'You can only do that inside your hut.';
@@ -476,7 +477,7 @@ export const en: Strings = {
         ? `The ${obj(msg.obj)} is too thorny to clear by hand. You need ${a(ITEM[msg.item].one)}.`
         : `You need ${a(ITEM[msg.item].one)} for the ${obj(msg.obj)}. Make one on the oil rig.`;
       case 'notSleepy': return "You're not sleepy right now.";
-      case 'fallAsleep': if (msg.obj === 'hut') return 'You snuggle into your bed and fall asleep.';
+      case 'fallAsleep': if (msg.obj === 'hut' || msg.obj === 'crew_cabin') return 'You snuggle into your bed and fall asleep.';
         return `You curl up in the ${msg.obj ? obj(msg.obj) : 'cave'} and fall asleep.`;
       case 'dozeOff': return 'You lie down on the ground and doze off.';
       case 'wake': {

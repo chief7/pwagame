@@ -91,6 +91,8 @@ export interface Strings {
     /** The Hut button and the Hut panel: the bed, the map wall, the rooms and adding a room. */
     hut: string;
     yourHut: string;
+    /** The Hut panel title in the crew cabin on the oil rig. */
+    yourCabin: string;
     bed: string;
     bedNote: string;
     lookAtMap: string;

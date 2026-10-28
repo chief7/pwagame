@@ -329,6 +329,7 @@ export const de: Strings = {
     keepProgress: 'Neue Insel, Fortschritt behalten',
     hut: 'Hütte',
     yourHut: 'Deine Hütte',
+    yourCabin: 'Deine Mannschaftskabine',
     bed: 'Bett',
     bedNote: 'Hier erholst du dich ganz. Gesundheit kommt schneller zurück.',
     lookAtMap: 'Ansehen',
@@ -498,7 +499,7 @@ export const de: Strings = {
       case 'seaSalty': return 'Das Meerwasser ist zu salzig zum Trinken. Such nach frischem Wasser.';
       case 'mapHint': return 'An der Hüttenwand hängt deine Karte. Tippe auf Karte, um sie anzusehen.';
       case 'stepInto': return `Du gehst ${contract(`in ${obj(msg.obj, 'acc', 'the')}`)}. Ein guter Platz zum Schlafen.`;
-      case 'enterHut': return 'Du gehst in deine Hütte.';
+      case 'enterHut': return msg.obj ? `Du gehst ${contract(`in ${obj(msg.obj, 'acc', 'the')}`)}.` : 'Du gehst in deine Hütte.';
       case 'oneHut': return 'Du hast schon eine Hütte auf dieser Insel. Drinnen baust du neue Räume an.';
       case 'roomBuilt': return `Du baust ${phrase(ROOM[msg.room], 'acc', 'a')} an deine Hütte an.`;
       case 'notInHut': return 'Das geht nur in deiner Hütte.';
@@ -553,7 +554,7 @@ export const de: Strings = {
         : `Für ${obj(msg.obj, 'acc', 'the')} brauchst du ${itemCount(msg.item, 1)}. Werkzeuge aus Metall baust du auf der Bohrinsel.`;
       case 'notSleepy': return 'Du bist gerade nicht müde.';
       case 'fallAsleep': {
-        if (msg.obj === 'hut') return 'Du kuschelst dich in dein Bett und schläfst ein.';
+        if (msg.obj === 'hut' || msg.obj === 'crew_cabin') return 'Du kuschelst dich in dein Bett und schläfst ein.';
         const place = msg.obj ? contract(`in ${obj(msg.obj, 'dat', 'the')}`) : 'in der Höhle';
         return `Du rollst dich ${place} zusammen und schläfst ein.`;
       }

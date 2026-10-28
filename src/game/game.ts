@@ -153,6 +153,11 @@ export type TravelResult = 'moved' | 'arrived' | 'blocked';
 
 type Items = Partial<Record<ItemId, number>>;
 
+/** The camp of an island: the hut, or the crew cabin on the oil rig. Both have a bed, rooms and a map wall. */
+export function isCamp(kind: ObjectKind): boolean {
+  return kind === 'hut' || kind === 'crew_cabin';
+}
+
 /** What a store crate holds, and what a building site already got (in the save). */
 export interface ObjectStock {
   store?: Items;
@@ -189,6 +194,8 @@ export type GameEvent = { late: boolean } & (
   | { type: 'hit'; id: number; x: number; y: number; damage: number }
   | { type: 'float'; x: number; y: number; amount: number; what: FloatWhat; tone: Tone }
   | { type: 'sparkle'; x: number; y: number }
+  /** The helicopter flies over the rig and drops a supply crate at (x, y). */
+  | { type: 'drop'; x: number; y: number }
   | { type: 'fade' }
 );
 type EventData = GameEvent extends infer E ? (E extends GameEvent ? Omit<E, 'late'> : never) : never;
@@ -594,7 +601,7 @@ export class Game {
   /** The hut the explorer is in, or null. */
   hutHere(): WorldObject | null {
     const obj = this.objectAt(this.player.x, this.player.y);
-    return obj?.kind === 'hut' ? obj : null;
+    return obj && isCamp(obj.kind) ? obj : null;
   }
 
   /** The explorer is in a hut that has this room. */
@@ -604,7 +611,7 @@ export class Game {
 
   /** This island already has a hut (the camp), or its building site: there is only one. */
   hasHut(): boolean {
-    for (const obj of this.objects.values()) if (obj.kind === 'hut' || obj.kind === 'hut_site') return true;
+    for (const obj of this.objects.values()) if (isCamp(obj.kind) || obj.kind === 'hut_site') return true;
     return false;
   }
 
@@ -1021,8 +1028,8 @@ export class Game {
     const inCave = this.inCave(p.x, p.y);
     p.x = nx;
     p.y = ny;
-    if (obj?.kind === 'hut') {
-      this.message({ key: 'enterHut' }, 'info');
+    if (obj && isCamp(obj.kind)) {
+      this.message(obj.kind === 'hut' ? { key: 'enterHut' } : { key: 'enterHut', obj: obj.kind }, 'info');
       this.hutAsked = true;
     } else if (obj && OBJECTS[obj.kind].shelter) {
       this.message({ key: 'stepInto', obj: obj.kind }, 'info');
@@ -1297,6 +1304,7 @@ export class Game {
     if (at === undefined) return;
     this.objects.set(at, { kind: 'supply_crate', store: { ...RADIO_ORDERS[this.delivery.order] } });
     const x = at % this.map.width;
+    this.emit({ type: 'drop', x, y: (at - x) / this.map.width });
     this.emit({ type: 'sparkle', x, y: (at - x) / this.map.width });
     this.message({ key: 'delivered', order: this.delivery.order }, 'good');
     this.delivery = null;

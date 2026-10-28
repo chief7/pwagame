@@ -601,10 +601,47 @@ export function platformIcon(): Sprite {
   return s.outline();
 }
 
+/** The supply helicopter, flying to the right: a white body with a red band, and a turning rotor (2 frames). */
+function helicopterFrame(name: string, frame: 0 | 1): Sprite {
+  const s = new Sprite(name, 32, 20);
+  // The cabin: a rounded body with a glass nose on the right.
+  for (let y = 5; y <= 13; y++) {
+    for (let x = 12; x <= 27; x++) {
+      const nx = (x + 0.5 - 20) / 8;
+      const ny = (y + 0.5 - 9.5) / 4.6;
+      if (nx * nx + ny * ny > 1) continue;
+      const glass = x >= 23 && y <= 9;
+      s.set(x, y, glass ? (y === 6 ? P.glassLight : P.glass) : y === 10 ? P.paintRed : y <= 6 ? P.paintWhite : y >= 12 ? P.steelLight : P.paintWhite);
+    }
+  }
+  // The tail boom to the left, with a red fin and a small rotor.
+  for (let x = 2; x <= 12; x++) {
+    s.set(x, 8, P.paintWhite);
+    s.set(x, 9, x % 3 === 0 ? P.paintRed : P.steelLight);
+  }
+  for (const [x, y] of [[2, 5], [3, 5], [2, 6], [3, 6], [2, 7], [3, 7]]) s.set(x, y, P.paintRed);
+  // Skids under the cabin.
+  for (let x = 13; x <= 26; x++) s.set(x, 16, P.steelDark);
+  for (const x of [15, 24]) for (let y = 14; y <= 15; y++) s.set(x, y, P.steelDark);
+  // The mast for the rotor.
+  for (const [x, y] of [[19, 4], [20, 4], [19, 3], [20, 3]]) s.set(x, y, P.steelDark);
+  s.outline();
+  // The rotor goes on after the outline so the blades stay thin: long in one frame, seen end-on in the other.
+  const reach = frame === 0 ? 13 : 6;
+  for (let x = 20 - reach; x <= 19 + reach; x++) s.set(x, 2, P.steelDeep);
+  const tail = frame === 0 ? [[1, 4], [1, 9]] : [[0, 7], [4, 6]];
+  for (const [x, y] of tail) s.set(x, y, P.steelDeep);
+  return s;
+}
+
+export function helicopter(): Sprite[] {
+  return [helicopterFrame('helicopter', 0), helicopterFrame('helicopter_2', 1)];
+}
+
 export function rigSprites(): Sprite[] {
   return [
     ...deck(), ...deckSide(), ...helipad(), ...gangway(), ...gangwayEnds(),
     container(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
-    pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(), supplyCrate(), platformIcon(),
+    pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(), supplyCrate(), platformIcon(), ...helicopter(),
   ];
 }

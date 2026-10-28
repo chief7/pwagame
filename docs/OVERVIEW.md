@@ -769,6 +769,9 @@ keeps a map on the wall of every hut. There is no map anywhere else.
   once its cell is explored (`cave`, see 4.18), and bear areas. A list under
   the map names the signs that are on it. The panel draws the map at the
   largest whole-number scale that fits.
+- **Gangways** (on the oil rig) are thin ink lines over the sea, red where
+  a gangway is broken: the map draws them from the objects (`overSea`,
+  `broken`), because the tiles under them are sea.
 - **Bear areas.** After each sight update, `updateFov()` stores the cell of
   every visible cave bear in `game.bearSpots`, unless a stored cell is 6 cells
   or closer (`BEAR_SPOT_GAP`). So bears the explorer never saw are not on the
@@ -871,6 +874,11 @@ wall of rock all round, and one way in (see §5).
   glowcaps or crystals.
 
 ### 4.19 The camp: the hut and its rooms
+
+On the oil rig, the crew cabin is the camp: `isCamp()` is true for the hut
+and the crew cabin. The cabin works like a hut in every way below (going
+inside, the Hut panel titled "Your crew cabin", the bed, rooms, the map wall,
+healing, one camp on each island), and it has its own stove.
 
 The hut is the camp. It takes 24 logs, 12 wood, 30 leaves, 20 stone and 8 rope, and
 each island has only one (see 4.8). It is the only place for a full rest and
@@ -997,6 +1005,12 @@ does not have.
   the rig, the helicopter drops a `supply_crate` on a free cell of the
   helipad (its middle if it can), with sparkles and `delivered`. While the
   explorer is away from the rig, the crate waits for them.
+- **The helicopter.** A delivery also sends a `drop` event. The animator
+  plays it for 3.2 s (`DROP_MS`; not with reduced motion): the helicopter
+  (`helicopter`, 2 frames for the rotor) flies in from 14 cells to the left,
+  hovers 3 cells above the pad and lowers the crate on a rope, lets it go at
+  55% of the flight, and flies off to the right. Until then the renderer
+  does not draw the crate on the pad.
 - **The supply crate** is a store (`store`, `dropped`): walking into it
   opens the Store panel. When it is empty, it is gone. It does not count as
   the island's store crate.
@@ -1869,14 +1883,12 @@ Also run `npm run build` (typecheck and build) before you commit.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
 - Four levels exist. After the radio on the oil rig (island 4), the end
   screen shows; the player can stay and go on (boat trips, the derrick).
-  The supply drops come without a helicopter on screen: only a message and
-  sparkles.
+  The helicopter of a supply drop is only a show: the crate is on the pad at
+  once (the renderer hides it until the helicopter lets go).
 - Rigs from saves before the fishing boat have no boat wreck: their player
   cannot sail.
-- The Cartographer's map shows the decks but not the gangways (they are
-  objects, and the map only draws tiles).
-- The crew cabin is not a hut: it has no rooms and no map wall, and the
-  player can still build a hut on the rig (with logs from elsewhere).
+- The crew cabin shows its rooms only inside (in the Hut panel), not on the
+  cabin outside, and its rooms look like the wooden rooms of a hut.
 - A deck's safety line also runs across the end of a gangway.
 - The derrick is 32 × 48 pixels and the fishing boat 48 × 28, larger than
   other tall sprites (24 × 32). The boat covers part of the explorer when they

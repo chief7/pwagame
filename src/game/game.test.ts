@@ -3158,6 +3158,61 @@ describe('Game: the rig workshop', () => {
   });
 });
 
+describe('Game: the crew cabin is the camp on the rig', () => {
+  function inCabin(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    const cabin = [...game.objects].find(([, o]) => o.kind === 'crew_cabin')![0];
+    const x = cabin % game.map.width;
+    game.player.x = x;
+    game.player.y = (cabin - x) / game.map.width + 1;
+    game.objects.delete(game.map.idx(game.player.x, game.player.y));
+    game.move(0, -1);
+    return game;
+  }
+
+  it('goes inside, like a hut, and has a bed that heals faster', () => {
+    const game = inCabin(170);
+    expect(game.hutHere()?.kind).toBe('crew_cabin');
+    expect(game.takeHutRequest()).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'enterHut', obj: 'crew_cabin' });
+    expect(game.hasHut()).toBe(true);
+    give(game, { log: 24, wood: 12, leaves: 30, stone: 20, rope: 8 });
+    expect(game.buildProblem('hut')).toEqual({ key: 'oneHut' });
+    game.needs.health = 50;
+    game.needs.energy = 20;
+    game.needs.food = game.needs.water = 100;
+    game.turn = nightTurn();
+    game.sleep();
+    expect(game.needs.health).toBeGreaterThan(80);
+  });
+
+  it('takes rooms, and with Cartographer its wall has the map', () => {
+    const game = inCabin(171);
+    give(game, ROOMS.hearth.cost);
+    expect(game.addRoom('hearth')).toBe(true);
+    expect(game.hutHere()?.rooms).toEqual(['hearth']);
+    expect(game.canReadMap()).toBe(false);
+    game.skills.add('cartographer');
+    expect(game.canReadMap()).toBe(true);
+  });
+
+  it('a supply drop sends the helicopter (an event for the UI)', () => {
+    const game = inCabin(172);
+    const radio = [...game.objects].find(([, o]) => o.kind === 'radio_hut')![0];
+    game.objects.get(radio)!.kind = 'radio_ready';
+    game.sailed = true;
+    game.delivery = { order: 'food', at: game.turn + 1 };
+    game.takeEvents();
+    game.wait();
+    const drop = game.takeEvents().find((e) => e.type === 'drop');
+    expect(drop).toBeDefined();
+    expect(game.objectAt((drop as { x: number }).x, (drop as { y: number }).y)?.kind).toBe('supply_crate');
+  });
+});
+
 function give(game: Game, cost: Partial<Record<Parameters<Game['inventory']['add']>[0], number>>): void {
   for (const [item, n] of Object.entries(cost)) game.inventory.add(item as Parameters<Game['inventory']['add']>[0], n);
 }
