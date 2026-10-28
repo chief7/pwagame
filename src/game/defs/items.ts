@@ -8,7 +8,7 @@ export type ItemId =
   | 'coconut' | 'berries' | 'mushroom' | 'cooked_fish' | 'apple'
   | 'wood' | 'log' | 'leaves' | 'stone' | 'fish' | 'rope'
   | 'axe' | 'fishing_rod'
-  | 'tar' | 'resin'
+  | 'tar' | 'resin' | 'sulphur'
   | 'glowcap' | 'crystal' | 'lantern';
 
 export interface Food {
@@ -50,6 +50,8 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   // Rare goal materials: tar from the old barrels on the tide islet, resin from snowy spruces.
   tar: { id: 'tar', rareFrom: ['barrel', 'barrel_empty'] },
   resin: { id: 'resin', rareFrom: ['tree_spruce_snow'] },
+  // Island 3: yellow sulphur from the steam vents near the crater, for the balloon burner.
+  sulphur: { id: 'sulphur', rareFrom: ['steam_vent'] },
   // Only in the deep caves: glowcaps (the food with the most Energy) and
   // crystals for the crystal lantern, which lights up caves and the night.
   glowcap: { id: 'glowcap', eat: { food: 6, water: 4, energy: 15 } },

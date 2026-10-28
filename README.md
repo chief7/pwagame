@@ -122,10 +122,20 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
   on the peak. Snow is cold even in the day: bring wood for a fire. Build a
   signal beacon on the peak in three steps (stone base, wood pile, tinder),
   then light it so a passing ship takes you on board. The tinder needs resin
-  from the snowy spruces. The next island is not
-  built yet, so you can stay or start a new one.
+  from the snowy spruces.
+- **Island 3 (Ember Isle):** a storm puts you ashore on a warm volcano
+  island: beach and jungle below, grey ash and black basalt cliffs above,
+  and a lake of lava in the crater. The ash is hot in the sun, so out there
+  in the day your Water drops up to 50% faster. There are only 4 springs,
+  but 3 hot springs on the ash give water and warm you like a small fire.
+  A lava flow takes the place of the river: lava is too hot to walk on, so
+  lay stepping stones (8 stones) across it. Fix the old hot-air balloon on
+  the crater rim in three steps (basket, cloth, burner); the burner needs
+  sulphur from the steam vents near the crater. Then fly home: the end of
+  the game for now. New animals: shy lizards, seagulls that snatch food,
+  and wild scorpions that sting.
 - **Island stars:** each island has three optional tasks (open every
-  chest, catch 5 fish or explore most of the island, go 3 days without
+  chest, catch 5 fish, explore most of the island, or go 3 days without
   fainting). The Build panel shows them; each star gives 5 XP.
 - **The dog:** a stray dog lives far from camp on each island. Walk into it
   with food to adopt it. Your dog follows you and barks crabs, monkeys,
@@ -189,7 +199,7 @@ src/
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
-    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow), deep caves, bramble wall, river, scenery
+    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow; island 3: volcano, ash, lava), deep caves, bramble wall, river (lava flow), scenery
     caves.ts     finds the deep caves (big caves with few ways in) from the tiles
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view

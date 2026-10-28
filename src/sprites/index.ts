@@ -14,7 +14,7 @@ import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons, starEmpty
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
 import {
-  ash, ashPumice, bankSets, basaltFace, basaltTop, caveFloor, grassAshSet, lava, lavaBankSets, lavaMouthSet, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, riverMouthSet, rockFace, rockTop,
+  ash, ashPumice, bankSets, basaltFace, basaltTop, caveFloor, grassAshSet, lava, lavaBankSets, lavaMouthSet, sandAshSet, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, riverMouthSet, rockFace, rockTop,
   sand, sandRipples, sandShell, scree, screeStones, shoreSet, snow, snowEdgeSet, snowTracks, water, waterVariants,
 } from './terrain';
 
@@ -36,7 +36,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Northern forest', sprites: [treeSpruce(), treeSpruceSnow(), treeBirch(), treeApple(), treeAppleBare(), fern()] },
     { title: 'Grass', sprites: [grass(), grassFlowers(), ...grassEdgeSet(), ...grassScreeSet()] },
     { title: 'Mountains', sprites: [scree(), screeStones(), snow(), snowTracks(), ...snowEdgeSet()] },
-    { title: 'Volcano', sprites: [ash(), ashPumice(), ...lava(), basaltTop(), basaltFace(), ...grassAshSet(), ...lavaBankSets(), ...lavaMouthSet()] },
+    { title: 'Volcano', sprites: [ash(), ashPumice(), ...lava(), basaltTop(), basaltFace(), ...grassAshSet(), ...sandAshSet(), ...lavaBankSets(), ...lavaMouthSet()] },
     { title: 'Volcano objects', sprites: [lavaStones('ns'), lavaStones('ew'), ...steamVent(), steamVentSpent(), ...hotSpring()] },
     { title: 'Steep steps', sprites: [ledge(), ledge('ladder'), iceWall(), iceWall('rope')] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },

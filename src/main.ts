@@ -1,6 +1,6 @@
 import './style.css';
 import { ITEMS, type ItemId } from './game/defs/items';
-import { LEVELS, levelDef, nextLevel } from './game/defs/levels';
+import { LEVELS, levelDef } from './game/defs/levels';
 import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { ROOM_IDS, type RoomId } from './game/defs/rooms';
@@ -593,20 +593,23 @@ function starsCard(): HTMLElement {
   return card;
 }
 
-/** The finished goal of this island: the ready boat, the ready beacon (lit once used). */
+/** The finished goal of this island: the ready boat, the ready beacon (lit once used), the balloon. */
 function goalDone(): string {
   const kind = levelDef(game.level).stages.at(-1)!.becomes;
   const done = OBJECTS[kind].done;
-  return game.sailed && done ? done.frames[0] : kind;
+  return game.sailed && done ? done.icon ?? done.frames[0] : kind;
 }
 
 /**
- * Leave on the finished goal. Towards a next island, the boat first sails
- * off over the water (not with reduced motion); the last goal ends the game.
+ * Leave on the finished goal. The boat first sails off over the water, and
+ * the balloon rises into the sky (not with reduced motion); the last goal
+ * ends the game.
  */
 function setSail(): void {
   closeSheet();
-  const trip = nextLevel(game.level) && !anim.reducedMotion ? boatTrip(performance.now()) : null;
+  const biome = levelDef(game.level).biome;
+  const now = performance.now();
+  const trip = anim.reducedMotion ? null : biome === 'tropical' ? boatTrip(now) : biome === 'volcano' ? balloonTrip(now) : null;
   const leave = () => {
     renderer.departure = null;
     if (!game.sail()) return;
@@ -635,6 +638,16 @@ function boatTrip(now: number): Departure | null {
       }
     }
     return best;
+  }
+  return null;
+}
+
+/** The balloon's way up: straight into the sky from the crater rim. */
+function balloonTrip(now: number): Departure | null {
+  for (const [i, obj] of game.objects) {
+    if (!OBJECTS[obj.kind].goal) continue;
+    const x = i % game.map.width;
+    return { x, y: (i - x) / game.map.width, dx: 0, dy: -1, cells: 10, start: now, balloon: true };
   }
   return null;
 }

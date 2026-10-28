@@ -392,71 +392,6 @@ export function grassScreeTileName(isScree: (dx: number, dy: number) => boolean)
   return transitionTileName('grass_scree', 'grass', isScree);
 }
 
-// ---- Edges against several kinds of ground ------------------------------------------
-
-/** Ground that draws edges, and for each kind of neighbour (one letter) its tile set and band. */
-const EDGES = {
-  grass: { a: ['grass', grassSandBand], r: ['bank', riverBankBand], c: ['grass_scree', grassScreeBand] },
-  snow: { c: ['snow', snowScreeBand], r: ['snow_bank', snowBankBand] },
-  scree: { r: ['scree_bank', screeBankBand] },
-  cave: { r: ['cave_bank', caveBankBand] },
-  river: { w: ['mouth', mouthBand(0)] },
-} as const satisfies Record<string, Record<string, readonly [string, Band]>>;
-
-export type EdgeGround = keyof typeof EDGES;
-
-/** Neighbour order in a mixed tile's name: four sides, then four corners. */
-const AROUND = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const;
-const SIDES: Side[] = ['n', 's', 'w', 'e'];
-const CORNERS: [Side, Side][] = [['n', 'w'], ['n', 'e'], ['s', 'w'], ['s', 'e']];
-
-/**
- * Tile for a cell of `own` ground. `kindAt` gives the letter of a
- * neighbour's ground from EDGES[own], or '.' when it draws no edge. With
- * one kind around, this is that kind's transition tile; with more, a mixed
- * tile 'mix_<own>_<8 letters>' that mixedTile() paints on demand.
- */
-export function edgeTileName(own: EdgeGround, plain: string, kindAt: (dx: number, dy: number) => string): string {
-  const kinds = AROUND.map(([dx, dy]) => kindAt(dx, dy));
-  const found = [...new Set(kinds.filter((k) => k !== '.'))];
-  if (!found.length) return plain;
-  if (found.length === 1) {
-    const [prefix] = (EDGES[own] as Record<string, readonly [string, Band]>)[found[0]];
-    return transitionTileName(prefix, plain, (dx, dy) => kindAt(dx, dy) === found[0]);
-  }
-  return `mix_${own}_${kinds.join('')}`;
-}
-
-/**
- * Paint a mixed tile: every pixel takes the band of the nearest boundary.
- * Sides work as in the transition sets; a corner counts only when neither
- * of its sides has an edge.
- */
-export function mixedTile(name: string): Sprite | null {
-  const m = /^mix_([a-z]+)_([a-z.]{8})$/.exec(name);
-  if (!m || !(m[1] in EDGES)) return null;
-  const bands = EDGES[m[1] as EdgeGround] as Record<string, readonly [string, Band]>;
-  const kinds = [...m[2]];
-  if (kinds.some((k) => k !== '.' && !bands[k])) return null;
-  const sides = SIDES.map((side, i) => [side, kinds[i]] as const).filter(([, k]) => k !== '.');
-  const edged = new Set(sides.map(([side]) => side));
-  const corners = CORNERS.map((pair, i) => [pair, kinds[4 + i]] as const)
-    .filter(([pair, k]) => k !== '.' && !edged.has(pair[0]) && !edged.has(pair[1]));
-  return new Sprite(name).paint((x, y) => {
-    let best = Infinity;
-    let kind = '';
-    for (const [side, k] of sides) {
-      const f = inland(side, x, y);
-      if (f < best) [best, kind] = [f, k];
-    }
-    for (const [[a, b], k] of corners) {
-      const f = Math.max(inland(a, x, y), inland(b, x, y));
-      if (f < best) [best, kind] = [f, k];
-    }
-    return bands[kind][1](best, x, y);
-  });
-}
-
 // ---- Island 3: the volcano: ash, basalt and lava ------------------------------------
 
 function ashPixel(x: number, y: number, seed: number): Color {
@@ -588,6 +523,18 @@ function lavaMouthBand(phase: number): Band {
   };
 }
 
+/** Beach sand up to the ash: a dark line of ash grains. */
+const sandAshBand: Band = (f, x, y) => {
+  if (f < 0) return ashPixel(x, y, 120);
+  if (f < 1) return hash2(x, y, 139) < 0.5 ? P.ashDark : P.sandDark;
+  return sandPixel(x, y, 1);
+};
+
+/** Sand with ash along its edges. */
+export function sandAshSet(): Sprite[] {
+  return transitionSet('sand_ash', sandAshBand);
+}
+
 /** Grass with volcano ash along its edges. */
 export function grassAshSet(): Sprite[] {
   return transitionSet('grass_ash', grassAshBand);
@@ -607,3 +554,75 @@ export function lavaBankSets(): Sprite[] {
 export function lavaMouthSet(): Sprite[] {
   return [...transitionSet('lava_mouth', lavaMouthBand(0)), ...transitionSet('lava_mouth2', lavaMouthBand(1))];
 }
+
+// ---- Edges against several kinds of ground ------------------------------------------
+
+/** Ground that draws edges, and for each kind of neighbour (one letter) its tile set and band. */
+const EDGES = {
+  grass: {
+    a: ['grass', grassSandBand], r: ['bank', riverBankBand], c: ['grass_scree', grassScreeBand],
+    h: ['grass_ash', grassAshBand], l: ['grass_lava', grassLavaBand],
+  },
+  sand: { w: ['shore', shoreBand], h: ['sand_ash', sandAshBand], l: ['sand_lava', sandLavaBand] },
+  snow: { c: ['snow', snowScreeBand], r: ['snow_bank', snowBankBand] },
+  scree: { r: ['scree_bank', screeBankBand] },
+  cave: { r: ['cave_bank', caveBankBand], l: ['cave_lava', caveLavaBand] },
+  river: { w: ['mouth', mouthBand(0)] },
+  ash: { l: ['ash_lava', ashLavaBand] },
+  lava: { w: ['lava_mouth', lavaMouthBand(0)] },
+} as const satisfies Record<string, Record<string, readonly [string, Band]>>;
+
+export type EdgeGround = keyof typeof EDGES;
+
+/** Neighbour order in a mixed tile's name: four sides, then four corners. */
+const AROUND = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const;
+const SIDES: Side[] = ['n', 's', 'w', 'e'];
+const CORNERS: [Side, Side][] = [['n', 'w'], ['n', 'e'], ['s', 'w'], ['s', 'e']];
+
+/**
+ * Tile for a cell of `own` ground. `kindAt` gives the letter of a
+ * neighbour's ground from EDGES[own], or '.' when it draws no edge. With
+ * one kind around, this is that kind's transition tile; with more, a mixed
+ * tile 'mix_<own>_<8 letters>' that mixedTile() paints on demand.
+ */
+export function edgeTileName(own: EdgeGround, plain: string, kindAt: (dx: number, dy: number) => string): string {
+  const kinds = AROUND.map(([dx, dy]) => kindAt(dx, dy));
+  const found = [...new Set(kinds.filter((k) => k !== '.'))];
+  if (!found.length) return plain;
+  if (found.length === 1) {
+    const [prefix] = (EDGES[own] as Record<string, readonly [string, Band]>)[found[0]];
+    return transitionTileName(prefix, plain, (dx, dy) => kindAt(dx, dy) === found[0]);
+  }
+  return `mix_${own}_${kinds.join('')}`;
+}
+
+/**
+ * Paint a mixed tile: every pixel takes the band of the nearest boundary.
+ * Sides work as in the transition sets; a corner counts only when neither
+ * of its sides has an edge.
+ */
+export function mixedTile(name: string): Sprite | null {
+  const m = /^mix_([a-z]+)_([a-z.]{8})$/.exec(name);
+  if (!m || !(m[1] in EDGES)) return null;
+  const bands = EDGES[m[1] as EdgeGround] as Record<string, readonly [string, Band]>;
+  const kinds = [...m[2]];
+  if (kinds.some((k) => k !== '.' && !bands[k])) return null;
+  const sides = SIDES.map((side, i) => [side, kinds[i]] as const).filter(([, k]) => k !== '.');
+  const edged = new Set(sides.map(([side]) => side));
+  const corners = CORNERS.map((pair, i) => [pair, kinds[4 + i]] as const)
+    .filter(([pair, k]) => k !== '.' && !edged.has(pair[0]) && !edged.has(pair[1]));
+  return new Sprite(name).paint((x, y) => {
+    let best = Infinity;
+    let kind = '';
+    for (const [side, k] of sides) {
+      const f = inland(side, x, y);
+      if (f < best) [best, kind] = [f, k];
+    }
+    for (const [[a, b], k] of corners) {
+      const f = Math.max(inland(a, x, y), inland(b, x, y));
+      if (f < best) [best, kind] = [f, k];
+    }
+    return bands[kind][1](best, x, y);
+  });
+}
+
