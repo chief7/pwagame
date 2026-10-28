@@ -269,6 +269,15 @@ export const PALETTE = {
   paintBlue: '#3f6f9a',
   paintBlueDark: '#2c4f70',
   glass: '#2a4a5c',
+  clay: '#c2683f',
+  clayLight: '#de8c5e',
+  clayDark: '#8f4527',
+  coal: '#2b2a2e',
+  coalShine: '#6e6d78',
+  ore: '#b5602e',
+  glassLight: '#bfe3e6',
+  carrot: '#ef8a2c',
+  tomato: '#d8402e',
   waterShade: '#1f5f7e',
 
   // The Cartographer's map: ink and washes on old paper.
