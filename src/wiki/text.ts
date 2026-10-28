@@ -10,7 +10,7 @@ import type { ItemGroup } from './data';
 // game's registries; this file holds the explanations around them.
 // Text may use **bold**.
 
-export type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow';
+export type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow' | 'ash';
 
 export interface Chain {
   title: string;
@@ -139,6 +139,7 @@ export interface WikiWords {
     title: string;
     one: { title: string; paras: string[] };
     two: { title: string; paras: string[] };
+    three: { title: string; paras: string[] };
     goalTitle: string;
     goalIntro: string;
     stageCols: { stage: string; cost: string };
@@ -162,10 +163,10 @@ const en: WikiWords = {
   items: {
     coconut: 'Coconut', berries: 'Berries', mushroom: 'Mushroom', cooked_fish: 'Cooked fish', apple: 'Apple',
     wood: 'Wood', log: 'Logs', leaves: 'Big leaves', stone: 'Stone', fish: 'Raw fish', rope: 'Rope',
-    axe: 'Stone axe', fishing_rod: 'Fishing rod', tar: 'Tar', resin: 'Resin',
+    axe: 'Stone axe', fishing_rod: 'Fishing rod', tar: 'Tar', resin: 'Resin', sulphur: 'Sulphur',
     glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern',
   },
-  ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow' },
+  ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash' },
 
   start: {
     title: 'Your first day',
@@ -187,9 +188,9 @@ const en: WikiWords = {
     cards: {
       health: { fill: 'Slowly, while Food and Water are both above 50 and no need is empty. Faster while you sleep, fastest in the hut bed.', drain: 'When another need is empty, and when wild animals hurt you.' },
       food: { fill: 'When you eat. Open the Bag and tap Eat.', drain: 'All the time: about 108 in a full day, half that while you sleep.' },
-      water: { fill: 'At a spring or the river (+35 each sip), and from coconuts, apples and berries.', drain: 'As fast as Food.' },
+      water: { fill: 'At a spring, a hot spring or the river (+35 each sip), and from coconuts, apples and berries.', drain: 'As fast as Food. Out on the hot ash of island 3, up to 50% faster in the day.' },
       energy: { fill: 'When you sleep. Only the bed in your hut fills it all the way.', drain: 'Slowly while you are awake (about 60 in a day). Climbing ladders and ropes costs a little too.' },
-      warmth: { fill: 'Next to a campfire, in a shelter or a cave, and in the daylight.', drain: 'At night out in the open, and on snow even in the day.' },
+      warmth: { fill: 'Next to a campfire or a hot spring, in a shelter or a cave, and in the daylight.', drain: 'At night out in the open, and on snow even in the day.' },
     },
     foodTitle: 'Food and drink',
     foodIntro: 'Each food fills these needs by the amount shown. You cannot eat when Food is almost full, unless the food also gives Water.',
@@ -283,7 +284,7 @@ const en: WikiWords = {
     atFire: 'Stand next to a campfire.',
     onto: (name) => `Stand next to a ${name.toLowerCase()}.`,
     paras: [
-      'Buildings go in front of you, in the way you face. A bridge goes straight ahead over the river (1 to 3 cells of water). Items such as the axe and rope go into your bag.',
+      'Buildings go in front of you, in the way you face. A bridge goes straight ahead over the river (1 to 3 cells of water), and stepping stones over the lava flow of island 3. Items such as the axe and rope go into your bag.',
       'A building is never placed where it would cut off part of the island, so you can never lock yourself in.',
     ],
   },
@@ -314,7 +315,7 @@ const en: WikiWords = {
       handy_builder: 'Every recipe and hut room with wood costs 1 less: campfires, shelters, bridges, ladders.',
       rope_maker: 'The goals and the hut need a lot of rope. This halves the leaves. In a hut with a workshop, 2 leaves give 3 ropes.',
       cartographer: 'The map hangs on the wall of your hut. It shows huts, campfires, springs, the goal, the deep caves you found and where you saw cave bears.',
-      small_sips: 'Good for long trips far from springs.',
+      small_sips: 'Good for long trips far from springs, and on the hot ash of island 3.',
       thick_skin: 'Helps on the cold snow of island 2.',
       night_eyes: 'You see up to 2 cells further at night.',
       sure_foot: 'Island 2 has many rocky steps and ice walls on the way up.',
@@ -373,7 +374,16 @@ const en: WikiWords = {
         'A cold island with a northern forest of spruces, birches, apple trees and ferns, a big mountain of cliffs and scree, and **two deep caves**. There are no coconuts here: apples, berries, mushrooms, fish and glowcaps are the food. Snow is cold even in the day: bring wood for a fire.',
         'Crabs, rabbits, squirrels and bats live here, and far from camp boars, wasps, cave bears and **mountain goats**. The goats climb over the rocky steps.',
         'An old stone ring stands on the snowy peak. Build a **signal beacon** on it and light it, so a passing ship takes you on board. On the way up, you cross a ring of **rocky steps** (build a ladder on one) and then a ring of **ice walls** (hang a climbing rope on one). The tinder needs **resin** from snowy spruces.',
-        'This is the last island for now. After the ship comes, you can stay on Pine Ridge or start a new island.',
+        'When the beacon burns, a ship takes you on board. A storm drives it off course, and it puts you ashore on Ember Isle. You keep your bag, XP, skills, stars and your dog.',
+      ],
+    },
+    three: {
+      title: 'Island 3: Ember Isle',
+      paras: [
+        'A storm puts you ashore on a warm volcano island. Palms and a jungle grow on the low slopes; higher up is grey **ash** between black basalt cliffs. The ash is hot in the sun: out there in the day you get thirsty faster. Springs are few, but **hot springs** on the ash give water and warm you like a fire.',
+        'A **lava flow** takes the place of the river. You cannot walk on lava: lay **stepping stones** (8 stones) across it. An old **balloon** lies on the crater rim, next to the lake of lava. Fix its basket and cloth, and build a burner. The burner needs **sulphur** from the steam vents near the crater. Then fly home!',
+        'Coconuts, berries, mushrooms, fish and glowcaps from the **two deep caves** are the food. Crabs, turtles, monkeys, bats, shy **lizards** and cheeky **gulls** that snatch food live here. Far from camp live boars, wasps, snakes and **scorpions** that sting.',
+        'This is the last island for now. The balloon takes you home, and the game ends. Then you can stay on Ember Isle or start a new island.',
       ],
     },
     goalTitle: 'Goal stages',
@@ -390,7 +400,8 @@ const en: WikiWords = {
       { title: 'From fish to a full tummy', steps: ['Earn 10 XP', 'Learn “Fishing rod”', 'Make a fishing rod', 'Walk into the sea to fish', 'Cook the fish at a campfire', 'Best food, and supplies for the boat'] },
       { title: 'Opening up the island', steps: ['Wood, stones, a leaf', 'Make a stone axe', 'Chop through the brambles', 'Chop logs from trees', 'Build a bridge', 'Reach the far side and the boat'] },
       { title: 'A warm, safe home', steps: ['Campfire and lean-to', 'Collect for the hut (logs and rope)', 'Build the hut: your camp', 'Full rest in its bed', 'Add a workshop, hearth and rain barrel', 'Cook, drink and heal at home'] },
-      { title: 'Rope for the goals', steps: ['Gather big leaves', 'Twist rope (2 leaves)', 'Rope maker: 2 ropes for 2 leaves', 'Mast, sail and beacon', 'Ladders and climbing ropes'] },
+      { title: 'Rope for the goals', steps: ['Gather big leaves', 'Twist rope (2 leaves)', 'Rope maker: 2 ropes for 2 leaves', 'Mast, sail, beacon and balloon', 'Ladders and climbing ropes'] },
+      { title: 'Up the volcano', steps: ['Gather stones', 'Lay stepping stones over the lava', 'Climb the hot ash (drink at the hot springs)', 'Scrape sulphur off the steam vents', 'Fix the old balloon', 'Fly home'] },
       { title: 'Into the deep caves', steps: ['Find a cave in the rocky hills', 'It is dark inside, even in the day', 'Pick glowcaps: food with lots of Energy', 'Break off crystals', 'Make a crystal lantern', 'See further in caves and at night'] },
       { title: 'Staying safe from wild animals', steps: ['Eat and drink well (above 50)', 'Health comes back', 'Wild sense shows danger', 'Animal friend: they notice you later', 'Your dog barks snakes away'] },
     ],
@@ -423,10 +434,10 @@ const de: WikiWords = {
   items: {
     coconut: 'Kokosnuss', berries: 'Beeren', mushroom: 'Pilz', cooked_fish: 'Gebratener Fisch', apple: 'Apfel',
     wood: 'Holz', log: 'Holzstämme', leaves: 'Große Blätter', stone: 'Stein', fish: 'Roher Fisch', rope: 'Seil',
-    axe: 'Steinaxt', fishing_rod: 'Angelrute', tar: 'Teer', resin: 'Harz',
+    axe: 'Steinaxt', fishing_rod: 'Angelrute', tar: 'Teer', resin: 'Harz', sulphur: 'Schwefel',
     glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne',
   },
-  ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee' },
+  ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche' },
 
   start: {
     title: 'Dein erster Tag',
@@ -448,9 +459,9 @@ const de: WikiWords = {
     cards: {
       health: { fill: 'Langsam, solange Essen und Wasser beide über 50 sind und nichts leer ist. Im Schlaf schneller, im Bett der Hütte am schnellsten.', drain: 'Wenn ein anderes Bedürfnis leer ist, und wenn wilde Tiere dir wehtun.' },
       food: { fill: 'Wenn du isst. Öffne die Tasche und tippe auf Essen.', drain: 'Die ganze Zeit: etwa 108 an einem ganzen Tag, im Schlaf nur halb so viel.' },
-      water: { fill: 'An einer Quelle oder am Fluss (+35 je Schluck) und durch Kokosnüsse, Äpfel und Beeren.', drain: 'So schnell wie Essen.' },
+      water: { fill: 'An einer Quelle, einer heißen Quelle oder am Fluss (+35 je Schluck) und durch Kokosnüsse, Äpfel und Beeren.', drain: 'So schnell wie Essen. Draußen auf der heißen Asche von Insel 3 am Tag bis zu 50 % schneller.' },
       energy: { fill: 'Wenn du schläfst. Nur das Bett in deiner Hütte füllt sie ganz.', drain: 'Langsam, solange du wach bist (etwa 60 am Tag). Klettern an Leitern und Seilen kostet auch etwas.' },
-      warmth: { fill: 'Neben einem Lagerfeuer, in einem Unterschlupf oder einer Höhle und bei Tageslicht.', drain: 'Nachts im Freien, und auf Schnee auch am Tag.' },
+      warmth: { fill: 'Neben einem Lagerfeuer oder einer heißen Quelle, in einem Unterschlupf oder einer Höhle und bei Tageslicht.', drain: 'Nachts im Freien, und auf Schnee auch am Tag.' },
     },
     foodTitle: 'Essen und Trinken',
     foodIntro: 'Jedes Essen füllt diese Bedürfnisse um den gezeigten Wert. Wenn Essen fast voll ist, kannst du nichts essen, außer es gibt auch Wasser.',
@@ -544,7 +555,7 @@ const de: WikiWords = {
     atFire: 'Stell dich neben ein Lagerfeuer.',
     onto: (name) => `Stell dich neben eine ${name}.`,
     paras: [
-      'Gebäude entstehen vor dir, in die Richtung, in die du schaust. Eine Brücke geht geradeaus über den Fluss (1 bis 3 Felder Wasser). Dinge wie die Axt und Seile kommen in deine Tasche.',
+      'Gebäude entstehen vor dir, in die Richtung, in die du schaust. Eine Brücke geht geradeaus über den Fluss (1 bis 3 Felder Wasser), Trittsteine über den Lavastrom von Insel 3. Dinge wie die Axt und Seile kommen in deine Tasche.',
       'Ein Gebäude wird nie so gebaut, dass es einen Teil der Insel absperrt. Du kannst dich also nie selbst einsperren.',
     ],
   },
@@ -575,7 +586,7 @@ const de: WikiWords = {
       handy_builder: 'Jedes Rezept und jeder Hüttenraum mit Holz kostet 1 weniger: Lagerfeuer, Unterschlupf, Brücken, Leitern.',
       rope_maker: 'Die Inselziele und die Hütte brauchen viele Seile. So brauchst du nur halb so viele Blätter. In einer Hütte mit Werkstatt geben 2 Blätter 3 Seile.',
       cartographer: 'Die Karte hängt an der Wand deiner Hütte. Sie zeigt Hütten, Lagerfeuer, Quellen, das Ziel, die tiefen Höhlen, die du gefunden hast, und wo du Höhlenbären gesehen hast.',
-      small_sips: 'Gut für lange Wege weit weg von Quellen.',
+      small_sips: 'Gut für lange Wege weit weg von Quellen, und auf der heißen Asche von Insel 3.',
       thick_skin: 'Hilft auf dem kalten Schnee von Insel 2.',
       night_eyes: 'Du siehst nachts bis zu 2 Felder weiter.',
       sure_foot: 'Auf Insel 2 gibt es auf dem Weg nach oben viele Felsstufen und Eiswände.',
@@ -634,7 +645,16 @@ const de: WikiWords = {
         'Eine kalte Insel mit einem Nadelwald aus Fichten, Birken, Apfelbäumen und Farnen, einem großen Berg aus Klippen und Geröll und **zwei tiefen Höhlen**. Hier gibt es keine Kokosnüsse: Äpfel, Beeren, Pilze, Fisch und Leuchtpilze sind das Essen. Schnee ist auch am Tag kalt: Nimm Holz für ein Feuer mit.',
         'Hier leben Krabben, Hasen, Eichhörnchen und Fledermäuse, und weit weg vom Lager Wildschweine, Wespen, Höhlenbären und **Bergziegen**. Die Ziegen klettern über die Felsstufen.',
         'Auf dem verschneiten Gipfel steht ein alter Steinkreis. Bau darauf ein **Leuchtfeuer** und zünde es an, damit ein Schiff dich an Bord holt. Auf dem Weg nach oben kommst du über einen Ring aus **Felsstufen** (bau eine Leiter daran) und dann über einen Ring aus **Eiswänden** (häng ein Kletterseil daran). Der Zunder braucht **Harz** von verschneiten Fichten.',
-        'Das ist vorerst die letzte Insel. Wenn das Schiff kommt, kannst du auf dem Kiefernkamm bleiben oder eine neue Insel beginnen.',
+        'Wenn das Leuchtfeuer brennt, holt dich ein Schiff an Bord. Ein Sturm treibt es vom Kurs ab, und es setzt dich auf der Glutinsel an Land. Du behältst deine Tasche, EP, Fähigkeiten, Sterne und deinen Hund.',
+      ],
+    },
+    three: {
+      title: 'Insel 3: Glutinsel',
+      paras: [
+        'Ein Sturm setzt dich auf einer warmen Vulkaninsel an Land. Unten wachsen Palmen und ein Dschungel; weiter oben liegt graue **Asche** zwischen schwarzen Basaltfelsen. Die Asche ist heiß in der Sonne: Dort bekommst du am Tag schneller Durst. Es gibt nur wenige Quellen, aber **heiße Quellen** auf der Asche geben Wasser und wärmen dich wie ein Feuer.',
+        'Ein **Lavastrom** ersetzt den Fluss. Auf Lava kannst du nicht laufen: Leg **Trittsteine** (8 Steine) darüber. Ein alter **Ballon** liegt am Kraterrand, neben dem Lavasee. Repariere Korb und Hülle und bau einen Brenner. Der Brenner braucht **Schwefel** von den Dampflöchern am Krater. Dann flieg nach Hause!',
+        'Kokosnüsse, Beeren, Pilze, Fisch und Leuchtpilze aus den **zwei tiefen Höhlen** sind das Essen. Hier leben Krabben, Schildkröten, Affen, Fledermäuse, scheue **Eidechsen** und freche **Möwen**, die dir Essen klauen. Weit weg vom Lager leben Wildschweine, Wespen, Schlangen und **Skorpione**, die stechen.',
+        'Das ist vorerst die letzte Insel. Der Ballon bringt dich nach Hause, und das Spiel ist zu Ende. Danach kannst du auf der Glutinsel bleiben oder eine neue Insel beginnen.',
       ],
     },
     goalTitle: 'Schritte zum Ziel',
@@ -651,7 +671,8 @@ const de: WikiWords = {
       { title: 'Vom Fisch zum vollen Bauch', steps: ['10 EP sammeln', 'Talent „Angelrute“ lernen', 'Angelrute bauen', 'Ins Meer laufen und angeln', 'Fisch am Lagerfeuer braten', 'Bestes Essen und Vorräte für das Boot'] },
       { title: 'Die Insel öffnen', steps: ['Holz, Steine, ein Blatt', 'Steinaxt bauen', 'Durch das Dornengestrüpp', 'Holzstämme von Bäumen schlagen', 'Brücke bauen', 'Zur anderen Seite und zum Boot'] },
       { title: 'Ein warmes, sicheres Zuhause', steps: ['Lagerfeuer und Unterstand', 'Für die Hütte sammeln (Holzstämme und Seile)', 'Hütte bauen: dein Lager', 'Im Bett ganz ausschlafen', 'Werkstatt, Kamin und Regentonne anbauen', 'Zu Hause braten, trinken und heilen'] },
-      { title: 'Seile für die Inselziele', steps: ['Große Blätter sammeln', 'Seil drehen (2 Blätter)', 'Seilmacher: 2 Seile für 2 Blätter', 'Mast, Segel und Leuchtfeuer', 'Leitern und Kletterseile'] },
+      { title: 'Seile für die Inselziele', steps: ['Große Blätter sammeln', 'Seil drehen (2 Blätter)', 'Seilmacher: 2 Seile für 2 Blätter', 'Mast, Segel, Leuchtfeuer und Ballon', 'Leitern und Kletterseile'] },
+      { title: 'Auf den Vulkan', steps: ['Steine sammeln', 'Trittsteine über die Lava legen', 'Über die heiße Asche steigen (trink an den heißen Quellen)', 'Schwefel von den Dampflöchern kratzen', 'Den alten Ballon reparieren', 'Nach Hause fliegen'] },
       { title: 'In die tiefen Höhlen', steps: ['Finde eine Höhle in den Felshügeln', 'Drinnen ist es dunkel, auch am Tag', 'Pflück Leuchtpilze: Essen mit viel Energie', 'Brich Kristalle ab', 'Bau eine Kristalllaterne', 'Sieh weiter in Höhlen und nachts'] },
       { title: 'Sicher vor wilden Tieren', steps: ['Gut essen und trinken (über 50)', 'Leben kommt zurück', 'Spürsinn zeigt die Gefahr', 'Tierfreund: Sie bemerken dich später', 'Dein Hund verbellt Schlangen'] },
     ],

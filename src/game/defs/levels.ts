@@ -6,15 +6,15 @@ import type { ObjectKind } from './objects';
 // start (an old wreck, a broken bridge…); walking into it hands over what it
 // still needs. Stage names and messages live in src/i18n/.
 
-export type StageId = 'hull' | 'mast' | 'sail' | 'supplies' | 'base' | 'pyre' | 'tinder';
-export type LevelId = 1 | 2;
+export type StageId = 'hull' | 'mast' | 'sail' | 'supplies' | 'base' | 'pyre' | 'tinder' | 'basket' | 'envelope' | 'burner';
+export type LevelId = 1 | 2 | 3;
 /**
  * Optional island tasks, each worth a star: open every chest, catch fish,
  * explore most of the island, or go some days without fainting.
  */
 export type StarId = 'chests' | 'fish' | 'explore' | 'safe';
-/** How world generation shapes the island: palms and beaches, or forest and mountains. */
-export type Biome = 'tropical' | 'mountain';
+/** How world generation shapes the island: palms and beaches, forest and mountains, or a volcano. */
+export type Biome = 'tropical' | 'mountain' | 'volcano';
 
 export interface GoalStage {
   id: StageId;
@@ -60,6 +60,19 @@ export const LEVELS: LevelDef[] = [
       { id: 'tinder', cost: { leaves: 12, wood: 4, resin: 3 }, becomes: 'beacon_ready' },
     ],
     stars: ['chests', 'explore', 'safe'],
+  },
+  {
+    // Ember Isle: an old hot-air balloon on the crater rim, to fly home.
+    level: 3,
+    biome: 'volcano',
+    site: 'balloon_site',
+    stages: [
+      { id: 'basket', cost: { log: 4, wood: 8, rope: 4 }, becomes: 'balloon_basket' },
+      { id: 'envelope', cost: { leaves: 16, rope: 4 }, becomes: 'balloon_envelope' },
+      // Sulphur from the steam vents makes the burner burn hot.
+      { id: 'burner', cost: { stone: 8, log: 2, sulphur: 4 }, becomes: 'balloon_ready' },
+    ],
+    stars: ['chests', 'fish', 'explore'],
   },
 ];
 

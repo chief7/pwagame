@@ -37,6 +37,10 @@ npm run preview   # serve the build (service worker is only active here)
   git push
   ```
 
+- The preview (and `npm run dev`) has a **Cheats** button in the Bag panel
+  for testing: jump to any island, go to the goal and other places, fill
+  the bag and needs, reveal the map, skip the clock. The game on `main`
+  does not show it.
 - Do not change `main` directly. If it changes, merge `main` into `preview`
   so the two stay in step.
 
@@ -112,7 +116,7 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
   you can bring things in as many trips as you like. The Build panel shows
   the next step.
 - **Island stars:** each island has three optional tasks (open every
-  chest, catch 5 fish or explore most of the island, go 3 days without
+  chest, catch 5 fish, explore most of the island, or go 3 days without
   fainting). The Build panel shows them; each star gives 5 XP.
 - **The dog:** a stray dog lives far from camp on each island. Walk into it
   with food to adopt it. Your dog follows you and barks crabs, monkeys,
@@ -128,7 +132,8 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
 ## The islands
 
 Every island has the same three parts: the home coast where you start, the
-wild forest behind a wall of brambles, and the far side across a river.
+wild forest behind a wall of brambles, and the far side across a river
+(a lava flow on island 3).
 Each island has springs, chests, a few deep caves, a stray dog and room
 for one hut. Each island also has one goal and three stars.
 
@@ -175,10 +180,36 @@ for one hut. Each island also has one goal and three stars.
   2. Wood pile: 10 logs, 4 wood, 4 rope.
   3. Tinder: 12 leaves, 4 wood, 3 resin (from the snowy spruces).
 
-  Then walk into it to light it, and a passing ship takes you on board. The
-  next island is not built yet, so you can stay or start a new one.
+  Then walk into it to light it, and a passing ship takes you on board. A
+  storm drives the ship off course, and it puts you ashore on the third
+  island. You keep your bag, XP, skills, stars, needs and dog.
 - **Stars:** open every chest, explore most of the island, go 3 days
   without fainting.
+
+### Island 3: Ember Isle
+
+- **The land:** a warm volcano island. Beaches with palms and a jungle
+  below, grey ash and black basalt cliffs above, and a lake of lava in the
+  crater. Two deep caves. The ash is hot in the sun: out there in the day,
+  your Water drops up to 50% faster.
+- **Water:** only 4 springs and no river, but 3 hot springs on the ash give
+  water and warm you like a small fire.
+- **Food:** coconuts, berries, mushrooms, fish, and glowcaps in the deep
+  caves.
+- **Animals:** crabs, turtles, monkeys, bats, shy lizards and seagulls that
+  snatch food. Wild: boars, wasps, snakes and scorpions that sting.
+- **The lava flow:** it takes the place of the river. Lava is too hot to
+  walk on, so lay stepping stones (8 stones) across it.
+- **Goal: repair the hot-air balloon and fly home.** An old balloon lies on
+  the crater rim. Fix it in three steps:
+  1. Basket: 4 logs, 8 wood, 4 rope.
+  2. Balloon cloth: 16 leaves, 4 rope.
+  3. Burner: 8 stone, 2 logs, 4 sulphur (from the steam vents near the
+     crater).
+
+  Then walk into it to fly home. This is the end of the game for now: you
+  can stay on the island or start a new one.
+- **Stars:** open every chest, catch 5 fish, explore most of the island.
 
 ## Controls
 
@@ -231,7 +262,7 @@ src/
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
-    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow), deep caves, bramble wall, river, scenery
+    worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow; island 3: volcano, ash, lava), deep caves, bramble wall, river (lava flow), scenery
     caves.ts     finds the deep caves (big caves with few ways in) from the tiles
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view

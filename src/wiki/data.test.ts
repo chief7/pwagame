@@ -17,7 +17,8 @@ describe('compendium data', () => {
     const listed = rows.flatMap((r) => r.kinds);
     expect(listed.sort()).toEqual(OBJECT_KINDS.filter((k) => OBJECTS[k].gather).sort());
     for (const row of rows) expect(row.islands.length, row.kinds.join()).toBeGreaterThan(0);
-    expect(objectIslands('palm_tall')).toEqual([1]);
+    expect(objectIslands('palm_tall')).toEqual([1, 3]);
+    expect(objectIslands('steam_vent')).toEqual([3]);
     expect(objectIslands('tree_spruce_snow')).toEqual([2]);
     expect(objectIslands('barrel')).toEqual([1]);
   });
@@ -30,7 +31,7 @@ describe('compendium data', () => {
   });
 
   it('lists every animal but the dog on some island', () => {
-    const listed = new Set([...animalsByIsland(1), ...animalsByIsland(2)]);
+    const listed = new Set([...animalsByIsland(1), ...animalsByIsland(2), ...animalsByIsland(3)]);
     expect([...listed].sort()).toEqual(ANIMAL_KINDS.filter((k) => k !== 'dog').sort());
   });
 

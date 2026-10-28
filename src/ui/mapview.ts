@@ -17,7 +17,7 @@ const MARGIN = 6;
 /** Cells around a bear sighting that the map shades as bear country. */
 export const BEAR_AREA = 5;
 
-type Ground = 'sea' | 'river' | 'sand' | 'forest' | 'rock' | 'scree' | 'snow';
+type Ground = 'sea' | 'river' | 'sand' | 'forest' | 'rock' | 'scree' | 'snow' | 'ash' | 'lava';
 
 const GROUND: Record<Tile, Ground> = {
   [Tile.Water]: 'sea',
@@ -28,6 +28,8 @@ const GROUND: Record<Tile, Ground> = {
   [Tile.River]: 'river',
   [Tile.Scree]: 'scree',
   [Tile.Snow]: 'snow',
+  [Tile.Ash]: 'ash',
+  [Tile.Lava]: 'lava',
 };
 
 /** Two washes per ground, mixed by noise so the paint looks uneven. */
@@ -39,10 +41,12 @@ const WASH: Record<Ground, [string, string]> = {
   rock: [P.washRock, P.washRockDark],
   scree: [P.washRock, P.washSand],
   snow: [P.washSnow, P.washSnow],
+  ash: [P.washAsh, P.washAshDark],
+  lava: [P.washLava, P.washLavaDark],
 };
 
 /** Objects that get a sign on the map (besides the island goal). */
-const SIGNS: Partial<Record<ObjectKind, MapSign>> = { hut: 'hut', campfire: 'fire', spring: 'spring' };
+const SIGNS: Partial<Record<ObjectKind, MapSign>> = { hut: 'hut', campfire: 'fire', spring: 'spring', hot_spring: 'spring' };
 
 export interface MapMarker {
   /** Drawn with the sprite `map_<sign>`. */

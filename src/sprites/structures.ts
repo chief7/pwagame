@@ -522,3 +522,190 @@ export function beacon(): Sprite[] {
     beaconLit('beacon_lit_2', 1),
   ];
 }
+
+// ---- Island 3: the hot-air balloon on the crater rim ------------------------------
+
+const BALLOON_W = 24;
+const BALLOON_H = 32;
+/** The basket: its rim row, its bottom row, and its left and right columns. */
+const BASKET_TOP = 25;
+const BASKET_FOOT = 30;
+const BASKET_X0 = 8;
+const BASKET_X1 = 15;
+/** Where the ropes meet the bottom of the envelope. */
+const SKIRT_Y = 19;
+
+type BalloonStage = 'site' | 'basket' | 'envelope' | 'ready';
+
+/** Woven wicker: straw strands that go over and under. */
+function wicker(x: number, y: number, x0: number, x1: number): string {
+  if (x === x0) return P.strawLight;
+  if (x === x1) return P.strawDeep;
+  return (x + (y % 2)) % 2 === 0 ? P.straw : P.strawDark;
+}
+
+function drawBasket(s: Sprite): void {
+  for (let y = BASKET_TOP; y <= BASKET_FOOT; y++) {
+    for (let x = BASKET_X0; x <= BASKET_X1; x++) s.set(x, y, y === BASKET_TOP ? P.woodLight : wicker(x, y, BASKET_X0, BASKET_X1));
+  }
+}
+
+/** Four ropes from the basket rim up to the envelope. */
+function drawBalloonRopes(s: Sprite, top: number): void {
+  for (const [bx, tx] of [[BASKET_X0, 9], [BASKET_X1, 14]]) {
+    for (let y = top; y < BASKET_TOP; y++) {
+      const x = Math.round(bx + ((tx - bx) * (BASKET_TOP - y)) / (BASKET_TOP - top));
+      s.set(x, y, P.strawDark);
+    }
+  }
+}
+
+/** Red and cream panels of balloon cloth: `u` runs from -1 (left) to 1 (right) across the balloon. */
+function cloth(u: number, x: number, y: number, seed: number, patched: boolean): string {
+  if (patched && hash2(x >> 1, y >> 1, seed) < 0.06) return x % 2 ? P.leafDark : P.leaf;
+  const red = Math.floor((u + 1) * 3) % 2 === 0;
+  const shade = u > 0.45 || hash2(x, y, seed + 1) < 0.06;
+  if (red) return shade ? P.balloonRedDark : P.balloonRed;
+  return shade ? P.balloonCreamDark : P.balloonCream;
+}
+
+/** The full envelope, round on top and narrowing to a skirt over the burner. */
+function drawEnvelope(s: Sprite): void {
+  for (let y = 0; y <= SKIRT_Y; y++) {
+    const dy = (y + 0.5 - 9) / 9.5;
+    const half = y <= 15 ? 10.5 * Math.sqrt(Math.max(0, 1 - dy * dy)) : 3 + (SKIRT_Y - y) * 0.9;
+    for (let x = 0; x < BALLOON_W; x++) {
+      const u = (x + 0.5 - 12) / Math.max(half, 0.5);
+      if (Math.abs(u) > 1) continue;
+      s.set(x, y, cloth(u, x, y, 150, true));
+    }
+  }
+  // A highlight on the upper left.
+  for (const [x, y] of [[6, 4], [7, 4], [5, 5], [6, 5], [5, 6]]) s.set(x, y, P.steamLight);
+}
+
+/** The patched envelope before it is filled: limp, lying in folds over the basket. */
+function drawLimpEnvelope(s: Sprite): void {
+  for (let y = 12; y <= BASKET_TOP - 1; y++) {
+    const dy = (y + 0.5 - 20) / 8;
+    const half = 9.5 * Math.sqrt(Math.max(0, 1 - dy * dy));
+    for (let x = 0; x < BALLOON_W; x++) {
+      const u = (x + 0.5 - 12) / Math.max(half, 0.5);
+      if (Math.abs(u) > 1) continue;
+      // Folds: dark lines that run down the cloth.
+      const fold = (x + Math.round(y * 0.3)) % 5 === 0;
+      s.set(x, y, fold ? P.balloonRedDark : cloth(u, x, y, 151, true));
+    }
+  }
+}
+
+/** A heap of torn balloon cloth with holes in it, centred on column `cx`. */
+function drawClothHeap(s: Sprite, cx: number): void {
+  for (let y = 22; y <= BASKET_FOOT; y++) {
+    const half = 6.5 * Math.sqrt(Math.max(0, 1 - ((y + 0.5 - BASKET_FOOT - 1) / 8.5) ** 2));
+    for (let x = Math.floor(cx - 7); x < BALLOON_W; x++) {
+      const u = (x + 0.5 - cx) / Math.max(half, 0.5);
+      if (Math.abs(u) > 1) continue;
+      const hole = hash2(x, y, 152) < 0.08;
+      const fold = (x + y) % 4 === 0;
+      s.set(x, y, hole ? P.interior : fold ? P.balloonCreamDark : cloth(u, x, y, 153, false));
+    }
+  }
+}
+
+/** A coil of new rope on the basket rim. */
+function drawRopeCoil(s: Sprite): void {
+  for (let x = 8; x <= 12; x++) {
+    s.set(x, BASKET_TOP - 2, x === 8 || x === 12 ? P.strawDark : P.strawLight);
+    s.set(x, BASKET_TOP - 1, x < 10 ? P.straw : P.strawDark);
+  }
+}
+
+/** The old balloon as it was found: the basket tipped over, the torn cloth in a heap. */
+function drawBalloonSite(s: Sprite): void {
+  // The basket on its side, the open top facing left.
+  for (let y = 24; y <= BASKET_FOOT; y++) {
+    for (let x = 2; x <= 9; x++) s.set(x, y, x === 2 ? P.interior : x === 3 ? P.woodLight : wicker(x, y, 3, 9));
+  }
+  drawClothHeap(s, 16.5);
+  // A broken rope across the ground.
+  for (let x = 4; x <= 13; x++) s.set(x, 23 - Math.round(Math.sin(x * 0.7)), P.strawDark);
+}
+
+/** A stone fire bowl over the basket; when `lit`, a flame burns in it. */
+function drawBurner(s: Sprite, lit: boolean, frame: 0 | 1): void {
+  for (let x = 10; x <= 13; x++) s.set(x, 22, x === 10 ? P.stoneLight : x === 13 ? P.stoneDark : P.stone);
+  for (let x = 11; x <= 12; x++) s.set(x, 23, P.stoneDark);
+  if (!lit) return;
+  const flame = frame === 0
+    ? [[11, 21, P.flameCore], [12, 21, P.flame], [11, 20, P.flame], [12, 20, P.flameOrange], [11, 19, P.flameOrange]]
+    : [[11, 21, P.flame], [12, 21, P.flameCore], [12, 20, P.flame], [11, 20, P.flameOrange], [12, 19, P.flameOrange]];
+  for (const [x, y, c] of flame) s.set(x as number, y as number, c as string);
+}
+
+function balloonSprite(name: string, stage: BalloonStage, frame: 0 | 1 = 0): Sprite {
+  const s = new Sprite(name, BALLOON_W, BALLOON_H);
+  if (stage === 'site') {
+    drawBalloonSite(s);
+  } else {
+    if (stage === 'ready') drawEnvelope(s);
+    if (stage !== 'basket') drawBalloonRopes(s, SKIRT_Y);
+    drawBurner(s, stage === 'ready', frame);
+    if (stage === 'envelope') drawLimpEnvelope(s);
+    if (stage === 'basket') drawClothHeap(s, 14);
+    drawBasket(s);
+    if (stage === 'basket') drawRopeCoil(s);
+  }
+  return s.outline().shadow(12, BASKET_FOOT + 1.5, 9, 1.4);
+}
+
+/** The explorer's head and shoulders over the basket rim. */
+function drawPilot(s: Sprite, body: 'male' | 'female'): void {
+  const look = LOOKS[body];
+  const rows = ['.hhh.', 'hhhhh', 'hsess', 'hSsss', 'ccccC'];
+  const key: Record<string, string> = { h: look.hair, s: look.skin, S: look.skinShade, e: P.outline, c: look.shirt, C: look.shirtShade };
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch !== '.') s.set(13 + x - 2, BASKET_TOP - 4 + y, key[ch]);
+  }));
+  if (body === 'female') s.set(12, BASKET_TOP - 4, P.flower);
+}
+
+/** The balloon in the air with the explorer on board, for the flight home: no shadow. 2 frames. */
+function balloonAwaySprite(body: 'male' | 'female', frame: 0 | 1): Sprite {
+  const s = new Sprite(`balloon_away_${body}${frame ? '_2' : ''}`, BALLOON_W, BALLOON_H);
+  drawEnvelope(s);
+  drawBalloonRopes(s, SKIRT_Y);
+  drawBurner(s, true, frame);
+  drawPilot(s, body);
+  drawBasket(s);
+  return s.outline();
+}
+
+/** Where the balloon stood after it flew off: two stakes with cut ropes. */
+function balloonGone(): Sprite {
+  const s = new Sprite('balloon_gone', BALLOON_W, BALLOON_H);
+  for (const x of [7, 16]) {
+    for (let y = BASKET_FOOT - 4; y <= BASKET_FOOT; y++) {
+      s.set(x, y, y === BASKET_FOOT - 4 ? P.woodCut : P.wood);
+      s.set(x + 1, y, P.woodDark);
+    }
+  }
+  for (const [x, y] of [[9, 27], [10, 28], [11, 28], [14, 27], [13, 28]]) s.set(x, y, P.strawDark);
+  return s.outline().shadow(12, BASKET_FOOT + 1.5, 7, 1.2);
+}
+
+export function balloonAway(): Sprite[] {
+  return (['male', 'female'] as const).flatMap((body) => [balloonAwaySprite(body, 0), balloonAwaySprite(body, 1)]);
+}
+
+/** The balloon in each stage; the ready balloon has two frames for its flame. */
+export function balloon(): Sprite[] {
+  return [
+    balloonSprite('balloon_site', 'site'),
+    balloonSprite('balloon_basket', 'basket'),
+    balloonSprite('balloon_envelope', 'envelope'),
+    balloonSprite('balloon_ready', 'ready', 0),
+    balloonSprite('balloon_ready_2', 'ready', 1),
+    balloonGone(),
+  ];
+}

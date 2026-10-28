@@ -18,7 +18,9 @@ export type ObjectKind =
   | 'beacon_site' | 'beacon_base' | 'beacon_pyre' | 'beacon_ready'
   | 'ledge' | 'ledge_ladder' | 'ice_wall' | 'ice_wall_rope'
   | 'barrel' | 'barrel_empty' | 'sandbar_ns' | 'sandbar_ew'
-  | 'glowcap' | 'crystal_cluster';
+  | 'glowcap' | 'crystal_cluster'
+  | 'lava_stones_ns' | 'lava_stones_ew' | 'steam_vent' | 'hot_spring'
+  | 'balloon_site' | 'balloon_basket' | 'balloon_envelope' | 'balloon_ready';
 
 export interface Yield {
   item: ItemId;
@@ -58,8 +60,10 @@ export interface ObjectDef {
   lightRadius?: number;
   /** Animation frames (sprite names), cycled by the renderer. */
   frames?: string[];
-  /** Built over river cells rather than on the ground. */
+  /** Built over river cells rather than on the ground (over the lava flow with `onLava`). */
   bridge?: true;
+  /** A bridge that crosses lava instead of the river: the stepping stones of island 3. */
+  onLava?: true;
   /** A steep step: blocks the way until the explorer builds a way up onto it (a recipe with `onto`). */
   steep?: true;
   /** A way up a steep step: walking onto it is tiring (costs Energy). */
@@ -71,8 +75,11 @@ export interface ObjectDef {
    * high tide it shows its `<kind>_wet` sprite.
    */
   tidal?: true;
-  /** A finished goal after the explorer used it (the lit beacon): its frames and how far its light reaches. */
-  done?: { frames: string[]; lightRadius: number };
+  /**
+   * A finished goal after the explorer used it (the lit beacon): its frames, how far its light reaches,
+   * and the picture for the goal card and end screen when that is not the first frame.
+   */
+  done?: { frames: string[]; lightRadius: number; icon?: string };
 }
 
 const def = (d: ObjectDef) => d;
@@ -214,6 +221,22 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   crystal_cluster: def({
     kind: 'crystal_cluster',
     gather: { yields: [{ item: 'crystal', min: 1, max: 2 }], after: { remove: true } },
+  }),
+  // Island 3: stepping stones over the lava flow, the sulphur vents, hot springs and the balloon.
+  lava_stones_ns: def({ kind: 'lava_stones_ns', walkable: true, bridge: true, onLava: true }),
+  lava_stones_ew: def({ kind: 'lava_stones_ew', walkable: true, bridge: true, onLava: true }),
+  steam_vent: def({
+    kind: 'steam_vent', depletedSprite: 'steam_vent_spent', frames: ['steam_vent', 'steam_vent_2'],
+    gather: { yields: [{ item: 'sulphur', min: 1, max: 2 }], after: { regrow: 150 } },
+  }),
+  hot_spring: def({ kind: 'hot_spring', drink: 35, warmthRadius: 1, frames: ['hot_spring', 'hot_spring_2'] }),
+  balloon_site: def({ kind: 'balloon_site', goal: true }),
+  balloon_basket: def({ kind: 'balloon_basket', goal: true }),
+  balloon_envelope: def({ kind: 'balloon_envelope', goal: true }),
+  // After the flight only the stakes it was tied to are left.
+  balloon_ready: def({
+    kind: 'balloon_ready', goal: true, frames: ['balloon_ready', 'balloon_ready_2'],
+    done: { frames: ['balloon_gone'], lightRadius: 0, icon: 'balloon_ready' },
   }),
 };
 

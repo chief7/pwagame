@@ -17,7 +17,7 @@ export function objectIslands(kind: ObjectKind): number[] {
   for (const level of LEVELS) {
     const scatter = Object.values(SCATTER[level.biome]).flat().some(([k]) => k === kind);
     const islet = level.level === 1 && ISLET_OBJECTS.includes(kind);
-    const goalMaterial = level.biome === 'mountain' && kind === 'tree_spruce_snow';
+    const goalMaterial = (level.biome === 'mountain' && kind === 'tree_spruce_snow') || (level.biome === 'volcano' && (kind === 'steam_vent' || kind === 'hot_spring'));
     if (scatter || islet || goalMaterial || EVERYWHERE.includes(kind)) islands.push(level.level);
   }
   return islands;

@@ -81,6 +81,7 @@ const ITEM: ItemWords<CountNoun> = {
   rope: { g: 'n', word: 'Seil', plural: 'Seile', short: ['Seil', 'Seile'] },
   tar: { g: 'm', word: 'Topf Teer', plural: 'Töpfe Teer', short: ['Teer', 'Teer'] },
   resin: { g: 'n', word: 'Stück Harz', plural: 'Stück Harz', short: ['Harz', 'Harz'] },
+  sulphur: { g: 'm', word: 'Brocken Schwefel', plural: 'Brocken Schwefel', short: ['Schwefel', 'Schwefel'] },
   glowcap: { g: 'm', word: 'Leuchtpilz', plural: 'Leuchtpilze', short: ['Leuchtpilz', 'Leuchtpilze'] },
   crystal: { g: 'm', word: 'Kristall', plural: 'Kristalle', short: ['Kristall', 'Kristalle'] },
   lantern: { g: 'f', word: 'Kristalllaterne', plural: 'Kristalllaternen', short: ['Laterne', 'Laternen'] },
@@ -136,6 +137,14 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   sandbar_ew: { g: 'f', word: 'Sandbank' },
   glowcap: { g: 'pl', word: 'Leuchtpilze', gather: 'Du pflückst die leuchtenden Pilze' },
   crystal_cluster: { g: 'f', word: 'Kristallgruppe', gather: 'Du brichst ein paar Kristalle ab' },
+  lava_stones_ns: { g: 'pl', word: 'Trittsteine' },
+  lava_stones_ew: { g: 'pl', word: 'Trittsteine' },
+  steam_vent: { g: 'n', word: 'Dampfloch', gather: 'Du kratzt gelben Schwefel vom Dampfloch' },
+  hot_spring: { g: 'f', word: 'Quelle', adj: 'heiß' },
+  balloon_site: { g: 'm', word: 'Ballon', adj: 'alt' },
+  balloon_basket: { g: 'm', word: 'Ballon' },
+  balloon_envelope: { g: 'm', word: 'Ballon' },
+  balloon_ready: { g: 'm', word: 'Ballon' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -164,6 +173,11 @@ const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }
     g: 'f', word: 'Bergziege', shoo: 'Du fuchtelst mit den Armen. Die Ziege meckert und springt über die Felsen davon.',
     hurt: 'Bums! Die Bergziege stößt dich mit den Hörnern.', alert: 'Eine Bergziege senkt die Hörner und rennt auf dich zu!',
   },
+  lizard: { g: 'f', word: 'Eidechse', shoo: 'Die Eidechse zuckt mit dem Schwanz und huscht davon.' },
+  gull: { g: 'f', word: 'Möwe', shoo: 'Die Möwe kreischt und flattert den Strand entlang davon.' },
+  scorpion: {
+    g: 'm', word: 'Skorpion', shoo: 'Der Skorpion hebt den Schwanz und krabbelt davon.', hurt: 'Autsch! Der Skorpion sticht dich.',
+  },
 };
 
 const NEEDS = { health: 'Leben', food: 'Essen', water: 'Wasser', energy: 'Energie', warmth: 'Wärme' };
@@ -187,9 +201,14 @@ function itemList(items: [keyof typeof ITEM, number][]): string {
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} und ${parts.at(-1)}` : parts.join('');
 }
 
-/** The goal of a stage's island: "das Boot", "dem Leuchtfeuer" (both neuter). */
+/** The goal of a stage's island: das Boot, das Leuchtfeuer, der Ballon. */
+function goalNoun(stage: StageId): Noun {
+  return ({ 1: { g: 'n', word: 'Boot' }, 2: { g: 'n', word: 'Leuchtfeuer' }, 3: { g: 'm', word: 'Ballon' } } as const)[stageLevel(stage)];
+}
+
+/** "das Boot", "dem Ballon". */
 function goalName(stage: StageId, c: Case): string {
-  return phrase({ g: 'n', word: stageLevel(stage) === 2 ? 'Leuchtfeuer' : 'Boot' }, c, 'the');
+  return phrase(goalNoun(stage), c, 'the');
 }
 
 /** "17:00". */
@@ -244,7 +263,7 @@ export const de: Strings = {
     goalStep: (index, count, stage) => `Schritt ${index + 1} von ${count}: ${de.stages[stage]}`,
     notYet: 'Noch nicht',
     endTitle: 'Geschafft!',
-    endText: 'Ein Schiff hat dein Leuchtfeuer gesehen und dich an Bord geholt. Die nächste Insel kommt bald! Bis dahin kannst du hierbleiben oder eine neue Insel starten.',
+    endText: 'Dein Ballon trägt dich über das Meer, bis nach Hause. Was für ein Abenteuer! Du kannst auf dieser Insel bleiben oder eine neue Insel starten.',
     stay: 'Auf dieser Insel bleiben',
     yourDog: 'Dein Hund',
     dogNeeds: (food, water) => `Essen ${food} · Wasser ${water}`,
@@ -287,6 +306,7 @@ export const de: Strings = {
   rareHints: {
     tar: 'Teer: Alte Fässer stehen auf einer kleinen Insel vor der Küste. Geh bei Ebbe über die Sandbank (5–11 und 17–23 Uhr).',
     resin: 'Harz: Schüttle die verschneiten Fichten hoch oben am Berg.',
+    sulphur: 'Schwefel: Kratz ihn von den dampfenden Löchern nahe am Krater.',
   },
   levels: {
     1: {
@@ -309,6 +329,16 @@ export const de: Strings = {
       sailText: 'Das Leuchtfeuer ist fertig. Willst du es anzünden, damit ein Schiff dich sieht?',
       setSail: 'Anzünden!',
     },
+    3: {
+      goalTitle: 'Inselziel: Flieg mit dem Ballon',
+      goalFind: 'Steig auf den Vulkan. Ein alter Ballon liegt am Kraterrand.',
+      goalHint: 'Lauf gegen den Ballon, um ihm zu geben, was du dabeihast.',
+      goalReady: 'Der Ballon ist fertig! Lauf dagegen, um loszufliegen.',
+      goalSailed: 'Du bist mit dem Ballon von dieser Insel weggeflogen.',
+      sailTitle: 'Losfliegen?',
+      sailText: 'Der Ballon ist fertig. Willst du über das Meer fliegen, bis nach Hause?',
+      setSail: 'Losfliegen!',
+    },
   },
   clock,
   needs: NEEDS,
@@ -319,6 +349,7 @@ export const de: Strings = {
     rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Für das Inselziel brauchst du Seile.' },
     axe: { name: 'Steinaxt', description: 'Schlägt Holzstämme von Bäumen und einen Weg durch Dornengestrüpp.' },
     bridge: { name: 'Brücke', description: 'Führt über einen Fluss, bis zu 3 Schritte breit. Schau zum Wasser, um sie zu bauen.' },
+    lava_stones: { name: 'Trittsteine', description: 'Flache Steine über den Lavastrom, bis zu 3 Schritte. Schau zur Lava, um sie zu legen.' },
     fishing_rod: { name: 'Angelrute', description: 'Lauf damit ins Meer, um Fische zu fangen.' },
     cooked_fish: { name: 'Fisch braten', description: 'Stell dich neben ein Lagerfeuer. Gebratener Fisch ist leckeres Essen.' },
     ladder: { name: 'Leiter', description: 'Bringt dich über eine Felsstufe in den Bergen. Stell dich neben die Stufe, um sie zu bauen.' },
@@ -328,7 +359,10 @@ export const de: Strings = {
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
   objectName: (kind) => name(OBJECT[kind]),
   animalName: (kind) => name(ANIMAL[kind]),
-  stages: { hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte', base: 'Steinsockel', pyre: 'Holzstoß', tinder: 'Zunder' },
+  stages: {
+    hull: 'Rumpf', mast: 'Mast', sail: 'Segel', supplies: 'Vorräte', base: 'Steinsockel', pyre: 'Holzstoß', tinder: 'Zunder',
+    basket: 'Korb', envelope: 'Ballonhülle', burner: 'Brenner',
+  },
   skills: {
     small_sips: { name: 'Kleine Schlucke', description: 'Dein Wasser sinkt 20 % langsamer.' },
     small_appetite: { name: 'Kleiner Hunger', description: 'Dein Essen sinkt 20 % langsamer.' },
@@ -369,6 +403,9 @@ export const de: Strings = {
       case 'needMaterials': return 'Du brauchst mehr Material.';
       case 'noRoom': return 'Hier ist kein Platz zum Bauen.';
       case 'noBridgeSpot': return 'Stell dich an einen Fluss und schau zum Wasser. Eine Brücke reicht bis zu 3 Schritte weit.';
+      case 'noLavaSpot': return 'Stell dich an den Lavastrom und schau zur Lava. Trittsteine reichen bis zu 3 Schritte weit.';
+      case 'lavaHot': return 'Viel zu heiß! Auf Lava kannst du nicht laufen. Leg Trittsteine über den Lavastrom.';
+      case 'ashHot': return 'Puh! Die Asche ist heiß in der Sonne. Hier oben bekommst du schneller Durst.';
       case 'haveTool': return `Du hast schon ${itemCount(msg.item, 1)}.`;
       case 'needTool': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu dornig für deine Hände. Du brauchst ${itemCount(msg.item, 1)}.`;
       case 'notSleepy': return 'Du bist gerade nicht müde.';
@@ -390,7 +427,7 @@ export const de: Strings = {
         return `${text} (${clock(msg.turn)})`;
       }
       case 'notThirsty': return 'Du hast keinen Durst.';
-      case 'drink': return 'Du trinkst das kühle, frische Wasser. Herrlich!';
+      case 'drink': return msg.warm ? 'Du trinkst das warme Wasser. Es schmeckt nach Stein, aber es tut gut.' : 'Du trinkst das kühle, frische Wasser. Herrlich!';
       case 'drinkRiver': return 'Du schöpfst kühles Flusswasser. Herrlich!';
       case 'look': return `${cap(obj(msg.obj, 'nom', 'a'))}.`;
       case 'nothingLeft': return `${cap(contract(`an ${obj(msg.obj, 'dat', 'the')}`))} ist nichts mehr. Komm später wieder.`;
@@ -405,7 +442,9 @@ export const de: Strings = {
       case 'shoo': return ANIMAL[msg.animal].shoo;
       case 'low': return {
         food: 'Dein Magen knurrt. Zeit, etwas zu essen zu finden.',
-        water: msg.level === 2 ? 'Du hast Durst. Trink an einer Quelle oder am Fluss.' : 'Du hast Durst. Such eine Quelle oder eine Kokosnuss.',
+        water: msg.level === 2 ? 'Du hast Durst. Trink an einer Quelle oder am Fluss.'
+          : msg.level === 3 ? 'Du hast Durst. Trink an einer Quelle oder einer heißen Quelle, oder such eine Kokosnuss.'
+          : 'Du hast Durst. Such eine Quelle oder eine Kokosnuss.',
         energy: 'Du wirst müde. Eine Pause würde helfen.',
         warmth: 'Brr, dir wird kalt. Ein Feuer oder ein Unterschlupf würde helfen.',
       }[msg.need];
@@ -437,15 +476,18 @@ export const de: Strings = {
       case 'noBite': return 'Nichts beißt an. Versuch es noch mal!';
       case 'goalFound': return msg.obj === 'beacon_site'
         ? 'Du findest einen alten Steinkreis auf dem Gipfel! Ein Leuchtfeuer hier könnte ein Schiff rufen.'
-        : 'Du findest ein altes Bootswrack am Strand! Vielleicht kannst du es reparieren und wegsegeln.';
+        : msg.obj === 'balloon_site'
+          ? 'Du findest einen alten Ballon am Kraterrand! Der Korb ist kaputt und die Hülle zerrissen. Vielleicht kannst du ihn reparieren und wegfliegen.'
+          : 'Du findest ein altes Bootswrack am Strand! Vielleicht kannst du es reparieren und wegsegeln.';
       case 'goalNeeds': {
         const stage = {
           hull: 'den Rumpf', mast: 'den Mast', sail: 'das Segel', supplies: 'die Vorräte',
           base: 'den Steinsockel', pyre: 'den Holzstoß', tinder: 'den Zunder',
+          basket: 'den Korb', envelope: 'die Ballonhülle', burner: 'den Brenner',
         }[msg.stage];
         return `${cap(goalName(msg.stage, 'nom'))} braucht ${itemList(msg.left)} für ${stage}.`;
       }
-      case 'goalGive': return `Du gibst ${goalName(msg.stage, 'dat')} ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;
+      case 'goalGive': return `Du gibst ${goalName(msg.stage, 'dat')} ${itemList(msg.given)}. ${goalNoun(msg.stage).g === 'm' ? 'Er' : 'Es'} braucht noch ${itemList(msg.left)}.`;
       case 'goalStage': return {
         hull: 'Der Rumpf ist fertig! Jetzt braucht das Boot einen Mast.',
         mast: 'Der Mast steht! Jetzt braucht das Boot ein Segel.',
@@ -454,12 +496,19 @@ export const de: Strings = {
         base: 'Der Steinsockel ist fertig! Jetzt staple Holz darauf.',
         pyre: 'Der Holzstoß steht! Jetzt braucht er trockenen Zunder.',
         tinder: 'Der Zunder ist drin. Das Leuchtfeuer ist bereit zum Anzünden!',
+        basket: 'Der Korb ist repariert! Jetzt braucht der Ballon seine Hülle.',
+        envelope: 'Die Hülle ist geflickt! Jetzt braucht sie einen Brenner für heiße Luft.',
+        burner: 'Der Brenner ist dran. Der Ballon ist bereit zum Losfliegen!',
       }[msg.stage];
-      case 'goalReady': return msg.level === 2 ? 'Das Leuchtfeuer ist bereit zum Anzünden.' : 'Das Boot ist bereit zum Lossegeln.';
-      case 'sailAway': return msg.level === 2
-        ? 'Du zündest das Leuchtfeuer an. Rauch steigt hoch in den Himmel, und bald holt dich ein Schiff an Bord!'
-        : 'Du schiebst das Boot in die Wellen und segelst davon!';
-      case 'landIsland': return 'Nach einer langen Fahrt landet dein Boot auf einer neuen Insel. Hohe Bäume und verschneite Berge! Hier ist es kälter.';
+      case 'goalReady': return { 1: 'Das Boot ist bereit zum Lossegeln.', 2: 'Das Leuchtfeuer ist bereit zum Anzünden.', 3: 'Der Ballon ist bereit zum Losfliegen.' }[msg.level];
+      case 'sailAway': return {
+        1: 'Du schiebst das Boot in die Wellen und segelst davon!',
+        2: 'Du zündest das Leuchtfeuer an. Rauch steigt hoch in den Himmel, und bald holt dich ein Schiff an Bord!',
+        3: 'Der Brenner faucht, und der Ballon steigt über den Krater. Du fliegst über das Meer davon!',
+      }[msg.level];
+      case 'landIsland': return msg.level === 3
+        ? 'Ein Sturm treibt das Schiff weit vom Kurs ab. Es muss dich an einer Vulkaninsel an Land setzen. Hier ist es warm, und der Berg raucht! Finde selbst einen Weg nach Hause.'
+        : 'Nach einer langen Fahrt landet dein Boot auf einer neuen Insel. Hohe Bäume und verschneite Berge! Hier ist es kälter.';
       case 'dogSniff': return 'Ein streunender Hund schnuppert an deiner Hand. Er sieht hungrig aus. Bring ihm etwas zu essen.';
       case 'dogAdopt': return `Du gibst dem Hund ${itemCount(msg.item, 1)}. Er wedelt mit dem Schwanz und folgt dir. Du hast einen Hund!`;
       case 'dogBark': return `Wuff! Dein Hund bellt, und ${phrase(ANIMAL[msg.animal], 'nom', 'the')} rennt weg.`;

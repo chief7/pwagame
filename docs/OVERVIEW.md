@@ -206,7 +206,7 @@ Change per turn:
 | Need | Awake | Asleep |
 |---|---|---|
 | Food | −0.45 | −0.225 |
-| Water | −0.45 | −0.225 |
+| Water | −0.45 (up to ×1.5 on hot ash, see below) | −0.225 |
 | Energy | −0.25 | +1.4 × (0.4 + 0.6 × shelter) |
 | Warmth | moves towards a target (see 4.3): +1.5 up, −0.6 down | same |
 | Health | −1 for each empty need (Food, Water, Energy, Warmth) | same |
@@ -221,11 +221,18 @@ What this means in play (awake, no food or drink):
   an explorer who eats badly stays hurt.
 - Energy goes from 90 to 0 in about 360 turns (one and a half days).
 
+**Hot ash (island 3).** On `Ash`, Water drops faster: the rate is × (1 +
+`heat` × (1 − shelter)), with `heat` = 0.5 × daylight (`ASH_HEAT`). So open
+ash at midday uses 0.675 Water a turn; at night, in a hut or off the ash it
+is the normal rate. Stepping onto ash in the day (daylight above 0.5) logs
+`ashHot`.
+
 **Warnings.** When a need goes below 25 (`LOW`), the log shows a warning one
 time. The warning resets when the need is above 35 again. The HUD bar of a
 low need pulses. The Water warning gives a tip for the island: a spring or a
-coconut on island 1, a spring or the river on island 2 (no coconuts there).
-The `low` message carries the `level` for this.
+coconut on island 1, a spring or the river on island 2 (no coconuts there),
+a spring, a hot spring or a coconut on island 3. The `low` message carries
+the `level` for this.
 
 ### 4.2 Fainting (no death)
 
@@ -249,7 +256,8 @@ home is the start point on the beach.
 
 Warmth moves towards a target value each turn:
 
-- Near a campfire (2 cells or less): target 100.
+- Near a campfire (2 cells or less) or a hot spring (1 cell, `warmthRadius`
+  1): target 100.
 - Else: target = 100 − (1 − shelter) × ((1 − daylight) × 95 + cold), at
   least 0. `cold` is 40 on snow (`SNOW_CHILL`, island 2) and 0 elsewhere. So
   open snow has a target of 60 by day and 0 at night. A hut or a campfire
@@ -372,8 +380,9 @@ Tools (`tool: true` on the item) stay in the bag. They are never used up.
 
 - **Eat** from the Bag panel. Each food adds to Food, Water and/or Energy.
   The player cannot eat when Food is 98 or more, unless the food also gives Water.
-- **Drink** by walking into a spring or the river: +35 Water. Not possible
-  when Water is 98 or more.
+- **Drink** by walking into a spring, a hot spring or the river: +35 Water.
+  Not possible when Water is 98 or more. A hot spring logs `drink` with
+  `warm`.
 - The sea cannot be used for drinking.
 
 ### 4.8 Building
@@ -410,6 +419,10 @@ Special recipes:
   (`BRIDGE_SPAN`), with free ground after them. The bridge fills all those
   cells. Facing left or right builds `bridge_ew`, else `bridge_ns`. If
   there is no such river, the message is `noBridgeSpot`.
+- **Stepping stones** (island 3, `lava_stones`, 8 stone): a bridge with
+  `onLava`. It works the same, but over lava cells (`lava_stones_ew` or
+  `lava_stones_ns`). With no lava ahead, the message is `noLavaSpot`. A
+  bridge does not go over lava, and stepping stones do not go over a river.
 - **On a step** (a recipe with `onto`): the building replaces that object.
   It goes on such an object in front of the player, else on the nearest one
   next to the player. If there is none, the message is `noStep` (see 4.14).
@@ -448,9 +461,11 @@ always works. Wild sense marks its full notice range while it is awake.
 **Islands.** `islands` lists the islands (levels) where an animal lives
 (default `[1]`). `islandAnimals(level)` gives the list. Island 1: crab,
 turtle, monkey, piglet, bat, boar, snake, wasps, bear. Island 2: crab, bat,
-boar, wasps, bear, rabbit, squirrel, mountain goat.
+boar, wasps, bear, rabbit, squirrel, mountain goat. Island 3: crab, turtle,
+monkey, bat, boar, snake, wasps, lizard (shy, ash and sand), gull (cheeky,
+sand), scorpion (grumpy and wild, ash and caves: 50%, −6). No cave bears.
 
-**Wild animals** (`wild: true`: boar, snake, wasps, cave bear, mountain goat) only appear
+**Wild animals** (`wild: true`: boar, snake, wasps, cave bear, mountain goat, scorpion) only appear
 at least `minHomeDistance` (25) cells from home. A new hurt message is
 `hurt`, with a text for each animal in `src/i18n/`. Crabs keep `pinch`.
 
@@ -538,8 +553,9 @@ path. The Skills button shows a star when there are free points.
 Each island is a **level** with one big goal: something the player builds
 in stages to leave the island. `src/game/defs/levels.ts` (`LEVELS`) holds
 each level's `biome` (how world generation shapes it, see §5), its goal
-object (`site`) and its stages. Two levels exist: 1 (`tropical`) and 2
-(`mountain`). §4.20 describes each island and its goal as a whole.
+object (`site`) and its stages. Three levels exist: 1 (`tropical`), 2
+(`mountain`) and 3 (`volcano`). §4.20 describes each island and its goal as
+a whole.
 
 Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
 
@@ -585,17 +601,26 @@ How it works:
   `renderer.departure` draws `boat_away_<body>` with the explorer on board
   while the camera follows it. Input is ignored during the trip. With
   reduced motion there is no trip, only the fade.
-- **On level 1**, `sail()` then lands the player on level 2 (`landOn()`): a
-  new island from `generateWorld(…, 2)`, the player on its start point
-  (also the new home), new animals for that island, `goalGiven` cleared,
-  and the clock at 8:00 the next day. The bag, XP, skills and needs stay.
-  The log says `landIsland`. `sailed` stays false.
-- **On the last level** (2), `sail()` sets `sailed`. The beacon then burns
-  (`done.frames` of `beacon_ready`: `beacon_lit`, `beacon_lit_2`) and lights
-  7 cells at night (`done.lightRadius`); it does not warm. The end screen says
-  that a ship took the player on board and the next island comes soon. The
+- **The balloon flight** (level 3) works the same way: `balloonTrip()`
+  sends the balloon straight up for 10 cells, and the renderer draws
+  `balloon_away_<body>` (2 frames for the flame). The beacon (level 2) has
+  no trip.
+- **On levels 1 and 2**, `sail()` then lands the player on the next level
+  (`landOn()`): a new island from `generateWorld(…, level)`, the player on
+  its start point (also the new home), new animals for that island,
+  `goalGiven` cleared, and the clock at 8:00 the next day. The bag, XP,
+  skills and needs stay. The log says `sailAway`, then `landIsland` (with
+  the new level). `sailed` stays false.
+- **On the last level** (3), `sail()` sets `sailed`. The balloon is gone:
+  `done.frames` of `balloon_ready` is `balloon_gone` (two stakes), and
+  `done.icon` (`balloon_ready`) is the picture on the goal card and the end
+  screen. The end screen says that the balloon carried the player home. The
   player can stay on the island or start a new island.
   `nextLevel(level)` gives the next level, or null on the last one.
+- **Old saves** from when island 2 was the last one can have `sailed` set
+  on level 2. They load with `sailed` false, so the lit beacon asks again
+  and takes the player to island 3. (A `done` object with `lightRadius`
+  keeps its look only while `sailed` is set.)
 - `game.goal()` gives the state for the goal card at the top of the Build
   panel: `missing` (an old island without a boat), `find`, `build` (with
   the stage and what it still needs), `ready` or `sailed`. The words for
@@ -613,6 +638,20 @@ highest snow of the mountain. The player builds a signal beacon on it.
 All stages together need 10 logs, 8 wood, 16 stone, 20 leaves (8 of them
 for rope) and 3 resin. There are no coconuts on island 2: apples, berries, mushrooms and
 fish are the food there.
+
+Level 3 (Ember Isle): an old hot-air balloon (`balloon_site`) lies on the
+crater rim, on the highest ash. The player repairs it and flies home.
+
+| Stage | Cost | The balloon becomes |
+|---|---|---|
+| Basket | 4 logs, 8 wood, 4 rope | `balloon_basket` |
+| Balloon cloth | 16 leaves, 4 rope | `balloon_envelope` |
+| Burner | 8 stone, 2 logs, 4 sulphur | `balloon_ready` |
+
+All stages together need 6 logs, 8 wood, 8 stone, 32 leaves (16 of them for
+rope) and 4 sulphur. **Sulphur** is the rare material of island 3: only
+steam vents give it (`steam_vent`: 1–2 sulphur, regrows in 150 turns,
+`steam_vent_spent` until then).
 
 ### 4.13 The dog
 
@@ -746,9 +785,9 @@ the goal.
 
 | Star | Islands | Task | Progress |
 |---|---|---|---|
-| `chests` (Treasure hunter) | 1, 2 | Open every chest on the island (also the islet chest) | open / all chests |
-| `fish` (Angler) | 1 | Catch 5 fish on this island (`STAR_FISH`) | `fishHere` |
-| `explore` (Explorer) | 2 | Explore 75% of the floor (`STAR_EXPLORE`) | percent |
+| `chests` (Treasure hunter) | 1, 2, 3 | Open every chest on the island (also the islet chest) | open / all chests |
+| `fish` (Angler) | 1, 3 | Catch 5 fish on this island (`STAR_FISH`) | `fishHere` |
+| `explore` (Explorer) | 2, 3 | Explore 75% of the floor (`STAR_EXPLORE`) | percent |
 | `safe` (Safe and sound) | 1, 2 | 3 days in a row without fainting (`STAR_SAFE_DAYS`) | whole days since `safeSince` |
 
 - `checkStars()` runs at the end of every turn and when the player sails. A
@@ -760,7 +799,7 @@ the goal.
 - `game.starStates()` gives each star of the island with `done`, `have` and
   `need`. The Build panel shows them in a card under the goal card: a gold
   `ui_star` when earned, else a grey `ui_star_empty` and the progress. The
-  end screen shows all stars earned ("Stars: 4 of 6").
+  end screen shows all stars earned ("Stars: 4 of 9").
 
 ### 4.18 Deep caves
 
@@ -838,20 +877,26 @@ heals faster (see 4.4).
 ### 4.20 The islands
 
 This section brings together, for each island, what is on it and what its
-goal is. The details are in the sections it links to. Both islands are
+goal is. The details are in the sections it links to. All islands are
 104 × 80 cells and have the same three regions (home coast, wild forest,
-far side), split by a bramble wall and a river (see §5). The explorer
-always starts on a beach of the home coast.
+far side), split by a bramble wall and a river (a lava flow on island 3)
+(see §5). The explorer always starts on a beach of the home coast.
 
-What both islands share:
+What all islands share:
 
-- 8 springs (2 or more on the home coast) and the river for fresh water.
+- Springs, 2 or more of them on the home coast.
 - 8 chests in the open (2 home coast, 3 wild forest, 3 far side) and one
   more at the far end of each deep cave.
 - Deep caves with glowcaps, crystals and bats, and cave bears (see 4.18).
 - One stray dog, far from camp, until the player has a dog (see 4.13).
 - One hut (see 4.19).
-- The Treasure hunter and Safe and sound stars (see 4.17).
+- The Treasure hunter star (see 4.17).
+
+| Island | Biome | Goal | Rare material | Stars |
+|---|---|---|---|---|
+| 1 | `tropical` | Repair the boat and sail away | Tar | Treasure hunter, Angler, Safe and sound |
+| 2 Pine Ridge | `mountain` | Light a signal beacon on the peak | Resin | Treasure hunter, Explorer, Safe and sound |
+| 3 Ember Isle | `volcano` | Repair the hot-air balloon and fly home | Sulphur | Treasure hunter, Angler, Explorer |
 
 #### Island 1: the tropical island (`tropical`)
 
@@ -859,6 +904,7 @@ What both islands share:
 |---|---|
 | Land | Wide sandy beaches, a broadleaf and pine forest, rocky hills with caves, mostly on the far side |
 | Trees and plants | Palms (tall, leaning, young), broadleaf and pine trees, bushes, berry bushes, mushrooms |
+| Water | 8 springs and the river |
 | Food | Coconuts, berries, mushrooms, fish, glowcaps (caves) |
 | Animals | Crab, turtle, monkey, piglet, bat. Wild: boar, wasps, snake, cave bear |
 | Deep caves | 3 |
@@ -888,6 +934,7 @@ skills, stars, needs and the dog come along (see 4.12).
 |---|---|
 | Land | A narrow beach, a northern forest, and a mountain of cliffs and scree with snow on the peak |
 | Trees and plants | Spruces, snowy spruces, birches, broadleaf trees, apple trees, ferns, bushes, berry bushes, mushrooms. No palms |
+| Water | 8 springs and the river |
 | Food | Apples, berries, mushrooms, fish, glowcaps (caves). No coconuts |
 | Animals | Crab, rabbit, squirrel, bat. Wild: boar, wasps, mountain goat (climbs over steps), cave bear |
 | Deep caves | 2 |
@@ -908,9 +955,40 @@ in three stages:
 To reach the peak, the player builds a ladder on a rocky step and then
 hangs a climbing rope on an ice wall. Bring wood for a campfire, because
 the snow is cold. When the beacon is ready, walking into it asks "Light the
-beacon?". The beacon burns, a passing ship takes the player on board and
-the end screen shows the stars earned. Island 2 is the last level for now:
-the player can stay on the island or start a new one (see 4.12).
+beacon?". The beacon burns and a passing ship takes the player on board. A
+storm drives the ship off course, and it puts the player ashore on island 3
+with the bag, XP, skills, stars, needs and the dog (see 4.12).
+
+#### Island 3: Ember Isle (`volcano`)
+
+| | |
+|---|---|
+| Land | Beaches with palms, a jungle on the low slopes, grey ash between black basalt cliffs higher up, and a lake of lava in the crater |
+| Trees and plants | Palms (tall, leaning, young), broadleaf trees, ferns, bushes, berry bushes, mushrooms |
+| Water | Only 4 springs, plus 3 hot springs on the ash (drink 35, warm 1 cell round them). No river |
+| Food | Coconuts, berries, mushrooms, fish, glowcaps (caves) |
+| Animals | Crab, turtle, monkey, bat, lizard (shy, ash and sand), gull (cheeky, beach). Wild: boar, wasps, snake, scorpion (ash and caves) |
+| Deep caves | 2 |
+| Chests | 10 (8 in the open, 2 in the deep caves) |
+| Heat | Open ash in the day makes Water drop up to 50% faster (see 4.1) |
+| Special places | A lava flow in place of the river: cross it with stepping stones (8 stone) (see 4.8). Lava lights 1 cell round it at night |
+| Rare material | Sulphur, from at least 3 steam vents near the crater (1–2 each, regrows in 150 turns) |
+| Stars | Treasure hunter, Angler (catch 5 fish), Explorer (explore 75% of the island) |
+
+**Goal: repair the hot-air balloon and fly home.** An old balloon
+(`balloon_site`) lies on the crater rim, on the highest ash. The player
+repairs it in three stages:
+
+1. **Basket** (4 logs, 8 wood, 4 rope).
+2. **Balloon cloth** (16 leaves, 4 rope).
+3. **Burner** (8 stone, 2 logs, 4 sulphur).
+
+To reach the crater, the player lays stepping stones across the lava flow.
+Bring water or drink at the hot springs, because the ash is hot in the day.
+When the balloon is ready, walking into it asks "Fly away?". The balloon
+rises and flies the explorer home. Island 3 is the last level for now: the
+end screen shows the stars earned, and the player can stay on the island
+or start a new one (see 4.12).
 
 ---
 
@@ -920,8 +998,11 @@ the player can stay on the island or start a new one (see 4.12).
 makes the same island.
 
 Tiles: `Water`, `Sand`, `Grass`, `Rock` (blocks movement and sight),
-`CaveFloor` and `River` (fresh water: blocks movement, not sight).
-`map.isWet()` is true for sea and river; `map.isLand()` is the opposite.
+`CaveFloor` and `River` (fresh water: blocks movement, not sight). Island 2
+adds `Scree` and `Snow`, island 3 `Ash` (walkable) and `Lava` (blocks
+movement, not sight). `map.isWet()` is true for sea and river;
+`map.isLand()` is the opposite (lava counts as land). `map.isFlow()` is true
+for river and lava: the bands that a bridge or stepping stones cross.
 
 Steps:
 
@@ -1043,6 +1124,41 @@ A typical island has about 3,100 floor cells (about 1,150 home, 1,000 forest,
 850 far side), 50 to 200 river cells and 50 to 80 brambles, plus the islet.
 Generation takes 0.1 to 0.6 seconds.
 
+### Island 3: the volcano
+
+`generateWorld(rng, width, height, 3)` uses the same steps, with these
+changes (`biome: 'volcano'`):
+
+- **Biomes** (`addVolcano`). The beach is as on island 1. The height of a
+  cell is 0.8 × its distance from the sea (scaled to 0..1) + 0.2 × noise, so
+  the island is one cone. Of the inland cells, the lowest 55% stay forest
+  (`VOLCANO_FOREST_LINE`). Above that, "cliff" noise makes `Rock` (drawn
+  as basalt; sometimes with `CaveFloor` inside), else `Ash`. The top 2%
+  (`CRATER_LINE`) is the crater: a lake of `Lava`.
+- **Cleaning** (`cleanVolcano`). Cave floor needs rock round it, else it
+  becomes ash. No grass by the sea. A thin strip of grass becomes beach
+  next to sand, else ash. A thin arm of the crater lake becomes ash.
+- **Tunnels** from the connect step are `Ash`. A tunnel can also go
+  through the edge of the crater lake.
+- **The lava flow.** The band at the river's walking distance is `Lava`,
+  not `River` (`addBorders(…, flow)`). Thin land between lava becomes lava.
+  Everything can be reached with stepping stones of up to 3 cells.
+- **The goal** (`balloon_site`) goes on the highest ash cell with at least
+  5 floor neighbours: on the crater rim. There are no steep steps.
+- **Water.** 4 springs (`SPRINGS_ON`), at least 2 on the home coast. Then
+  3 hot springs (`HOT_SPRINGS`) on the ash, 8 or more cells apart
+  (`HOT_SPRING_GAP`).
+- **Steam vents.** At least 3 (`VENTS`) on the highest free ash, 3 or more
+  cells apart (`VENT_GAP`). Else the island is made again.
+- **Deep caves:** 2 (`DEEP_CAVES`). **No tide islet.**
+- **Scatter** uses the `volcano` table of `SCATTER`: palms, driftwood and
+  pebbles on the beach; broadleaf trees, young palms, ferns, bushes, berry
+  bushes and mushrooms in the jungle; pebbles and boulders on the ash.
+
+A typical island 3 has about 1,250 sand, 1,150 forest, 580 ash, 290 basalt,
+90 cave floor and 70 to 260 lava cells. Generation takes 0.1 to 0.4
+seconds.
+
 ---
 
 ## 6. Content registries
@@ -1092,11 +1208,12 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `lightRadius` | Lights cells at night. |
 | `frames` | Sprite names for an animation (2 frames, 220 ms each). |
 | `bridge` | Built across river cells (see 4.8). The player can walk on it. |
+| `onLava` | A bridge over lava cells instead of the river: the stepping stones of island 3 (see 4.8). |
 | `steep` | A steep step: blocks the way until a recipe with `onto` builds on it (see 4.14). Counts as open for placement checks. |
 | `climb` | A way up a step: stepping onto it costs Energy (see 4.14). |
 | `goal` | The island goal: walking into it gives it materials (see 4.12). |
 | `tidal` | A sandbar on sea cells: walkable at low tide only, `<kind>_wet` sprite at high tide (see 4.16). Counts as open for placement checks. |
-| `done` | A finished goal after `sail()` (the lit beacon): `frames` to show instead and its `lightRadius`. |
+| `done` | A finished goal after `sail()` (the lit beacon, the balloon that flew off): `frames` to show instead, its `lightRadius`, and `icon` for the goal card and end screen when that is not the first frame. |
 
 Also add the kind to the `ObjectKind` type.
 
@@ -1138,15 +1255,15 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin (rare goal materials); stone axe, fishing rod, crystal lantern (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Deep caves (both islands): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope; one on each island), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope) |
+| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin, sulphur (rare goal materials); stone axe, fishing rod, crystal lantern (tools) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (every island): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope; one on each island), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope), stepping stones (8 stone; over lava) |
 | Hut rooms | workshop (12 wood, 6 stone, 2 rope), hearth (12 stone, 4 wood), rain barrel (8 wood, 3 rope) (see 4.19) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
-| Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder) |
-| Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound (see 4.17) |
+| Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder). 3: repair the hot-air balloon on the crater rim (basket, balloon cloth, burner) |
+| Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound. 3: Treasure hunter, Angler, Explorer (see 4.17) |
 | Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
-| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves; sleeps by day). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps) |
+| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves; sleeps by day). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps). Island 3: crab, turtle, monkey, bat, lizard (shy, ash and sand), gull (cheeky, beach); wild: boar, wasps, snake, scorpion (grumpy, ash and caves) |
 
 ---
 
@@ -1178,8 +1295,17 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
   | Grass | sand / river / scree | `grass_*` / `bank_*` / `grass_scree_*` |
   | Snow | scree / river | `snow_*` / `snow_bank_*` |
   | Scree | river | `scree_bank_*` |
-  | Cave floor | river | `cave_bank_*` |
+  | Cave floor | river / lava | `cave_bank_*` / `cave_lava_*` |
   | River | sea | `mouth_*` (2 frames: `mouth_*`, `mouth2_*`) |
+  | Grass | ash / lava | `grass_ash_*` / `grass_lava_*` |
+  | Sand | ash / lava | `sand_ash_*` / `sand_lava_*` |
+  | Ash | lava | `ash_lava_*` |
+  | Lava | sea | `lava_mouth_*` (2 frames: `lava_mouth_*`, `lava_mouth2_*`) |
+
+  Lava has 2 frames (`lava`, `lava_2`) like the river. Rock on island 3
+  draws as `basalt_top` and `basalt_face`. Lava cells light 1 cell at night
+  (`LAVA_LIGHT`, in `game.lights()`); the renderer only uses the lights
+  that reach the screen.
 
   The renderer asks `edgeTileName()` for every cell. When a cell is next to
   more than one kind (for example grass with sand on one side and scree on
@@ -1312,6 +1438,22 @@ Auto-walk (travel and hold) stops when:
 - The deep caves need no change to the save: the game finds them from the
   tiles (see 4.18). Glowcaps, crystals and the lantern are normal objects
   and items. `SAVE_VERSION` stays 8.
+- Island 3 needs no change to the save shape either: its tiles (`Ash` 8,
+  `Lava` 9) are new numbers, and level 3 is a new value. `SAVE_VERSION`
+  stays 9. A save with `sailed` on a level that now has a next level loads
+  with `sailed` false (see 4.12).
+
+**Cheats (preview builds only).** A preview build (`VITE_PREVIEW`) and the
+dev server (`npm run dev`) show a "Cheats (preview only)" button in the Bag
+panel; the published game on `main` does not. The panel (`src/cheats.ts`,
+English only like the other developer tools) can: go to island 1, 2 or 3
+(`game.jumpToIsland()`, keeps the bag, XP, skills and dog); go to the island
+goal, the river or lava flow, a steam vent, a hot spring, the sandbar, the
+tar barrels or a deep cave (`game.teleportNear()`; tap again for the next
+one); give a starter kit, the goal materials for every stage left, or 5 of
+every item; fill all needs; give 50 XP; reveal the map
+(`game.revealMap()`); and skip to 7:00, 12:00 or 22:00
+(`game.skipToHour()`). A cheat saves at once.
 
 **Test a special situation in the browser.** You can start the game in any
 state: edit a save and load it before the game starts. The game saves on
@@ -1341,10 +1483,11 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon), snow cold, steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable; island 3: ash, basalt and lava, reach with stepping stones, the balloon on the crater rim, vents and hot springs, volcano edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon, on to island 3, old saves that lit the beacon), snow cold, island 3 (lava blocks, stepping stones, hot ash, hot springs, steam vents and sulphur, the balloon and the flight, lava light, saves), steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each set of hut rooms has its hut sprites (both smoke frames), and each room its inside sprite. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching, cave signs |
+| `src/cheats.test.ts` | The cheats: a picture for each, jumping to island 3, going to the goal and finishing it with the goal materials, going to the lava, vents and hot springs, needs, map and clock |
 | `src/i18n/i18n.test.ts` | Every message works in both languages; German articles, cases and adjective endings; English text is unchanged; browser language choice |
 
 To add content, use the `add-content` skill (`.claude/skills/add-content/`).
@@ -1384,6 +1527,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Where the goal goes | `worldgen.ts` → `GOAL_REGIONS` | far side, forest, home |
 | River drink | `game.ts` → `RIVER_DRINK` | 35 |
 | Snow cold | `game.ts` → `SNOW_CHILL` | 40 |
+| Ash heat, lava light | `game.ts` → `ASH_HEAT`, `LAVA_LIGHT` | Water up to ×1.5 by day; 1 cell |
+| Island 3 forest line, crater | `worldgen.ts` → `VOLCANO_FOREST_LINE`, `CRATER_LINE` | 0.55, 0.98 |
+| Island 3 water and vents | `worldgen.ts` → `SPRINGS_ON`, `HOT_SPRINGS`, `HOT_SPRING_GAP`, `VENTS`, `VENT_GAP` | 4 springs; 3 hot springs 8 apart; 3 vents 3 apart |
 | Climb cost | `game.ts` → `CLIMB_ENERGY` | 2 Energy |
 | Rings of steps round the goal | `worldgen.ts` → `LEDGE_RING`, `ICE_RING` | 6–10 and 3–4 cells of walking |
 | Dog hunger, thirst | `game.ts` → `DOG_HUNGER`, `DOG_THIRST` | 0.3, 0.35 per turn |
@@ -1430,8 +1576,16 @@ Also run `npm run build` (typecheck and build) before you commit.
   while it walks.
 - Only one dog: after the first is adopted, no other stray dog appears.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
-- Only two levels exist. After the beacon on island 2, there is no next
-  island yet: the player stays on the island or starts a new one.
+- Three levels exist. After the balloon on island 3, the game ends: the
+  player stays on the island or starts a new one.
+- The crater lake and the lava flow repeat the same lava pattern, so a big
+  lake looks a little like a grid.
+- Lava stepping stones have no edge drawing of their own: lava shows round
+  them, also where they meet the bank.
+- The Build panel shows the bridge and the stepping stones on every island,
+  also where there is no river or no lava.
+- On island 3, sand is often more than a third of the island, because
+  thin strips of grass near the coast become beach.
 - Island 1 cannot be visited again after sailing. "New island" always
   starts again on island 1.
 - Islands from saves before version 4 have no boat, so they have no goal. The

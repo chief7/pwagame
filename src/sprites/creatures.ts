@@ -408,8 +408,80 @@ export function dogFacings(): Sprite[] {
   return [...companionDog(), rest, rest.mirrored('dog_rest_left')];
 }
 
+
+// ---- Island 3: the volcano -----------------------------------------------------------
+
+export function lizard(): Sprite[] {
+  // A small lizard sunning itself on the warm ash, long tail behind.
+  return animal('animal_lizard', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '................',
+    '...........ggg..',
+    '..........gLLeg.',
+    '.g.....ggggLggg.',
+    '..gggggLLLggd...',
+    '.....ddggggdd...',
+    '......d....d....',
+    '................',
+  ], { g: P.lizard, L: P.lizardLight, d: P.lizardDark, e: P.outline }, 6);
+}
+
+export function gull(): Sprite[] {
+  // A seagull with grey wings and a yellow beak; it flaps as it moves.
+  return animal('animal_gull', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '..........WWW...',
+    '.........WWeWbb.',
+    '.........WWWW...',
+    '...wwwwwwWWW....',
+    '..wwddwwwwWW....',
+    '...ddWWWWWWW....',
+    '......WWWWW.....',
+    '.......f..f.....',
+    '.......f..f.....',
+    '................',
+    '................',
+    '................',
+  ], { W: P.gull, w: P.gullGrey, d: P.gullDark, e: P.outline, b: P.gold, f: P.gullFoot }, 4, { flap: 'w' });
+}
+
+export function scorpion(): Sprite[] {
+  // A scorpion with its tail curled over its back and its claws held out.
+  return animal('animal_scorpion', [
+    '................',
+    '................',
+    '................',
+    '................',
+    '....ttt.........',
+    '...t...K........',
+    '..t.............',
+    '..t.............',
+    '..ss............',
+    '...sssLLss...cc.',
+    '....sLLssss.c.C.',
+    '....sssssssscc..',
+    '.....DDDDDD.....',
+    '....D.D..D.D....',
+    '................',
+    '................',
+  ], { s: P.scorpion, L: P.scorpionLight, D: P.scorpionDark, t: P.scorpion, K: P.outline, c: P.scorpion, C: P.scorpionDark }, 5);
+}
+
 export function animalSet(): Sprite[] {
-  return [crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), bearAsleep(), rabbit(), squirrel(), goat(), strayDog(), dogFacings()].flat();
+  return [
+    crab(), turtle(), monkey(), piglet(), bat(), boar(), snake(), wasps(), bear(), bearAsleep(), rabbit(), squirrel(), goat(),
+    lizard(), gull(), scorpion(), strayDog(), dogFacings(),
+  ].flat();
 }
 
 // ---- Item icons -------------------------------------------------------------------
@@ -571,6 +643,13 @@ export function itemIcons(): Sprite[] {
         }
       }
       for (let y = 6; y <= 9; y++) s.set(9, y, y === 9 ? P.tarLight : P.tar);
+    }),
+    icon('sulphur', (s) => {
+      // Lumps of yellow sulphur crystal from the vents.
+      ball(s, 6, 10, 3.6, P.sulphurLight, P.sulphur, P.sulphurDark);
+      ball(s, 10.5, 9, 3.2, P.sulphurLight, P.sulphur, P.sulphurDark);
+      ball(s, 8.5, 5.5, 2.6, P.sulphurLight, P.sulphur, P.sulphurDark);
+      for (const [x, y] of [[5, 8], [10, 7], [8, 4]]) s.set(x, y, P.steamLight);
     }),
     icon('resin', (s) => {
       // A drop of golden resin, round at the bottom, pointed at the top.
