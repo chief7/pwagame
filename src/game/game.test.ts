@@ -10,7 +10,7 @@ import { RECIPES } from './defs/recipes';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import {
-  BAG_LOAD, DELIVERY_TURNS, Game, HOLD_LOAD, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
+  BAG_LOAD, DELIVERY_TURNS, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
 } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -3021,6 +3021,140 @@ describe('Game: radio supply drops and new platforms', () => {
     delete old.orderDay;
     const older = Game.fromSave(old as ReturnType<Game['toSave']>);
     expect(older.delivery).toBe(null);
+  });
+});
+
+describe('Game: the rig workshop', () => {
+  function rigGame(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    const { map, player: p } = game;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      map.set(p.x + dx, p.y + dy, Tile.Deck);
+      game.objects.delete(map.idx(p.x + dx, p.y + dy));
+    }
+    game.takeEvents();
+    return game;
+  }
+
+  it('puts ore veins on island 2, clay banks on island 1 and sealed crates on islands 1 to 3', () => {
+    const count = (game: Game, kind: string) => [...game.objects.values()].filter((o) => o.kind === kind).length;
+    const one = new Game(160);
+    expect(count(one, 'clay_bank')).toBeGreaterThan(0);
+    expect(count(one, 'sealed_crate')).toBe(4);
+    one.jumpToIsland(2);
+    expect(count(one, 'ore_vein')).toBeGreaterThan(0);
+    expect(count(one, 'sealed_crate')).toBe(4);
+    for (const [i, o] of one.objects) {
+      if (o.kind !== 'ore_vein') continue;
+      const x = i % one.map.width;
+      expect(one.map.get(x, (i - x) / one.map.width)).toBe(Tile.Scree);
+    }
+    one.jumpToIsland(4);
+    expect(count(one, 'sealed_crate')).toBe(0);
+  });
+
+  it('gives each island its resources only once, also an island from an older save', () => {
+    const game = new Game(161);
+    const save = { ...game.toSave(), v: 12 } as Partial<ReturnType<Game['toSave']>>;
+    delete save.holdUpgrades;
+    delete save.stocked;
+    save.objects = save.objects!.filter(([, kind]) => kind !== 'clay_bank' && kind !== 'sealed_crate');
+    const loaded = Game.fromSave(save as ReturnType<Game['toSave']>);
+    expect([...loaded.objects.values()].filter((o) => o.kind === 'sealed_crate')).toHaveLength(4);
+    const again = Game.fromSave(JSON.parse(JSON.stringify(loaded.toSave())));
+    expect([...again.objects.values()].filter((o) => o.kind === 'sealed_crate')).toHaveLength(4);
+  });
+
+  it('needs the right tool for ore veins, clay banks and sealed crates', () => {
+    const game = sandbox(162);
+    place(game, 1, 0, 'ore_vein');
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'needTool', obj: 'ore_vein', item: 'pickaxe' });
+    give(game, { scrap: 4, wood: 2 });
+    expect(game.build('pickaxe')).toBe(true);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('iron_ore')).toBeGreaterThanOrEqual(1);
+    place(game, 0, 1, 'sealed_crate');
+    give(game, { scrap: 3 });
+    expect(game.build('crowbar')).toBe(true);
+    expect(game.move(0, 1)).toBe(true);
+    expect(game.inventory.count('spare_part')).toBe(1);
+    expect(game.objectAt(game.player.x, game.player.y + 1)).toBeUndefined();
+  });
+
+  it('builds rig buildings only on the rig', () => {
+    const island = sandbox(163);
+    give(island, { clay: 12, stone: 6 });
+    expect(island.buildProblem('furnace')).toEqual({ key: 'rigOnly' });
+    const game = rigGame(163);
+    give(game, { clay: 12, stone: 6 });
+    game.player.facing = 'right';
+    expect(game.build('furnace')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('furnace');
+  });
+
+  it('smelts steel plates next to the furnace only', () => {
+    const game = rigGame(164);
+    give(game, { iron_ore: 4, coal: 2 });
+    expect(game.buildProblem('smelt')).toEqual({ key: 'needFurnace' });
+    place(game, 1, 0, 'furnace');
+    expect(game.build('smelt')).toBe(true);
+    expect(game.inventory.count('steel_plate')).toBe(1);
+    expect(game.inventory.count('iron_ore')).toBe(2);
+  });
+
+  it('grows vegetables in the greenhouse, and makes water from the sea', () => {
+    const game = rigGame(165);
+    place(game, 1, 0, 'greenhouse');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('vegetables')).toBeGreaterThanOrEqual(2);
+    expect(game.move(1, 0)).toBe(false);
+    game.turn += 121;
+    expect(game.move(1, 0)).toBe(true);
+    place(game, -1, 0, 'water_maker');
+    game.needs.water = 30;
+    expect(game.move(-1, 0)).toBe(true);
+    expect(game.needs.water).toBeGreaterThan(60);
+  });
+
+  it('builds a fish trap on the sea in front of a deck, and it catches fish', () => {
+    const game = rigGame(166);
+    const { map, player: p } = game;
+    map.set(p.x + 1, p.y, Tile.Water);
+    game.player.facing = 'right';
+    give(game, { steel_plate: 2, rope: 2 });
+    expect(game.build('fish_trap')).toBe(true);
+    expect(game.objectAt(p.x + 1, p.y)?.kind).toBe('fish_trap');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('fish')).toBeGreaterThanOrEqual(1);
+    // No sea next to the explorer: no trap.
+    map.set(p.x + 1, p.y, Tile.Deck);
+    game.objects.delete(map.idx(p.x + 1, p.y));
+    give(game, { steel_plate: 2, rope: 2 });
+    for (const [dx, dy] of [[0, 1], [0, -1], [-1, 0]]) map.set(p.x + dx, p.y + dy, Tile.Deck);
+    expect(game.buildProblem('fish_trap')).toEqual({ key: 'noSeaSpot' });
+  });
+
+  it('makes the hold bigger next to the boat, two times', () => {
+    const game = rigGame(167);
+    const { map, player: p } = game;
+    map.set(p.x, p.y + 1, Tile.Water);
+    game.objects.set(map.idx(p.x, p.y + 1), { kind: 'fishing_boat' });
+    for (let k = 0; k < 3; k++) give(game, { steel_plate: 4, spare_part: 2 });
+    expect(game.holdLimit).toBe(HOLD_LOAD);
+    expect(game.build('hold_upgrade')).toBe(true);
+    expect(game.holdLimit).toBe(HOLD_LOAD + HOLD_UPGRADE);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'holdUpgraded', limit: HOLD_LOAD + HOLD_UPGRADE });
+    expect(game.build('hold_upgrade')).toBe(true);
+    expect(game.buildProblem('hold_upgrade')).toEqual({ key: 'holdMax' });
+    expect(Game.fromSave(JSON.parse(JSON.stringify(game.toSave()))).holdLimit).toBe(HOLD_LOAD + 2 * HOLD_UPGRADE);
+    // Away from the boat, the hold cannot be changed.
+    const other = rigGame(168);
+    give(other, { steel_plate: 4, spare_part: 2 });
+    expect(other.buildProblem('hold_upgrade')).toEqual({ key: 'noBoat' });
   });
 });
 

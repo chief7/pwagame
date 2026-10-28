@@ -254,6 +254,11 @@ stars.
 - **New platforms:** build "Platform" (6 scrap, 2 wood) at the edge of the
   crew platform to add a piece of deck, and "Rain tank" (6 scrap) for
   water. New deck stays near the cabin and away from gangways.
+- **The rig workshop:** make a pickaxe, a shovel and a crowbar from scrap.
+  Mine iron ore and coal on Pine Ridge, dig clay at the river of island 1,
+  and open sealed crates with spare parts on islands 1 to 3. On the rig,
+  build a furnace (smelt steel plates), a greenhouse (vegetables), a water
+  maker, fish traps, and a bigger hold for the boat (two times).
 
 ## Controls
 

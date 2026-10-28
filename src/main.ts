@@ -6,7 +6,7 @@ import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { ROOM_IDS, type RoomId } from './game/defs/rooms';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
-import { Game, HOLD_LOAD, ORDER_IDS, RADIO_ORDERS, VOYAGE_DIESEL, type SaveData } from './game/game';
+import { Game, ORDER_IDS, RADIO_ORDERS, VOYAGE_DIESEL, type SaveData } from './game/game';
 import { Tile } from './game/map';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
@@ -483,7 +483,8 @@ function renderSheet(): void {
       const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
-      if (problem && !site && (problem.key === 'needSkill' || problem.key === 'needFire' || problem.key === 'oneHut' || problem.key === 'oneStore')) {
+      const told = ['needSkill', 'needFire', 'needFurnace', 'oneHut', 'oneStore', 'rigOnly', 'holdMax'];
+      if (problem && !site && told.includes(problem.key)) {
         note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
       }
       if (site) note.insertBefore(el('span', { className: 'row-note goal-step', textContent: words.ui.siteLeft }), costs);
@@ -635,7 +636,7 @@ function renderChart(rows: HTMLElement): void {
     rows.append(row(icon(levelDef(level).site), words.ui.islandName(level), note, go));
   }
   rows.append(row(icon('ui_load'), words.ui.hold, el('div', {}, [
-    el('div', { className: `row-note${game.holdLoad >= HOLD_LOAD ? ' locked' : ''}`, textContent: words.ui.loadOf(game.holdLoad, HOLD_LOAD) }),
+    el('div', { className: `row-note${game.holdLoad >= game.holdLimit ? ' locked' : ''}`, textContent: words.ui.loadOf(game.holdLoad, game.holdLimit) }),
     el('div', { className: 'row-note', textContent: words.ui.holdNote }),
   ])));
   rows.append(loadRow());

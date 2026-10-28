@@ -27,6 +27,15 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   diesel: { one: 'can of diesel', many: 'cans of diesel', short: ['diesel', 'diesel'] },
   mussels: { one: 'handful of mussels', many: 'handfuls of mussels', short: ['mussels', 'mussels'] },
   pack_frame: { one: 'pack frame', many: 'pack frames', short: ['pack frame', 'pack frames'] },
+  pickaxe: { one: 'pickaxe', many: 'pickaxes', short: ['pickaxe', 'pickaxes'] },
+  shovel: { one: 'shovel', many: 'shovels', short: ['shovel', 'shovels'] },
+  crowbar: { one: 'crowbar', many: 'crowbars', short: ['crowbar', 'crowbars'] },
+  iron_ore: { one: 'lump of iron ore', many: 'lumps of iron ore', short: ['ore', 'ore'] },
+  coal: { one: 'lump of coal', many: 'lumps of coal', short: ['coal', 'coal'] },
+  clay: { one: 'lump of clay', many: 'lumps of clay', short: ['clay', 'clay'] },
+  spare_part: { one: 'spare part', many: 'spare parts', short: ['part', 'parts'] },
+  steel_plate: { one: 'steel plate', many: 'steel plates', short: ['plate', 'plates'] },
+  vegetables: { one: 'basket of vegetables', many: 'baskets of vegetables', short: ['vegetables', 'vegetables'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -117,6 +126,14 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   fishing_boat: { name: 'fishing boat' },
   supply_crate: { name: 'supply crate' },
   platform_deck: { name: 'platform' },
+  ore_vein: { name: 'ore vein', gather: 'You hack ore out of the rock' },
+  clay_bank: { name: 'clay bank', gather: 'You dig up wet clay' },
+  sealed_crate: { name: 'sealed crate', gather: 'You prise the crate open' },
+  furnace: { name: 'furnace' },
+  greenhouse: { name: 'greenhouse', gather: 'You pick vegetables' },
+  water_maker: { name: 'water maker' },
+  fish_trap: { name: 'fish trap', gather: 'You pull up the fish trap' },
+  hold_upgrade: { name: 'bigger hold' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -356,6 +373,15 @@ export const en: Strings = {
     ladder: { name: 'Ladder', description: 'Gets you up a rocky step in the mountains. Stand next to the step to build it.' },
     climbing_rope: { name: 'Climbing rope', description: 'Gets you up a wall of ice near the peak. Stand next to the wall to build it.' },
     lantern: { name: 'Crystal lantern', description: 'Cave crystals glow in a little wooden frame. You see further in dark caves and at night.' },
+    pickaxe: { name: 'Pickaxe', description: 'Mines iron ore and coal from ore veins on Pine Ridge (island 2).' },
+    shovel: { name: 'Shovel', description: 'Digs clay from the clay banks at the river of island 1.' },
+    crowbar: { name: 'Crowbar', description: 'Opens the sealed crates on islands 1 to 3. They hold spare parts.' },
+    furnace: { name: 'Furnace', description: 'A clay kiln on the rig. Stand next to it to smelt steel plates.' },
+    smelt: { name: 'Smelt steel', description: 'Stand next to the furnace. 2 iron ore and 1 coal make a steel plate.' },
+    greenhouse: { name: 'Greenhouse', description: 'Grows vegetables on the rig. Walk into it to pick them; they grow again.' },
+    water_maker: { name: 'Water maker', description: 'Makes drinking water from the sea. Drink as much as you like.' },
+    fish_trap: { name: 'Fish trap', description: 'A cage in the sea that catches fish. Stand on a deck and face the sea to build it.' },
+    hold_upgrade: { name: 'Bigger hold', description: 'Stand next to the fishing boat. Its hold carries 30 more heavy things (two times).' },
     platform: { name: 'Platform', description: 'Lays a new piece of deck at the edge of the crew platform. Stand at the edge and face the sea.' },
     rain_tank: { name: 'Rain tank', description: 'A steel tank that catches rain water. Drink from it.' },
     gangway: { name: 'Mend gangway', description: 'Fixes a broken gangway on the rig with scrap metal. Stand next to a broken end to build it.' },
@@ -420,6 +446,11 @@ export const en: Strings = {
         : msg.obj === 'derrick_working'
           ? 'The drilling tower works again! Its pump brings up diesel. Walk into it to fill up.'
           : `The ${obj(msg.obj)} is finished! Walk into it to go inside.`;
+      case 'rigOnly': return 'You can only build this on the oil rig.';
+      case 'needFurnace': return 'Stand next to the furnace to smelt.';
+      case 'noSeaSpot': return 'Stand on a deck at the edge and face the sea.';
+      case 'holdMax': return 'The hold is as big as it can be.';
+      case 'holdUpgraded': return `You make the hold bigger. It now carries ${msg.limit} heavy things.`;
       case 'openRadio': return 'The radio hums. You can order supplies.';
       case 'noRadio': return 'Stand next to the working radio, after you called for help.';
       case 'onTheWay': return 'Your crate is on its way. Listen for the helicopter.';
@@ -441,7 +472,9 @@ export const en: Strings = {
       case 'lavaHot': return "Too hot! You can't walk on lava. Lay stepping stones across the lava flow.";
       case 'ashHot': return 'Phew! The ash is hot in the sun. You get thirsty faster up here.';
       case 'haveTool': return `You already have ${a(ITEM[msg.item].one)}.`;
-      case 'needTool': return `The ${obj(msg.obj)} is too thorny to clear by hand. You need ${a(ITEM[msg.item].one)}.`;
+      case 'needTool': return msg.obj === 'bramble'
+        ? `The ${obj(msg.obj)} is too thorny to clear by hand. You need ${a(ITEM[msg.item].one)}.`
+        : `You need ${a(ITEM[msg.item].one)} for the ${obj(msg.obj)}. Make one on the oil rig.`;
       case 'notSleepy': return "You're not sleepy right now.";
       case 'fallAsleep': if (msg.obj === 'hut') return 'You snuggle into your bed and fall asleep.';
         return `You curl up in the ${msg.obj ? obj(msg.obj) : 'cave'} and fall asleep.`;

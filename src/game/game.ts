@@ -124,7 +124,23 @@ export const ORDER_IDS = Object.keys(RADIO_ORDERS) as OrderId[];
 export const DELIVERY_TURNS = 20;
 /** A new platform cell must be this close to the crew cabin. */
 export const PLATFORM_RANGE = 6;
-export const SAVE_VERSION = 12;
+/** The bigger hold: 30 more heavy things each time, at most two times. */
+export const HOLD_UPGRADE = 30;
+export const HOLD_UPGRADES = 2;
+/**
+ * What the rig's tools find on the islands, placed when the explorer first
+ * comes to an island (also one from before the rig): ore veins on scree by
+ * the cliffs of island 2, clay banks by the river of island 1, and sealed
+ * crates on islands 1 to 3, far from home.
+ */
+export const WORKSHOP_STOCK: Partial<Record<LevelId, [ObjectKind, number][]>> = {
+  1: [['clay_bank', 6], ['sealed_crate', 4]],
+  2: [['ore_vein', 8], ['sealed_crate', 4]],
+  3: [['sealed_crate', 4]],
+};
+/** Sealed crates are at least this far from home. */
+const CRATE_DISTANCE = 12;
+export const SAVE_VERSION = 13;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -300,6 +316,10 @@ export interface SaveData {
   /** The crate ordered on the radio and the turn it comes, and the day of the last order. */
   delivery: { order: OrderId; at: number } | null;
   orderDay: number;
+  /** How often the boat's hold was made bigger. */
+  holdUpgrades: number;
+  /** Islands that got their ore veins, clay banks and sealed crates. */
+  stocked: LevelId[];
 }
 
 export class Game {
@@ -331,6 +351,10 @@ export class Game {
   delivery: { order: OrderId; at: number } | null = null;
   /** The day of the last order (0: none yet). */
   orderDay = 0;
+  /** How often the boat's hold was made bigger (see HOLD_UPGRADE). */
+  holdUpgrades = 0;
+  /** Islands that got their ore veins, clay banks and sealed crates. */
+  private stocked = new Set<LevelId>();
   /** The adopted dog, or null before you find one. */
   dog: Dog | null = null;
   /** Cells where the explorer saw a cave bear on this island, at least BEAR_SPOT_GAP apart. */
@@ -385,6 +409,8 @@ export class Game {
       this.hold = save.hold;
       this.delivery = save.delivery;
       this.orderDay = save.orderDay;
+      this.holdUpgrades = save.holdUpgrades;
+      this.stocked = new Set(save.stocked);
       this.animals = save.animals;
       this.player = save.player;
       this.home = save.home;
@@ -412,9 +438,11 @@ export class Game {
       this.player = { id: PLAYER_ID, x: world.start.x, y: world.start.y, facing: 'down' };
       this.home = { ...world.start };
       this.inventory.add('coconut', 2);
+      this.stockIsland();
       this.populate();
       this.message({ key: 'arrive' }, 'info');
     }
+    if (save) this.stockIsland();
     this.updateFov();
   }
 
@@ -677,6 +705,49 @@ export class Game {
     return [...this.lavaCache.cells];
   }
 
+  /** A furnace stands next to the explorer (for smelting). */
+  nearFurnace(): boolean {
+    return DIRS.some(([dx, dy]) => {
+      const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
+      return !!obj && !!OBJECTS[obj.kind].furnace;
+    });
+  }
+
+  /**
+   * Put what the rig's tools find on this island (see WORKSHOP_STOCK), the
+   * first time the explorer is here. Nothing may cut off part of the island.
+   */
+  private stockIsland(): void {
+    const stock = WORKSHOP_STOCK[this.level];
+    if (!stock || this.stocked.has(this.level)) return;
+    this.stocked.add(this.level);
+    const { map } = this;
+    const w = map.width;
+    const near = (x: number, y: number, tile: Tile) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.get(x + dx, y + dy) === tile);
+    const fits: Partial<Record<ObjectKind, (x: number, y: number) => boolean>> = {
+      ore_vein: (x, y) => map.get(x, y) === Tile.Scree && near(x, y, Tile.Rock),
+      clay_bank: (x, y) => (map.get(x, y) === Tile.Grass || map.get(x, y) === Tile.Sand) && near(x, y, Tile.River),
+      sealed_crate: (x, y) => map.isFloor(x, y) && map.get(x, y) !== Tile.CaveFloor &&
+        Math.max(Math.abs(x - this.home.x), Math.abs(y - this.home.y)) >= CRATE_DISTANCE,
+    };
+    for (const [kind, count] of stock) {
+      const fit = fits[kind]!;
+      const cells: number[] = [];
+      for (let i = 0; i < map.tiles.length; i++) {
+        const x = i % w;
+        const y = (i - x) / w;
+        if (!this.objects.has(i) && fit(x, y) && !this.animalAt(x, y) && !(x === this.player.x && y === this.player.y)) cells.push(i);
+      }
+      let placed = 0;
+      for (const i of this.rng.shuffle(cells)) {
+        if (placed >= count) break;
+        this.objects.set(i, { kind });
+        if (this.allReachableFrom(this.home.x, this.home.y)) placed++;
+        else this.objects.delete(i);
+      }
+    }
+  }
+
   nearFire(x: number, y: number): boolean {
     return this.nearestFire(x, y) !== null;
   }
@@ -800,11 +871,16 @@ export class Game {
     if ('makes' in recipe && ITEMS[recipe.makes].tool && this.inventory.count(recipe.makes) > 0) {
       return { key: 'haveTool', item: recipe.makes };
     }
+    if (recipe.rigOnly && levelDef(this.level).biome !== 'rig') return { key: 'rigOnly' };
+    if ('builds' in recipe && OBJECTS[recipe.builds].holdUpgrade && this.holdUpgrades >= HOLD_UPGRADES) return { key: 'holdMax' };
     if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
+    if (recipe.atFurnace && !this.nearFurnace()) return { key: 'needFurnace' };
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
       if (recipe.onto) return { key: 'noStep', obj: recipe.onto[0] };
       const built = OBJECTS[recipe.builds];
+      if (built.holdUpgrade) return { key: 'noBoat' };
+      if (built.onSea) return { key: 'noSeaSpot' };
       return built.deck ? { key: 'noDeckSpot' } : built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
     return null;
@@ -1068,6 +1144,15 @@ export class Game {
       return true;
     }
     const spot = this.buildSpot(recipe.builds, recipe.onto)!;
+    if (OBJECTS[spot.kind].holdUpgrade) {
+      this.holdUpgrades++;
+      const [boat] = spot.cells;
+      this.emit({ type: 'sparkle', x: boat.x, y: boat.y });
+      this.message({ key: 'holdUpgraded', limit: this.holdLimit }, 'good');
+      this.gainXp(xp, boat.x, boat.y);
+      this.endTurn();
+      return true;
+    }
     if (OBJECTS[spot.kind].deck) {
       // A new cell of deck: the tile changes, nothing stands on it.
       const [cell] = spot.cells;
@@ -1277,6 +1362,11 @@ export class Game {
     return this.islands.has(level);
   }
 
+  /** How many heavy things the hold can carry: more with each upgrade. */
+  get holdLimit(): number {
+    return HOLD_LOAD + this.holdUpgrades * HOLD_UPGRADE;
+  }
+
   /** How many heavy things the hold carries. */
   get holdLoad(): number {
     return (Object.entries(this.hold) as [ItemId, number][]).reduce((sum, [id, n]) => sum + (ITEMS[id].heavy ? n : 0), 0);
@@ -1343,7 +1433,7 @@ export class Game {
 
   /** Put up to n of an item from the bag into the boat's hold, as much as it carries. Takes no time. */
   loadItem(id: ItemId, n: number): boolean {
-    const room = ITEMS[id].heavy ? HOLD_LOAD - this.holdLoad : Infinity;
+    const room = ITEMS[id].heavy ? this.holdLimit - this.holdLoad : Infinity;
     if (!this.boatNear() || this.inventory.count(id) <= 0) return false;
     if (room <= 0) {
       this.message({ key: 'holdFull' }, 'info');
@@ -1441,6 +1531,7 @@ export class Game {
     this.player.facing = 'down';
     // By boat, the explorer lands where the boat moors (where it was left, if they were here before).
     if (dock !== undefined) this.moor(this.home.x, this.home.y, kept?.dock);
+    this.stockIsland();
     this.sailAsked = false;
     if (dock === undefined) this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
     this.animals = [];
@@ -1826,6 +1917,18 @@ export class Game {
     if (OBJECTS[kind].deck) {
       const cell = this.deckSpot(fx, fy);
       return cell ? { kind, cells: [cell] } : null;
+    }
+    if (OBJECTS[kind].holdUpgrade) {
+      const boat = this.boatCell();
+      return boat < 0 ? null : { kind, cells: [{ x: boat % this.map.width, y: Math.floor(boat / this.map.width) }] };
+    }
+    if (OBJECTS[kind].onSea) {
+      // On the sea in front of the explorer (else next to them), who stands on a deck.
+      const here = this.map.get(p.x, p.y);
+      if (here !== Tile.Deck && here !== Tile.Helipad) return null;
+      const sea = [[fx, fy], [0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => (dx === 0) !== (dy === 0) &&
+        this.map.get(p.x + dx, p.y + dy) === Tile.Water && !this.objectAt(p.x + dx, p.y + dy) && !this.animalAt(p.x + dx, p.y + dy));
+      return sea ? { kind, cells: [{ x: p.x + sea[0], y: p.y + sea[1] }] } : null;
     }
     if (OBJECTS[kind].bridge) {
       const lava = !!OBJECTS[kind].onLava;
@@ -2554,6 +2657,8 @@ export class Game {
       hold: { ...this.hold },
       delivery: this.delivery && { ...this.delivery },
       orderDay: this.orderDay,
+      holdUpgrades: this.holdUpgrades,
+      stocked: [...this.stocked],
     };
   }
 
@@ -2605,7 +2710,11 @@ export class Game {
     }
     if (data.v === 11) {
       // Version 11 had no radio orders.
-      data = { ...data, v: SAVE_VERSION, delivery: null, orderDay: 0 };
+      data = { ...data, v: 12, delivery: null, orderDay: 0 };
+    }
+    if (data.v === 12) {
+      // Version 12 had no rig workshop. Each island gets its new resources when the explorer is there.
+      data = { ...data, v: SAVE_VERSION, holdUpgrades: 0, stocked: [] };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

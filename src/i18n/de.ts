@@ -89,6 +89,15 @@ const ITEM: ItemWords<CountNoun> = {
   diesel: { g: 'm', word: 'Kanister Diesel', plural: 'Kanister Diesel', short: ['Diesel', 'Diesel'] },
   mussels: { g: 'f', word: 'Handvoll Muscheln', plural: 'Handvoll Muscheln', short: ['Muscheln', 'Muscheln'] },
   pack_frame: { g: 'f', word: 'Kraxe', plural: 'Kraxen', short: ['Kraxe', 'Kraxen'] },
+  pickaxe: { g: 'f', word: 'Spitzhacke', plural: 'Spitzhacken', short: ['Hacke', 'Hacken'] },
+  shovel: { g: 'f', word: 'Schaufel', plural: 'Schaufeln', short: ['Schaufel', 'Schaufeln'] },
+  crowbar: { g: 'n', word: 'Brecheisen', plural: 'Brecheisen', short: ['Brecheisen', 'Brecheisen'] },
+  iron_ore: { g: 'm', word: 'Brocken Eisenerz', plural: 'Brocken Eisenerz', short: ['Erz', 'Erz'] },
+  coal: { g: 'm', word: 'Brocken Kohle', plural: 'Brocken Kohle', short: ['Kohle', 'Kohle'] },
+  clay: { g: 'm', word: 'Klumpen Lehm', plural: 'Klumpen Lehm', short: ['Lehm', 'Lehm'] },
+  spare_part: { g: 'n', word: 'Ersatzteil', plural: 'Ersatzteile', short: ['Teil', 'Teile'] },
+  steel_plate: { g: 'f', word: 'Stahlplatte', plural: 'Stahlplatten', short: ['Platte', 'Platten'] },
+  vegetables: { g: 'm', word: 'Korb Gemüse', plural: 'Körbe Gemüse', short: ['Gemüse', 'Gemüse'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -179,6 +188,14 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   fishing_boat: { g: 'n', word: 'Fischerboot' },
   supply_crate: { g: 'f', word: 'Versorgungskiste' },
   platform_deck: { g: 'f', word: 'Plattform' },
+  ore_vein: { g: 'f', word: 'Erzader', gather: 'Du hackst Erz aus dem Fels' },
+  clay_bank: { g: 'f', word: 'Lehmbank', gather: 'Du gräbst nassen Lehm aus' },
+  sealed_crate: { g: 'f', word: 'Kiste', adj: 'versiegelt', gather: 'Du brichst die Kiste auf' },
+  furnace: { g: 'm', word: 'Schmelzofen' },
+  greenhouse: { g: 'n', word: 'Gewächshaus', gather: 'Du erntest Gemüse' },
+  water_maker: { g: 'f', word: 'Wasseranlage' },
+  fish_trap: { g: 'f', word: 'Fischreuse', gather: 'Du ziehst die Fischreuse hoch' },
+  hold_upgrade: { g: 'm', word: 'Laderaum', adj: 'größer' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -432,6 +449,15 @@ export const de: Strings = {
     ladder: { name: 'Leiter', description: 'Bringt dich über eine Felsstufe in den Bergen. Stell dich neben die Stufe, um sie zu bauen.' },
     climbing_rope: { name: 'Kletterseil', description: 'Bringt dich über eine Eiswand nahe am Gipfel. Stell dich neben die Wand, um es zu bauen.' },
     lantern: { name: 'Kristalllaterne', description: 'Höhlenkristalle leuchten in einem kleinen Holzrahmen. Du siehst weiter in dunklen Höhlen und in der Nacht.' },
+    pickaxe: { name: 'Spitzhacke', description: 'Hackt Eisenerz und Kohle aus den Erzadern auf dem Kiefernkamm (Insel 2).' },
+    shovel: { name: 'Schaufel', description: 'Gräbt Lehm aus den Lehmbänken am Fluss von Insel 1.' },
+    crowbar: { name: 'Brecheisen', description: 'Öffnet die versiegelten Kisten auf den Inseln 1 bis 3. Darin sind Ersatzteile.' },
+    furnace: { name: 'Schmelzofen', description: 'Ein Ofen aus Lehm auf der Bohrinsel. Stell dich daneben, um Stahlplatten zu schmelzen.' },
+    smelt: { name: 'Stahl schmelzen', description: 'Stell dich neben den Schmelzofen. 2 Eisenerz und 1 Kohle geben eine Stahlplatte.' },
+    greenhouse: { name: 'Gewächshaus', description: 'Hier wächst Gemüse auf der Bohrinsel. Lauf dagegen, um es zu ernten; es wächst nach.' },
+    water_maker: { name: 'Wasseranlage', description: 'Macht Trinkwasser aus dem Meer. Trink so viel du willst.' },
+    fish_trap: { name: 'Fischreuse', description: 'Ein Käfig im Meer, der Fische fängt. Stell dich auf ein Deck und schau aufs Meer, um sie zu bauen.' },
+    hold_upgrade: { name: 'Größerer Laderaum', description: 'Stell dich neben das Fischerboot. Sein Laderaum trägt 30 schwere Dinge mehr (zweimal).' },
     platform: { name: 'Plattform', description: 'Legt ein neues Stück Deck an den Rand der Mannschaftsplattform. Stell dich an den Rand und schau aufs Meer.' },
     rain_tank: { name: 'Regentank', description: 'Ein Stahltank, der Regenwasser auffängt. Trink daraus.' },
     gangway: { name: 'Steg reparieren', description: 'Repariert einen kaputten Steg der Bohrinsel mit Schrott. Stell dich neben ein kaputtes Ende, um ihn zu bauen.' },
@@ -496,6 +522,11 @@ export const de: Strings = {
         : msg.obj === 'derrick_working'
           ? 'Der Bohrturm läuft wieder! Seine Pumpe holt Diesel herauf. Lauf dagegen, um abzufüllen.'
           : `${cap(obj(msg.obj, 'nom', 'the'))} ist fertig! Lauf hinein.`;
+      case 'rigOnly': return 'Das kannst du nur auf der Bohrinsel bauen.';
+      case 'needFurnace': return 'Stell dich neben den Schmelzofen, um zu schmelzen.';
+      case 'noSeaSpot': return 'Stell dich auf ein Deck an den Rand und schau aufs Meer.';
+      case 'holdMax': return 'Der Laderaum ist so groß, wie er sein kann.';
+      case 'holdUpgraded': return `Du machst den Laderaum größer. Er trägt jetzt ${msg.limit} schwere Dinge.`;
       case 'openRadio': return 'Das Funkgerät summt. Du kannst Vorräte bestellen.';
       case 'noRadio': return 'Stell dich neben das Funkgerät, nachdem du Hilfe gerufen hast.';
       case 'onTheWay': return 'Deine Kiste ist unterwegs. Hör auf den Hubschrauber.';
@@ -517,7 +548,9 @@ export const de: Strings = {
       case 'lavaHot': return 'Viel zu heiß! Auf Lava kannst du nicht laufen. Leg Trittsteine über den Lavastrom.';
       case 'ashHot': return 'Puh! Die Asche ist heiß in der Sonne. Hier oben bekommst du schneller Durst.';
       case 'haveTool': return `Du hast schon ${itemCount(msg.item, 1)}.`;
-      case 'needTool': return `${cap(obj(msg.obj, 'nom', 'the'))} ist zu dornig für deine Hände. Du brauchst ${itemCount(msg.item, 1)}.`;
+      case 'needTool': return msg.obj === 'bramble'
+        ? `${cap(obj(msg.obj, 'nom', 'the'))} ist zu dornig für deine Hände. Du brauchst ${itemCount(msg.item, 1)}.`
+        : `Für ${obj(msg.obj, 'acc', 'the')} brauchst du ${itemCount(msg.item, 1)}. Werkzeuge aus Metall baust du auf der Bohrinsel.`;
       case 'notSleepy': return 'Du bist gerade nicht müde.';
       case 'fallAsleep': {
         if (msg.obj === 'hut') return 'Du kuschelst dich in dein Bett und schläfst ein.';

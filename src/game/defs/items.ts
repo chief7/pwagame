@@ -11,7 +11,8 @@ export type ItemId =
   | 'tar' | 'resin' | 'sulphur'
   | 'glowcap' | 'crystal' | 'lantern'
   | 'scrap' | 'diesel' | 'mussels'
-  | 'pack_frame';
+  | 'pack_frame'
+  | 'pickaxe' | 'shovel' | 'crowbar' | 'iron_ore' | 'coal' | 'clay' | 'spare_part' | 'steel_plate' | 'vegetables';
 
 export interface Food {
   food?: number;
@@ -68,6 +69,19 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   mussels: { id: 'mussels', eat: { food: 12, water: 2 } },
   // A wooden frame on your back: you carry more heavy things (see Game.loadLimit).
   pack_frame: { id: 'pack_frame', tool: true },
+  // The rig's workshop: metal tools from scrap, and what they bring back from
+  // the islands (ore and coal from island 2, clay from island 1, spare parts
+  // from sealed crates). The furnace makes steel plates from ore and coal.
+  pickaxe: { id: 'pickaxe', tool: true },
+  shovel: { id: 'shovel', tool: true },
+  crowbar: { id: 'crowbar', tool: true },
+  iron_ore: { id: 'iron_ore', heavy: true },
+  coal: { id: 'coal', heavy: true },
+  clay: { id: 'clay', heavy: true },
+  spare_part: { id: 'spare_part' },
+  steel_plate: { id: 'steel_plate', heavy: true },
+  // From the greenhouse on the rig.
+  vegetables: { id: 'vegetables', eat: { food: 15, water: 6 } },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];

@@ -61,6 +61,12 @@ export type Msg =
   /** A new platform cell; or no place for one in front of the explorer. */
   | { key: 'platformBuilt' }
   | { key: 'noDeckSpot' }
+  /** The rig's workshop: a rig building elsewhere, smelting away from the furnace, no sea for the fish trap, the hold at its biggest, and the hold made bigger. */
+  | { key: 'rigOnly' }
+  | { key: 'needFurnace' }
+  | { key: 'noSeaSpot' }
+  | { key: 'holdMax' }
+  | { key: 'holdUpgraded'; limit: number }
   /** Walked into the fishing boat: the sea chart and the hold open. */
   | { key: 'openChart' }
   /** The boat cannot sail: no boat here, already on that island, not enough diesel. */

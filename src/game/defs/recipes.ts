@@ -6,7 +6,8 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway' | 'platform' | 'rain_tank';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway' | 'platform' | 'rain_tank'
+  | 'pickaxe' | 'shovel' | 'crowbar' | 'furnace' | 'smelt' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade';
 
 export type Recipe = {
   id: RecipeId;
@@ -20,6 +21,10 @@ export type Recipe = {
   skill?: SkillId;
   /** Only possible next to a campfire (cooking). */
   atFire?: true;
+  /** Only possible next to the furnace (smelting). */
+  atFurnace?: true;
+  /** Only on the oil rig. */
+  rigOnly?: true;
   /**
    * Built on one of these objects next to the explorer, which it replaces (a
    * ladder on a rocky step). A broken gangway is mended across its whole gap.
@@ -55,6 +60,17 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   // Island 4: a new cell of deck at the edge of the crew platform, and a tank that catches rain.
   platform: { id: 'platform', builds: 'platform_deck', cost: { scrap: 6, wood: 2 } },
   rain_tank: { id: 'rain_tank', builds: 'water_tank', cost: { scrap: 6 } },
+  // The rig's workshop: tools for the islands, and buildings for the rig.
+  pickaxe: { id: 'pickaxe', makes: 'pickaxe', cost: { scrap: 4, wood: 2 } },
+  shovel: { id: 'shovel', makes: 'shovel', cost: { scrap: 3, wood: 2 } },
+  crowbar: { id: 'crowbar', makes: 'crowbar', cost: { scrap: 3 } },
+  furnace: { id: 'furnace', builds: 'furnace', cost: { clay: 12, stone: 6 }, rigOnly: true },
+  smelt: { id: 'smelt', makes: 'steel_plate', cost: { iron_ore: 2, coal: 1 }, atFurnace: true },
+  greenhouse: { id: 'greenhouse', builds: 'greenhouse', cost: { steel_plate: 4, clay: 10, wood: 4 }, rigOnly: true },
+  water_maker: { id: 'water_maker', builds: 'water_maker', cost: { steel_plate: 4, spare_part: 2 }, rigOnly: true },
+  fish_trap: { id: 'fish_trap', builds: 'fish_trap', cost: { steel_plate: 2, rope: 2 }, rigOnly: true },
+  // Next to the fishing boat: 30 more heavy things in its hold, two times.
+  hold_upgrade: { id: 'hold_upgrade', builds: 'hold_upgrade', cost: { steel_plate: 4, spare_part: 2 } },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];
