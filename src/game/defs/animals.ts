@@ -84,7 +84,7 @@ export const ANIMALS: Record<AnimalKind, AnimalDef> = {
   },
   // Island 3: lizards on the warm ash, gulls on the beach, scorpions on the ash and in caves.
   lizard: { kind: 'lizard', temper: 'shy', habitat: [Tile.Ash, Tile.Sand], notice: 3, wander: 0.4, population: 4, islands: [3] },
-  gull: { kind: 'gull', temper: 'cheeky', habitat: [Tile.Sand], notice: 5, wander: 0.5, population: 3, islands: [3], scaredByDog: true },
+  gull: { kind: 'gull', temper: 'cheeky', habitat: [Tile.Sand, Tile.Deck], notice: 5, wander: 0.5, population: 3, islands: [3, 4], scaredByDog: true },
   scorpion: {
     kind: 'scorpion', temper: 'grumpy', habitat: [Tile.Ash, Tile.CaveFloor], notice: 1, wander: 0.15, population: 4,
     damage: 6, hitChance: 0.5, wild: true, minHomeDistance: 25, islands: [3], scaredByDog: true,

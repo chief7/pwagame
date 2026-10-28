@@ -3,6 +3,7 @@ import { levelDef, type Biome } from './defs/levels';
 import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { GameMap, Tile } from './map';
 import { DIRS, distanceMap, reachWithBridges } from './pathing';
+import { generateRig } from './riggen';
 import type { Rng } from './rng';
 
 export interface World {
@@ -66,10 +67,10 @@ const HOT_SPRINGS = 3;
 const HOT_SPRING_GAP = 8;
 
 /** Springs on each kind of island: the volcano is dry, but it has hot springs too. */
-const SPRINGS_ON: Record<Biome, number> = { tropical: SPRINGS, mountain: SPRINGS, volcano: 4 };
+const SPRINGS_ON: Record<Biome, number> = { tropical: SPRINGS, mountain: SPRINGS, volcano: 4, rig: 0 };
 
 /** Deep caves dug into the hills of each kind of island, and how many floor cells each gets. */
-const DEEP_CAVES: Record<Biome, number> = { tropical: 3, mountain: 2, volcano: 2 };
+const DEEP_CAVES: Record<Biome, number> = { tropical: 3, mountain: 2, volcano: 2, rig: 0 };
 const DEEP_CAVE_SIZE = { min: 45, max: 80 };
 /** A deep cave's floor stays at least this many cells from the sea. */
 const DEEP_CAVE_INLAND = 6;
@@ -139,6 +140,8 @@ export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
     snow: [],
     ash: [['stone_pebbles', 0.05], ['stone_boulder', 0.025]],
   },
+  // The oil rig places its things itself (see riggen.ts).
+  rig: { sand: [], grass: [], cave: [], scree: [], snow: [], ash: [] },
 };
 
 /**
@@ -160,9 +163,12 @@ export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
  * Level 3 is a volcano (see addVolcano): beach and jungle, then ash and
  * basalt cliffs up to a crater with a lake of lava. A lava flow takes the
  * place of the river, and the goal (the old balloon) is on the crater rim.
+ *
+ * Level 4 is no island but an old oil rig in the sea (see riggen.ts).
  */
 export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIGHT, level = 1): World {
   const { biome, site } = levelDef(level);
+  if (biome === 'rig') return generateRig(rng, width, height);
   for (;;) {
     const map = landmass(width, height, rng);
     if (!map) continue;

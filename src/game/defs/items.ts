@@ -9,7 +9,8 @@ export type ItemId =
   | 'wood' | 'log' | 'leaves' | 'stone' | 'fish' | 'rope'
   | 'axe' | 'fishing_rod'
   | 'tar' | 'resin' | 'sulphur'
-  | 'glowcap' | 'crystal' | 'lantern';
+  | 'glowcap' | 'crystal' | 'lantern'
+  | 'scrap' | 'diesel' | 'mussels';
 
 export interface Food {
   food?: number;
@@ -57,6 +58,11 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   glowcap: { id: 'glowcap', eat: { food: 6, water: 4, energy: 15 } },
   crystal: { id: 'crystal' },
   lantern: { id: 'lantern', tool: true },
+  // Island 4, the oil rig: scrap metal to repair gangways and the radio, diesel
+  // from old drums for its generator, and mussels from the rig's legs.
+  scrap: { id: 'scrap' },
+  diesel: { id: 'diesel', rareFrom: ['diesel_drums', 'diesel_drums_empty'] },
+  mussels: { id: 'mussels', eat: { food: 12, water: 2 } },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];

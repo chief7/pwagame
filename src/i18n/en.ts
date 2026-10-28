@@ -23,6 +23,9 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   glowcap: { one: 'glowcap', many: 'glowcaps', short: ['glowcap', 'glowcaps'] },
   crystal: { one: 'crystal', many: 'crystals', short: ['crystal', 'crystals'] },
   lantern: { one: 'crystal lantern', many: 'crystal lanterns', short: ['lantern', 'lanterns'] },
+  scrap: { one: 'piece of scrap metal', many: 'pieces of scrap metal', short: ['scrap', 'scrap'] },
+  diesel: { one: 'can of diesel', many: 'cans of diesel', short: ['diesel', 'diesel'] },
+  mussels: { one: 'handful of mussels', many: 'handfuls of mussels', short: ['mussels', 'mussels'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -83,6 +86,29 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   balloon_basket: { name: 'balloon' },
   balloon_envelope: { name: 'balloon' },
   balloon_ready: { name: 'balloon' },
+  gangway_ns: { name: 'gangway' },
+  gangway_ew: { name: 'gangway' },
+  gangway_end_n: { name: 'broken gangway' },
+  gangway_end_s: { name: 'broken gangway' },
+  gangway_end_e: { name: 'broken gangway' },
+  gangway_end_w: { name: 'broken gangway' },
+  scrap_pile: { name: 'pile of scrap', gather: 'You pick through the scrap' },
+  rig_container: { name: 'rusty container' },
+  diesel_drums: { name: 'old fuel drums', gather: 'You pour diesel out of the old drums' },
+  diesel_drums_empty: { name: 'empty drums' },
+  pallet: { name: 'wooden pallet', gather: 'You break up the pallet' },
+  old_net: { name: 'old fishing net', gather: 'You pull rope out of the old net' },
+  water_tank: { name: 'rain water tank' },
+  mussel_bed: { name: 'mussel bed', gather: 'You pick mussels off the rig leg' },
+  life_ring: { name: 'life ring' },
+  derrick: { name: 'old drilling tower' },
+  crane: { name: 'deck crane' },
+  crew_cabin: { name: 'crew cabin' },
+  balloon_crashed: { name: 'crashed balloon' },
+  radio_hut: { name: 'radio room' },
+  radio_aerial: { name: 'radio room' },
+  radio_power: { name: 'radio room' },
+  radio_ready: { name: 'radio room' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -133,7 +159,7 @@ function itemList(items: [keyof typeof ITEM, number][]): string {
 }
 
 /** What the goal of a stage's island is called: "boat", "beacon", "balloon". */
-const goalName = (stage: StageId) => ({ 1: 'boat', 2: 'beacon', 3: 'balloon' })[stageLevel(stage)];
+const goalName = (stage: StageId) => ({ 1: 'boat', 2: 'beacon', 3: 'balloon', 4: 'radio room' })[stageLevel(stage)];
 
 /** "17:00". */
 function time(turn: number): string {
@@ -187,8 +213,8 @@ export const en: Strings = {
     goalStep: (index, count, stage) => `Step ${index + 1} of ${count}: ${en.stages[stage]}`,
     notYet: 'Not yet',
     endTitle: 'You did it!',
-    endText: 'Your balloon carries you over the sea, all the way home. What an adventure! You can stay on this island or start a new one.',
-    stay: 'Stay on this island',
+    endText: 'A voice answers on the radio! Help is on its way. That is the end of the story for now. You can stay on the rig or start a new island.',
+    stay: 'Stay here',
     yourDog: 'Your dog',
     dogNeeds: (food, water) => `Food ${food} · Water ${water}`,
     dogTired: 'Tired. Give it food, and walk past water so it can drink.',
@@ -231,6 +257,7 @@ export const en: Strings = {
     tar: 'Tar: old barrels stand on a little island off the coast. Walk over the sandbar at low tide (5–11 and 17–23 o’clock).',
     resin: 'Resin: shake the snowy spruces high up on the mountain.',
     sulphur: 'Sulphur: scrape it off the steaming vents near the crater.',
+    diesel: 'Diesel: pour it out of the old red fuel drums on the platforms.',
   },
   levels: {
     1: {
@@ -260,8 +287,18 @@ export const en: Strings = {
       goalReady: 'The balloon is ready! Walk into it to fly away.',
       goalSailed: 'You flew away from this island in the balloon.',
       sailTitle: 'Fly away?',
-      sailText: 'The balloon is ready. Do you want to fly over the sea, all the way home?',
+      sailText: 'The balloon is ready. Do you want to fly away over the sea?',
       setSail: 'Fly!',
+    },
+    4: {
+      goalTitle: 'Rig goal: repair the radio',
+      goalFind: 'Find the radio room. It is on a far platform of the rig. Mend the broken gangways with scrap to get there.',
+      goalHint: 'Walk into the radio room to give it what you carry.',
+      goalReady: 'The radio works! Walk into the radio room to call for help.',
+      goalSailed: 'You called for help on the radio.',
+      sailTitle: 'Call for help?',
+      sailText: 'The radio works. Do you want to call for help?',
+      setSail: 'Call!',
     },
   },
   clock,
@@ -279,13 +316,14 @@ export const en: Strings = {
     ladder: { name: 'Ladder', description: 'Gets you up a rocky step in the mountains. Stand next to the step to build it.' },
     climbing_rope: { name: 'Climbing rope', description: 'Gets you up a wall of ice near the peak. Stand next to the wall to build it.' },
     lantern: { name: 'Crystal lantern', description: 'Cave crystals glow in a little wooden frame. You see further in dark caves and at night.' },
+    gangway: { name: 'Mend gangway', description: 'Fixes a broken gangway on the rig with scrap metal. Stand next to a broken end to build it.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
   objectName: (kind) => cap(OBJECT[kind].name),
   animalName: (kind) => cap(ANIMAL[kind].name),
   stages: {
     hull: 'Hull', mast: 'Mast', sail: 'Sail', supplies: 'Supplies', base: 'Stone base', pyre: 'Wood pile', tinder: 'Tinder',
-    basket: 'Basket', envelope: 'Balloon cloth', burner: 'Burner',
+    basket: 'Basket', envelope: 'Balloon cloth', burner: 'Burner', aerial: 'Aerial', generator: 'Generator', radio_set: 'Radio',
   },
   skills: {
     small_sips: { name: 'Small sips', description: 'Your water goes down 20% slower.' },
@@ -328,6 +366,8 @@ export const en: Strings = {
       case 'noRoom': return 'There is no room to build here.';
       case 'noBridgeSpot': return 'Stand at a river and face the water. A bridge can cross up to 3 steps.';
       case 'noLavaSpot': return 'Stand at the lava flow and face the lava. Stepping stones can cross up to 3 steps.';
+      case 'gangwayBroken': return 'This gangway is broken in the middle. Mend it with scrap metal: build “Mend gangway” next to it.';
+      case 'gangwayMended': return 'You bolt scrap metal over the gap. The gangway is whole again!';
       case 'lavaHot': return "Too hot! You can't walk on lava. Lay stepping stones across the lava flow.";
       case 'ashHot': return 'Phew! The ash is hot in the sun. You get thirsty faster up here.';
       case 'haveTool': return `You already have ${a(ITEM[msg.item].one)}.`;
@@ -348,7 +388,9 @@ export const en: Strings = {
         return `${text} (${clock(msg.turn)})`;
       }
       case 'notThirsty': return "You're not thirsty.";
-      case 'drink': return msg.warm ? 'You drink the warm water. It tastes of stone, but it does you good.' : 'You drink the cool, fresh water. Lovely!';
+      case 'drink': return msg.warm ? 'You drink the warm water. It tastes of stone, but it does you good.'
+        : msg.tank ? 'You drink rain water from the tank. Lovely!'
+        : 'You drink the cool, fresh water. Lovely!';
       case 'drinkRiver': return 'You scoop up some cool river water. Lovely!';
       case 'look': {
         const name = a(obj(msg.obj));
@@ -366,6 +408,7 @@ export const en: Strings = {
         food: 'Your tummy rumbles. Time to find something to eat.',
         water: msg.level === 2 ? "You're thirsty. Drink at a spring or the river."
           : msg.level === 3 ? "You're thirsty. Drink at a spring or a hot spring, or find a coconut."
+          : msg.level === 4 ? "You're thirsty. Drink at a rain water tank."
           : "You're thirsty. Look for a spring or a coconut.",
         energy: "You're getting sleepy. A rest would help.",
         warmth: "Brr, you're getting cold. A fire or a shelter would help.",
@@ -400,7 +443,9 @@ export const en: Strings = {
         ? 'You find an old ring of stones on the peak! A beacon here could call a ship.'
         : msg.obj === 'balloon_site'
           ? 'You find an old balloon on the crater rim! The basket is broken and the cloth is torn. Maybe you can fix it and fly away.'
-          : 'You find an old boat wreck on the beach! Maybe you can fix it and sail away.';
+          : msg.obj === 'radio_hut'
+            ? 'You find the old radio room! Its aerial is bent, and it has no power. Repair it and call for help.'
+            : 'You find an old boat wreck on the beach! Maybe you can fix it and sail away.';
       case 'goalNeeds': return `The ${goalName(msg.stage)} needs ${itemList(msg.left)} for the ${en.stages[msg.stage].toLowerCase()}.`;
       case 'goalGive': return `You give the ${goalName(msg.stage)} ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;
       case 'goalStage': return {
@@ -414,14 +459,19 @@ export const en: Strings = {
         basket: 'The basket is fixed! Now the balloon needs its cloth.',
         envelope: 'The cloth is patched! Now it needs a burner to fill it with hot air.',
         burner: 'The burner is in. The balloon is ready to fly!',
+        aerial: 'The aerial stands straight again! Now the radio needs power.',
+        generator: 'The generator runs! Now mend the radio set.',
+        radio_set: 'The radio crackles to life. You can call for help!',
       }[msg.stage];
-      case 'goalReady': return { 1: 'The boat is ready to sail.', 2: 'The beacon is ready to light.', 3: 'The balloon is ready to fly.' }[msg.level];
+      case 'goalReady': return { 1: 'The boat is ready to sail.', 2: 'The beacon is ready to light.', 3: 'The balloon is ready to fly.', 4: 'The radio is ready to call for help.' }[msg.level];
       case 'sailAway': return {
         1: 'You push the boat into the waves and sail away!',
         2: 'You light the beacon. Smoke rises high into the sky, and soon a ship comes to take you on board!',
         3: 'The burner roars, and the balloon rises over the crater. You fly away over the sea!',
+        4: 'You call on the radio: “Hello? Can anyone hear me?” It crackles, and then a voice answers!',
       }[msg.level];
-      case 'landIsland': return msg.level === 3
+      case 'landIsland': if (msg.level === 4) return 'The wind turns, and your balloon drifts far out to sea. Bump! It comes down on an old oil rig. The balloon is broken. Look around: maybe the old radio still works.';
+        return msg.level === 3
         ? 'A storm drives the ship far off course, and it has to put you ashore on a volcano island. It is warm here, and the mountain smokes! Find your own way home.'
         : 'After a long trip, your boat lands on a new island. Tall trees and snowy mountains! It is colder here.';
       case 'dogSniff': return 'A stray dog sniffs your hand. It looks hungry. Bring it something to eat.';

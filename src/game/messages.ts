@@ -40,6 +40,9 @@ export type Msg =
   | { key: 'noBridgeSpot' }
   /** Tried to lay stepping stones without lava ahead. */
   | { key: 'noLavaSpot' }
+  /** Walked into a broken gangway end on the oil rig: mend it with scrap. */
+  | { key: 'gangwayBroken' }
+  | { key: 'gangwayMended' }
   /** Walked into the lava: far too hot. */
   | { key: 'lavaHot' }
   /** Stepped onto the ash in the day: it is hot up here, and you get thirsty. */
@@ -52,8 +55,8 @@ export type Msg =
   | { key: 'dozeOff' }
   | { key: 'wake'; reason: WakeReason; turn: number }
   | { key: 'notThirsty' }
-  /** Drank at a spring; `warm` at a hot spring. */
-  | { key: 'drink'; warm?: true }
+  /** Drank at a spring; `warm` at a hot spring, `tank` at a rain water tank on the rig. */
+  | { key: 'drink'; warm?: true; tank?: true }
   | { key: 'drinkRiver' }
   | { key: 'look'; obj: ObjectKind }
   | { key: 'nothingLeft'; obj: ObjectKind }

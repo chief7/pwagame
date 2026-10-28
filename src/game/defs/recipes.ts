@@ -6,7 +6,7 @@ import type { SkillId } from './skills';
 // places an object in front of the explorer (`builds`) or puts an item in
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
-export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones';
+export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway';
 
 export type Recipe = {
   id: RecipeId;
@@ -15,8 +15,11 @@ export type Recipe = {
   skill?: SkillId;
   /** Only possible next to a campfire (cooking). */
   atFire?: true;
-  /** Built on this object in front of the explorer, which it replaces (a ladder on a rocky step). */
-  onto?: ObjectKind;
+  /**
+   * Built on one of these objects next to the explorer, which it replaces (a
+   * ladder on a rocky step). A broken gangway is mended across its whole gap.
+   */
+  onto?: ObjectKind[];
 } & ({ builds: ObjectKind } | { makes: ItemId });
 
 export const RECIPES: Record<RecipeId, Recipe> = {
@@ -33,10 +36,12 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   fishing_rod: { id: 'fishing_rod', makes: 'fishing_rod', cost: { wood: 3, leaves: 2 }, skill: 'fishing_rod' },
   cooked_fish: { id: 'cooked_fish', makes: 'cooked_fish', cost: { fish: 1 }, atFire: true },
   // Island 2: ways up the steep steps.
-  ladder: { id: 'ladder', builds: 'ledge_ladder', onto: 'ledge', cost: { wood: 4, rope: 2 } },
-  climbing_rope: { id: 'climbing_rope', builds: 'ice_wall_rope', onto: 'ice_wall', cost: { wood: 1, rope: 4 } },
+  ladder: { id: 'ladder', builds: 'ledge_ladder', onto: ['ledge'], cost: { wood: 4, rope: 2 } },
+  climbing_rope: { id: 'climbing_rope', builds: 'ice_wall_rope', onto: ['ice_wall'], cost: { wood: 1, rope: 4 } },
   // From the crystals of the deep caves: you see further in caves and at night.
   lantern: { id: 'lantern', makes: 'lantern', cost: { crystal: 3, wood: 1, rope: 1 } },
+  // Island 4: mend a broken gangway between two platforms of the rig with scrap metal.
+  gangway: { id: 'gangway', builds: 'gangway_ew', onto: ['gangway_end_n', 'gangway_end_s', 'gangway_end_e', 'gangway_end_w'], cost: { scrap: 6 } },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];

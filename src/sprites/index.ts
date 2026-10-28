@@ -13,6 +13,7 @@ import {
 import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons, starEmpty } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
+import { rigSprites } from './rig';
 import {
   ash, ashPumice, bankSets, basaltFace, basaltTop, caveFloor, grassAshSet, lava, lavaBankSets, lavaMouthSet, sandAshSet, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, riverMouthSet, rockFace, rockTop,
   sand, sandRipples, sandShell, scree, screeStones, shoreSet, snow, snowEdgeSet, snowTracks, water, waterVariants,
@@ -56,6 +57,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Beacon', sprites: beacon() },
     { title: 'Balloon', sprites: [...balloon(), ...balloonAway()] },
     { title: 'Interface', sprites: [globe(), ...skillIcons(), starEmpty(), ...grillButton(), appIcon()] },
+    { title: 'Oil rig', sprites: rigSprites() },
     { title: 'Map', sprites: [mapIcon(), ...mapMarkers()] },
   ];
 }

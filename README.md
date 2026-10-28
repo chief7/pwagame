@@ -131,11 +131,12 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
 
 ## The islands
 
-Every island has the same three parts: the home coast where you start, the
-wild forest behind a wall of brambles, and the far side across a river
+Islands 1 to 3 have the same three parts: the home coast where you start,
+the wild forest behind a wall of brambles, and the far side across a river
 (a lava flow on island 3).
-Each island has springs, chests, a few deep caves, a stray dog and room
-for one hut. Each island also has one goal and three stars.
+Each of them has springs, chests, a few deep caves, a stray dog and room
+for one hut. Each island (and the oil rig) also has one goal and three
+stars.
 
 ### Island 1: the tropical island
 
@@ -200,16 +201,40 @@ for one hut. Each island also has one goal and three stars.
   snatch food. Wild: boars, wasps, snakes and scorpions that sting.
 - **The lava flow:** it takes the place of the river. Lava is too hot to
   walk on, so lay stepping stones (8 stones) across it.
-- **Goal: repair the hot-air balloon and fly home.** An old balloon lies on
+- **Goal: repair the hot-air balloon and fly away.** An old balloon lies on
   the crater rim. Fix it in three steps:
   1. Basket: 4 logs, 8 wood, 4 rope.
   2. Balloon cloth: 16 leaves, 4 rope.
   3. Burner: 8 stone, 2 logs, 4 sulphur (from the steam vents near the
      crater).
 
-  Then walk into it to fly home. This is the end of the game for now: you
-  can stay on the island or start a new one.
+  Then walk into it to fly away. The wind turns, and the balloon comes
+  down on an old oil rig.
 - **Stars:** open every chest, catch 5 fish, explore most of the island.
+
+### Island 4: the old oil rig
+
+- **The land:** none. Steel platforms stand on legs in the open sea,
+  joined by gangways. One platform has a helipad.
+- **Water:** 2 rain water tanks. No springs and no river.
+- **Food:** fish from the decks, and mussels on the rig legs at the
+  waterline. There are no trees and no fruit.
+- **Materials:** scrap metal from scrap piles, wood from old pallets, rope
+  from old fishing nets, and diesel from old fuel drums.
+- **Animals:** only seagulls that snatch food.
+- **Camp:** the crew cabin has a bed for a full rest and a stove to cook
+  fish on.
+- **Broken gangways:** 2 to 4 gangways are broken in the middle. Build
+  "Mend gangway" (6 scrap) next to a broken end to cross.
+- **Goal: repair the radio and call for help.** The radio room stands on
+  the platform furthest away. Fix it in three steps:
+  1. Aerial: 8 scrap, 2 rope.
+  2. Generator: 6 scrap, 4 diesel.
+  3. Radio: 4 scrap, 2 rope.
+
+  Then walk into it to call for help. This is the end of the game for now:
+  you can stay on the rig or start a new island.
+- **Stars:** open every chest, catch 5 fish, explore most of the rig.
 
 ## Controls
 
@@ -263,6 +288,7 @@ src/
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
     worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow; island 3: volcano, ash, lava), deep caves, bramble wall, river (lava flow), scenery
+    riggen.ts    the oil rig (island 4): platforms, gangways, helipad, and what stands on the decks
     caves.ts     finds the deep caves (big caves with few ways in) from the tiles
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view

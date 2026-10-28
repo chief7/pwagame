@@ -15,6 +15,10 @@ export const Tile = {
   Ash: 8,
   /** Island 3: molten rock (the lava flow and the crater lake). Blocks movement; stepping stones cross the flow. */
   Lava: 9,
+  /** Island 4: the steel deck of the old oil rig. Walkable. */
+  Deck: 10,
+  /** Island 4: the painted landing circle on a deck. Walkable, like the deck. */
+  Helipad: 11,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -70,7 +74,7 @@ export class GameMap {
   /** Ground you can stand on, ignoring objects. */
   isFloor(x: number, y: number): boolean {
     const t = this.get(x, y);
-    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow || t === Tile.Ash;
+    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow || t === Tile.Ash || t === Tile.Deck || t === Tile.Helipad;
   }
 
   isOpaque(x: number, y: number): boolean {

@@ -20,7 +20,11 @@ export type ObjectKind =
   | 'barrel' | 'barrel_empty' | 'sandbar_ns' | 'sandbar_ew'
   | 'glowcap' | 'crystal_cluster'
   | 'lava_stones_ns' | 'lava_stones_ew' | 'steam_vent' | 'hot_spring'
-  | 'balloon_site' | 'balloon_basket' | 'balloon_envelope' | 'balloon_ready';
+  | 'balloon_site' | 'balloon_basket' | 'balloon_envelope' | 'balloon_ready'
+  | 'gangway_ns' | 'gangway_ew' | 'gangway_end_n' | 'gangway_end_s' | 'gangway_end_e' | 'gangway_end_w'
+  | 'scrap_pile' | 'rig_container' | 'diesel_drums' | 'diesel_drums_empty' | 'pallet' | 'old_net' | 'water_tank'
+  | 'mussel_bed' | 'life_ring' | 'derrick' | 'crane' | 'crew_cabin' | 'balloon_crashed'
+  | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready';
 
 export interface Yield {
   item: ItemId;
@@ -70,6 +74,14 @@ export interface ObjectDef {
   climb?: true;
   /** The island's goal (see levels.ts): walking into it hands over materials. */
   goal?: true;
+  /** Walkable over the sea: a gangway between the platforms of the oil rig. */
+  overSea?: true;
+  /**
+   * A broken end of a gangway, on a sea cell: it blocks the way until the
+   * explorer repairs the gangway (the recipe with `onto`). The value is the
+   * way the gangway runs, so the repair fills the whole gap.
+   */
+  broken?: 'ns' | 'ew';
   /**
    * A sandbar on sea cells: walkable at low tide only (see clock.ts). At
    * high tide it shows its `<kind>_wet` sprite.
@@ -238,11 +250,54 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     kind: 'balloon_ready', goal: true, frames: ['balloon_ready', 'balloon_ready_2'],
     done: { frames: ['balloon_gone'], lightRadius: 0, icon: 'balloon_ready' },
   }),
+  // Island 4, the old oil rig: gangways between the platforms, some broken.
+  gangway_ns: def({ kind: 'gangway_ns', walkable: true, overSea: true }),
+  gangway_ew: def({ kind: 'gangway_ew', walkable: true, overSea: true }),
+  gangway_end_n: def({ kind: 'gangway_end_n', broken: 'ns' }),
+  gangway_end_s: def({ kind: 'gangway_end_s', broken: 'ns' }),
+  gangway_end_e: def({ kind: 'gangway_end_e', broken: 'ew' }),
+  gangway_end_w: def({ kind: 'gangway_end_w', broken: 'ew' }),
+  scrap_pile: def({
+    kind: 'scrap_pile',
+    gather: { yields: [{ item: 'scrap', min: 2, max: 3 }], after: { remove: true } },
+  }),
+  rig_container: def({ kind: 'rig_container', blocksSight: true }),
+  diesel_drums: def({
+    kind: 'diesel_drums',
+    gather: { yields: [{ item: 'diesel', min: 2, max: 2 }], after: { becomes: 'diesel_drums_empty' } },
+  }),
+  diesel_drums_empty: def({ kind: 'diesel_drums_empty' }),
+  pallet: def({
+    kind: 'pallet',
+    gather: { yields: [{ item: 'wood', min: 2, max: 3 }], after: { remove: true } },
+  }),
+  old_net: def({
+    kind: 'old_net',
+    gather: { yields: [{ item: 'rope', min: 1, max: 2 }], after: { remove: true } },
+  }),
+  // Rain water caught in a tank: drink like at a spring.
+  water_tank: def({ kind: 'water_tank', drink: 35 }),
+  // Mussels grow on the rig's legs, in the sea under the edge of a deck.
+  mussel_bed: def({
+    kind: 'mussel_bed', depletedSprite: 'mussel_bed_picked',
+    gather: { yields: [{ item: 'mussels', min: 2, max: 3 }], after: { regrow: 200 } },
+  }),
+  life_ring: def({ kind: 'life_ring' }),
+  derrick: def({ kind: 'derrick', blocksSight: true }),
+  crane: def({ kind: 'crane', blocksSight: true }),
+  // The camp on the rig: a bed for a full rest, and a little stove to cook on.
+  crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),
+  balloon_crashed: def({ kind: 'balloon_crashed' }),
+  radio_hut: def({ kind: 'radio_hut', goal: true }),
+  radio_aerial: def({ kind: 'radio_aerial', goal: true }),
+  radio_power: def({ kind: 'radio_power', goal: true }),
+  radio_ready: def({ kind: 'radio_ready', goal: true, frames: ['radio_ready', 'radio_ready_2'], lightRadius: 2 }),
 };
 
-/** Objects the explorer can get past by building, clearing or waiting for low tide: brambles, steep steps, sandbars. */
+/** Objects the explorer can get past by building, clearing or waiting for low tide: brambles, steep steps, sandbars, broken gangways. */
 export function canBeOpened(kind: ObjectKind): boolean {
-  return kind === 'bramble' || !!OBJECTS[kind].steep || !!OBJECTS[kind].tidal;
+  const def = OBJECTS[kind];
+  return kind === 'bramble' || !!def.steep || !!def.tidal || !!def.broken;
 }
 
 export interface WorldObject {

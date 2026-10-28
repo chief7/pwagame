@@ -2,6 +2,7 @@ import { levelDef } from '../game/defs/levels';
 import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
+import { rigLegAt } from '../game/riggen';
 import { hash2 } from '../sprites/pixel';
 import { bake, buildSprites, edgeTileName, mixedTile, type Sprite } from '../sprites';
 import { characterName, fishingName } from '../sprites/characters';
@@ -472,7 +473,22 @@ export class Renderer {
     const roll = hash2(x, y, 52);
     switch (map.get(x, y)) {
       case Tile.Water:
+        // Under the south edge of a rig platform: its steel face, sometimes with a leg.
+        if (isDeck(map, x, y - 1)) return rigLegAt(x) ? 'deck_side_leg' : 'deck_side';
         return '~';
+      case Tile.Deck: {
+        // A safety line along the sides that meet the sea.
+        const sides = ([['n', 0, -1], ['e', 1, 0], ['w', -1, 0]] as const).filter(([, dx, dy]) => !isDeck(map, x + dx, y + dy)).map(([s]) => s).join('');
+        return `deck${roll < 0.12 ? '_rust' : ''}${sides ? `_${sides}` : ''}`;
+      }
+      case Tile.Helipad: {
+        // The landing circle is 3 × 3 cells: find this cell's place in it.
+        let dx = 0;
+        let dy = 0;
+        while (dx < 2 && map.get(x - dx - 1, y) === Tile.Helipad) dx++;
+        while (dy < 2 && map.get(x, y - dy - 1) === Tile.Helipad) dy++;
+        return `helipad_${dy * 3 + dx}`;
+      }
       case Tile.River:
         return edgeTileName('river', '≈', (dx, dy) => (map.get(x + dx, y + dy) === Tile.Water ? 'w' : '.'));
       case Tile.Lava:
@@ -508,4 +524,10 @@ export class Renderer {
         });
     }
   }
+}
+
+/** A rig deck (the helipad is a deck too). */
+function isDeck(map: GameMap, x: number, y: number): boolean {
+  const t = map.get(x, y);
+  return t === Tile.Deck || t === Tile.Helipad;
 }
