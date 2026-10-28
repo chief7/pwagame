@@ -26,6 +26,8 @@ export interface Conditions {
   chill?: number;
   /** Extra cold out in the open, day and night (snow on the peaks). */
   cold?: number;
+  /** Extra thirst out in the open (hot ash by day): Water drops this share faster, less in a shelter. */
+  heat?: number;
   /** How much faster Health comes back while asleep (a hut bed, a hearth); default 1. */
   heal?: number;
 }
@@ -55,7 +57,7 @@ export function warmthTarget(c: Conditions): number {
 export function tickNeeds(n: Needs, c: Conditions): Needs {
   const slow = c.sleeping ? 0.5 : 1;
   n.food -= RATES.food * slow * (c.hunger ?? 1);
-  n.water -= RATES.water * slow * (c.thirst ?? 1);
+  n.water -= RATES.water * slow * (c.thirst ?? 1) * (1 + (c.heat ?? 0) * (1 - c.shelter));
   n.energy += c.sleeping ? RATES.energySleep * (0.4 + 0.6 * c.shelter) : -RATES.energyAwake;
 
   const target = warmthTarget(c);

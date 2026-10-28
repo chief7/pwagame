@@ -52,8 +52,24 @@ const ICE_RING = { from: 3, to: 4, ground: Tile.Snow, kind: 'ice_wall' } as cons
 /** Island 2: at least this many snowy spruces, which give the resin for the beacon. */
 const RESIN_TREES = 4;
 
+/**
+ * Island 3: share of the inland ground (lowest first) that stays forest,
+ * and above which the crater is a lake of lava.
+ */
+const VOLCANO_FOREST_LINE = 0.55;
+const CRATER_LINE = 0.98;
+/** Island 3: steam vents (for the sulphur) on the highest ash, at least this far apart. */
+const VENTS = 3;
+const VENT_GAP = 3;
+/** Island 3: hot springs on the ash, at least this far apart. */
+const HOT_SPRINGS = 3;
+const HOT_SPRING_GAP = 8;
+
+/** Springs on each kind of island: the volcano is dry, but it has hot springs too. */
+const SPRINGS_ON: Record<Biome, number> = { tropical: SPRINGS, mountain: SPRINGS, volcano: 4 };
+
 /** Deep caves dug into the hills of each kind of island, and how many floor cells each gets. */
-const DEEP_CAVES: Record<Biome, number> = { tropical: 3, mountain: 2 };
+const DEEP_CAVES: Record<Biome, number> = { tropical: 3, mountain: 2, volcano: 2 };
 const DEEP_CAVE_SIZE = { min: 45, max: 80 };
 /** A deep cave's floor stays at least this many cells from the sea. */
 const DEEP_CAVE_INLAND = 6;
@@ -80,7 +96,7 @@ const ISLET_GAP = 2;
 /** What stands on the islet: old tar barrels, a palm for food and drink, a chest. */
 export const ISLET_OBJECTS: ObjectKind[] = ['barrel', 'barrel', 'barrel', 'palm_tall', 'chest_closed'];
 
-export type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow';
+export type Ground = 'sand' | 'grass' | 'cave' | 'scree' | 'snow' | 'ash';
 
 /** What grows where, as chance per free cell, for each kind of island. */
 export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
@@ -96,6 +112,7 @@ export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
     cave: [['stalagmite', 0.05], ['mushroom', 0.05], ['stone_pebbles', 0.05]],
     scree: [],
     snow: [],
+    ash: [],
   },
   mountain: {
     sand: [['log_driftwood', 0.02], ['stone_pebbles', 0.02], ['stone_boulder', 0.01], ['log', 0.006]],
@@ -106,6 +123,21 @@ export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
     cave: [['stalagmite', 0.05], ['mushroom', 0.05], ['stone_pebbles', 0.05]],
     scree: [['stone_pebbles', 0.05], ['stone_boulder', 0.025], ['tree_spruce', 0.02], ['fern', 0.008]],
     snow: [['tree_spruce_snow', 0.04], ['stone_boulder', 0.02], ['stone_pebbles', 0.02]],
+    ash: [],
+  },
+  volcano: {
+    sand: [
+      ['palm_tall', 0.025], ['palm_leaning', 0.02], ['palm_young', 0.015],
+      ['log_driftwood', 0.012], ['stone_pebbles', 0.015], ['stone_boulder', 0.006],
+    ],
+    grass: [
+      ['tree_broadleaf', 0.08], ['palm_young', 0.02], ['fern', 0.03], ['bush', 0.03], ['berry_bush', 0.02],
+      ['mushroom', 0.008], ['stone_pebbles', 0.012], ['stone_mossy', 0.006], ['log_pile', 0.004],
+    ],
+    cave: [['stalagmite', 0.05], ['mushroom', 0.04], ['stone_pebbles', 0.05]],
+    scree: [],
+    snow: [],
+    ash: [['stone_pebbles', 0.05], ['stone_boulder', 0.025]],
   },
 };
 
@@ -124,20 +156,25 @@ export const SCATTER: Record<Biome, Record<Ground, [ObjectKind, number][]>> = {
  * Level 2 is a mountain island instead (see addMountains): a narrow beach,
  * a northern forest, and a mountain range of cliffs and scree with snow on
  * the peak. Its goal (the beacon) stands on the highest snow it can.
+ *
+ * Level 3 is a volcano (see addVolcano): beach and jungle, then ash and
+ * basalt cliffs up to a crater with a lake of lava. A lava flow takes the
+ * place of the river, and the goal (the old balloon) is on the crater rim.
  */
 export function generateWorld(rng: Rng, width = WORLD_WIDTH, height = WORLD_HEIGHT, level = 1): World {
   const { biome, site } = levelDef(level);
   for (;;) {
     const map = landmass(width, height, rng);
     if (!map) continue;
-    const elevation = biome === 'mountain' ? addMountains(map, rng) : (addBiomes(map, rng), null);
+    const elevation = biome === 'mountain' ? addMountains(map, rng) : biome === 'volcano' ? addVolcano(map, rng) : (addBiomes(map, rng), null);
     if (!digCaves(map, rng, DEEP_CAVES[biome])) continue;
     if (biome === 'mountain') cleanGrass(map);
+    else if (biome === 'volcano') cleanVolcano(map);
     else removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, Tile.Sand));
     const start = pickStart(map, rng);
     if (!start) continue;
-    connectFloor(map, start, biome === 'mountain' ? Tile.Scree : Tile.CaveFloor);
-    const borders = addBorders(map, start);
+    connectFloor(map, start, biome === 'mountain' ? Tile.Scree : biome === 'volcano' ? Tile.Ash : Tile.CaveFloor);
+    const borders = addBorders(map, start, biome === 'volcano' ? Tile.Lava : Tile.River);
     if (!borders) continue;
     const objects = scatterObjects(map, rng, start, borders, site, biome, elevation);
     if (!objects) continue;
@@ -385,7 +422,7 @@ function digCaves(map: GameMap, rng: Rng, count: number): boolean {
     if (!map.inBounds(x, y)) return false;
     const i = map.idx(x, y);
     const t = map.tiles[i];
-    if (seaDist[i] < DEEP_CAVE_INLAND || t === Tile.Water || t === Tile.River || t === Tile.Snow) return false;
+    if (seaDist[i] < DEEP_CAVE_INLAND || t === Tile.Water || t === Tile.River || t === Tile.Snow || t === Tile.Lava) return false;
     for (let gy = -DEEP_CAVE_GAP; gy <= DEEP_CAVE_GAP; gy++) {
       for (let gx = -DEEP_CAVE_GAP; gx <= DEEP_CAVE_GAP; gx++) {
         if (map.inBounds(x + gx, y + gy) && taken[map.idx(x + gx, y + gy)]) return false;
@@ -447,7 +484,7 @@ function digCaves(map: GameMap, rng: Rng, count: number): boolean {
             if (!mouth || path.length < mouth.length) mouth = path.slice();
             break;
           }
-          if (t === Tile.River || t === Tile.Water) break;
+          if (t === Tile.River || t === Tile.Water || t === Tile.Lava) break;
           path.push(p);
         }
       }
@@ -498,6 +535,74 @@ function cleanGrass(map: GameMap): void {
   }
 }
 
+/**
+ * Island 3: beach and jungle, then the volcano. Height rises with the
+ * distance from the sea, with a little noise, so the island is one cone.
+ * Above the forest is grey ash with black basalt cliffs (rock, sometimes
+ * with caves); the very top is the crater, a lake of lava. Returns each
+ * cell's height (0..1, -1 for the sea) so the balloon can go on the rim.
+ */
+function addVolcano(map: GameMap, rng: Rng): Float32Array {
+  const seaDist = distanceMap4(map);
+  const wobble = valueNoise(map.width, map.height, 5, rng);
+  const ridges = valueNoise(map.width, map.height, 11, rng);
+  const cliffs = valueNoise(map.width, map.height, 4, rng);
+  const caves = valueNoise(map.width, map.height, 4, rng);
+  const maxDist = Math.max(...seaDist);
+
+  const elevation = new Float32Array(map.tiles.length).fill(-1);
+  const inland: number[] = [];
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      const i = map.idx(x, y);
+      const d = seaDist[i];
+      if (d < 0) continue;
+      elevation[i] = (d / maxDist) * 0.8 + ridges(x, y) * 0.2;
+      if (d >= BEACH_WIDTH + Math.round(wobble(x, y) * 2)) {
+        map.set(x, y, Tile.Grass);
+        if (d >= HILL_MIN_DIST) inland.push(i);
+      }
+    }
+  }
+  removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, Tile.Sand));
+
+  const sorted = inland.map((i) => elevation[i]).sort((a, b) => a - b);
+  const forestTop = sorted[Math.floor(sorted.length * VOLCANO_FOREST_LINE)];
+  const crater = sorted[Math.floor(sorted.length * CRATER_LINE)];
+  for (const i of inland) {
+    const x = i % map.width;
+    const y = (i - x) / map.width;
+    if (map.tiles[i] !== Tile.Grass || elevation[i] < forestTop) continue;
+    if (elevation[i] >= crater) map.tiles[i] = Tile.Lava;
+    else if (cliffs(x, y) > 0.6) map.tiles[i] = caves(x, y) > 0.68 ? Tile.CaveFloor : Tile.Rock;
+    else map.tiles[i] = Tile.Ash;
+  }
+  cleanVolcano(map);
+  return elevation;
+}
+
+/**
+ * Make the volcano drawable: caves only inside rock, no grass by the sea,
+ * no grass strip one cell thin (it becomes beach, or ash up the slopes),
+ * and no thin arm of the crater lake.
+ */
+function cleanVolcano(map: GameMap): void {
+  const near = (x: number, y: number, t: Tile) => DIRS.some(([dx, dy]) => map.get(x + dx, y + dy) === t);
+  for (let changed = true; changed; ) {
+    const before = map.tiles.slice();
+    for (let y = 0; y < map.height; y++) {
+      for (let x = 0; x < map.width; x++) {
+        const t = map.get(x, y);
+        if (t === Tile.CaveFloor && DIRS.filter(([dx, dy]) => map.get(x + dx, y + dy) === Tile.Rock).length < 2) map.set(x, y, Tile.Ash);
+        if (t === Tile.Grass && DIRS.some(([dx, dy]) => !map.isLand(x + dx, y + dy))) map.set(x, y, Tile.Sand);
+      }
+    }
+    removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, near(x, y, Tile.Sand) ? Tile.Sand : Tile.Ash));
+    removeThin(map, (x, y) => map.get(x, y) === Tile.Lava, (x, y) => map.set(x, y, Tile.Ash));
+    changed = map.tiles.some((t, i) => t !== before[i]);
+  }
+}
+
 function distanceMap4(map: GameMap): Int32Array {
   const dist = new Int32Array(map.width * map.height).fill(-1);
   const queue: number[] = [];
@@ -541,8 +646,9 @@ function pickStart(map: GameMap, rng: Rng): { x: number; y: number } | null {
 }
 
 /**
- * Dig cave tunnels (mountain passes on island 2) through rock until every
- * walkable cell can be reached from the start.
+ * Dig cave tunnels (mountain passes on island 2, ash on island 3) through
+ * rock (or the edge of the crater lake) until every walkable cell can be
+ * reached from the start.
  */
 function connectFloor(map: GameMap, start: { x: number; y: number }, tunnel: Tile): void {
   for (;;) {
@@ -584,7 +690,7 @@ function connectFloor(map: GameMap, start: { x: number; y: number }, tunnel: Til
       }
       if (!next) break;
       [cx, cy] = next;
-      if (map.get(cx, cy) === Tile.Rock) map.set(cx, cy, tunnel);
+      if (map.get(cx, cy) === Tile.Rock || map.get(cx, cy) === Tile.Lava) map.set(cx, cy, tunnel);
     }
   }
 }
@@ -599,11 +705,12 @@ interface Borders {
 
 /**
  * Close off the home coast with a band of brambles, and the forest with a
- * river two cells wide. Each band follows one walking distance from the
- * start, so every way out has to cross it. Returns null when the island
- * doesn't split well (too little far side, or a river too wide to bridge).
+ * river two cells wide (on island 3 a lava flow, `flow`). Each band follows
+ * one walking distance from the start, so every way out has to cross it.
+ * Returns null when the island doesn't split well (too little far side, or
+ * a river too wide to bridge).
  */
-function addBorders(map: GameMap, start: { x: number; y: number }): Borders | null {
+function addBorders(map: GameMap, start: { x: number; y: number }, flow: Tile): Borders | null {
   const dist = distanceMap(map, start.x, start.y, (x, y) => map.isFloor(x, y));
   const floor = [...dist].filter((d) => d >= 0).sort((a, b) => a - b);
   const homeDist = floor[Math.floor(floor.length * HOME_SHARE)];
@@ -611,9 +718,9 @@ function addBorders(map: GameMap, start: { x: number; y: number }): Borders | nu
   if (riverDist - homeDist < 6) return null;
 
   for (let i = 0; i < dist.length; i++) {
-    if (dist[i] === riverDist || dist[i] === riverDist + 1) map.tiles[i] = Tile.River;
+    if (dist[i] === riverDist || dist[i] === riverDist + 1) map.tiles[i] = flow;
   }
-  cleanRiverBanks(map);
+  cleanRiverBanks(map, flow);
 
   const region = new Uint8Array(dist.length).fill(NO_REGION);
   const brambles: number[] = [];
@@ -627,31 +734,32 @@ function addBorders(map: GameMap, start: { x: number; y: number }): Borders | nu
   }
   if (far < floor.length * MIN_FAR_SHARE) return null;
 
-  const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
-  const reach = reachWithBridges(map, start.x, start.y, (x, y) => map.isFloor(x, y), isRiver);
+  const isFlow = (x: number, y: number) => map.get(x, y) === flow;
+  const reach = reachWithBridges(map, start.x, start.y, (x, y) => map.isFloor(x, y), isFlow);
   for (let i = 0; i < dist.length; i++) if (region[i] !== NO_REGION && !reach[i]) return null;
   return { region, brambles };
 }
 
 /**
- * Make the river drawable: no land strips one cell thin between water, and
- * no grass that touches both the river and the beach (a grass tile can
- * only show one kind of edge). Sand by the river uses the shore tiles.
+ * Make the river (or the lava flow, `flow`) drawable: no land strips one
+ * cell thin between water or lava, and no grass that touches both the
+ * river and the beach (a grass tile can only show one kind of edge). Sand
+ * by the river uses the shore tiles.
  */
-function cleanRiverBanks(map: GameMap): void {
+function cleanRiverBanks(map: GameMap, flow: Tile): void {
+  const near = (x: number, y: number, t: Tile) => DIRS.some(([dx, dy]) => map.get(x + dx, y + dy) === t);
   for (let changed = true; changed; ) {
     const before = map.tiles.slice();
-    removeThin(map, (x, y) => map.isLand(x, y), (x, y) => map.set(x, y, Tile.River));
+    removeThin(map, (x, y) => map.isLand(x, y) && map.get(x, y) !== flow, (x, y) => map.set(x, y, flow));
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        if (map.get(x, y) !== Tile.Grass) continue;
-        const near = (t: Tile) => DIRS.some(([dx, dy]) => map.get(x + dx, y + dy) === t);
-        if (near(Tile.River) && near(Tile.Sand)) map.set(x, y, Tile.Sand);
+        if (flow === Tile.River && map.get(x, y) === Tile.Grass && near(x, y, Tile.River) && near(x, y, Tile.Sand)) map.set(x, y, Tile.Sand);
       }
     }
-    // Thin grass becomes beach, or scree in the mountains of island 2.
-    const screeNear = (x: number, y: number) => DIRS.some(([dx, dy]) => map.get(x + dx, y + dy) === Tile.Scree);
-    removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, screeNear(x, y) ? Tile.Scree : Tile.Sand));
+    // Thin grass becomes beach, or scree (ash) in the mountains of island 2 (3).
+    const thinGrass = (x: number, y: number) =>
+      near(x, y, Tile.Scree) ? Tile.Scree : near(x, y, Tile.Ash) && !near(x, y, Tile.Sand) ? Tile.Ash : Tile.Sand;
+    removeThin(map, (x, y) => map.get(x, y) === Tile.Grass, (x, y) => map.set(x, y, thinGrass(x, y)));
     removeThin(map, (x, y) => map.get(x, y) === Tile.Snow, (x, y) => map.set(x, y, Tile.Scree));
     changed = map.tiles.some((t, i) => t !== before[i]);
   }
@@ -677,7 +785,7 @@ function scatterObjects(
     return o !== undefined && !OBJECTS[o.kind].walkable && !canBeOpened(o.kind);
   };
   const open = (x: number, y: number) => map.isFloor(x, y) && !blocked(x, y);
-  const isRiver = (x: number, y: number) => map.get(x, y) === Tile.River;
+  const isRiver = (x: number, y: number) => map.isFlow(x, y);
   const nearStart = (x: number, y: number) => Math.max(Math.abs(x - start.x), Math.abs(y - start.y)) <= 1;
   // River banks stay clear so a bridge always has somewhere to land.
   const onBank = (x: number, y: number) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isRiver(x + dx, y + dy));
@@ -709,7 +817,8 @@ function scatterObjects(
   }
 
   // The goal goes first, with room round it so the big sprite stays clear
-  // of trees: the boat on a beach by the sea, the beacon on the peak.
+  // of trees: the boat on a beach by the sea, the beacon on the peak, the
+  // balloon on the crater rim.
   const byTheSea = (x: number, y: number) =>
     map.get(x, y) === Tile.Sand && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.get(x + dx, y + dy) === Tile.Water);
   const goalFree = (i: number) => {
@@ -723,10 +832,13 @@ function scatterObjects(
       const x = i % map.width;
       return DIRS.filter(([dx, dy]) => map.isFloor(x + dx, (i - x) / map.width + dy)).length;
     };
-    const peaks = cells.filter((i) => map.tiles[i] === Tile.Snow).sort((a, b) => elevation[b] - elevation[a]);
+    const top = biome === 'volcano' ? Tile.Ash : Tile.Snow;
+    const peaks = cells.filter((i) => map.tiles[i] === top).sort((a, b) => elevation[b] - elevation[a]);
     goalAt = peaks.find((i) => goalFree(i) && openSides(i) >= GOAL_OPEN_SIDES && place(i, goal)) ?? -1;
     if (goalAt < 0) return null;
-    for (const ring of [LEDGE_RING, ICE_RING]) if (!addStepRing(map, goalAt, start, objects, ring)) return null;
+    if (biome === 'mountain') {
+      for (const ring of [LEDGE_RING, ICE_RING]) if (!addStepRing(map, goalAt, start, objects, ring)) return null;
+    }
   } else {
     for (const r of GOAL_REGIONS) {
       goalAt = cells.find((i) => {
@@ -748,7 +860,8 @@ function scatterObjects(
     if (!map.isFloor(x, y) || objects.has(i) || nearStart(x, y) || onBank(x, y) || nearGoal(x, y)) continue;
     const tile = map.get(x, y);
     const ground: Ground =
-      tile === Tile.Sand ? 'sand' : tile === Tile.Grass ? 'grass' : tile === Tile.Scree ? 'scree' : tile === Tile.Snow ? 'snow' : 'cave';
+      tile === Tile.Sand ? 'sand' : tile === Tile.Grass ? 'grass' : tile === Tile.Scree ? 'scree' : tile === Tile.Snow ? 'snow'
+        : tile === Tile.Ash ? 'ash' : 'cave';
     const density = ground === 'grass' ? 0.4 + forest(x, y) * 1.2 : 1;
     let roll = rng.next();
     for (const [kind, chance] of SCATTER[biome][ground]) {
@@ -775,8 +888,23 @@ function scatterObjects(
     if (region[i] === 0 && place(i, 'spring')) springs++;
   }
   for (const i of springSpots) {
-    if (springs >= SPRINGS) break;
+    if (springs >= SPRINGS_ON[biome]) break;
     if (free(i) && place(i, 'spring')) springs++;
+  }
+
+  // Island 3: hot springs on the ash, spread over the slopes.
+  const apart = (i: number, list: number[], gap: number) => list.every((j) => {
+    const dx = Math.abs((i % map.width) - (j % map.width));
+    const dy = Math.abs(Math.floor(i / map.width) - Math.floor(j / map.width));
+    return Math.max(dx, dy) >= gap;
+  });
+  if (biome === 'volcano') {
+    const hot: number[] = [];
+    for (const i of cells) {
+      if (hot.length >= HOT_SPRINGS) break;
+      if (map.tiles[i] === Tile.Ash && free(i) && apart(i, hot, HOT_SPRING_GAP) && place(i, 'hot_spring')) hot.push(i);
+    }
+    if (hot.length < HOT_SPRINGS) return null;
   }
 
   // A few chests to find, most of them further out.
@@ -809,6 +937,17 @@ function scatterObjects(
       if (glowcaps && place(i, 'glowcap')) glowcaps--;
       else if (crystals && place(i, 'crystal_cluster')) crystals--;
     }
+  }
+
+  // Island 3: steam vents for the sulphur, on the highest ash near the crater.
+  if (biome === 'volcano' && elevation) {
+    const vents: number[] = [];
+    const high = cells.filter((i) => map.tiles[i] === Tile.Ash).sort((a, b) => elevation[b] - elevation[a]);
+    for (const i of high) {
+      if (vents.length >= VENTS) break;
+      if (free(i) && apart(i, vents, VENT_GAP) && place(i, 'steam_vent')) vents.push(i);
+    }
+    if (vents.length < VENTS) return null;
   }
 
   // Island 2: enough snowy spruces for the beacon's resin.

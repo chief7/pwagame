@@ -360,7 +360,7 @@ function skillsSection(): HTMLElement {
 }
 
 const GROUND: Partial<Record<Tile, Ground>> = {
-  [Tile.Sand]: 'sand', [Tile.Grass]: 'grass', [Tile.CaveFloor]: 'cave', [Tile.Scree]: 'scree', [Tile.Snow]: 'snow',
+  [Tile.Sand]: 'sand', [Tile.Grass]: 'grass', [Tile.CaveFloor]: 'cave', [Tile.Scree]: 'scree', [Tile.Snow]: 'snow', [Tile.Ash]: 'ash',
 };
 
 function animalCard(kind: AnimalKind): HTMLElement {
@@ -401,7 +401,7 @@ function dogSection(): HTMLElement {
 function islandsSection(): HTMLElement {
   const w = W.islands;
   const parts = LEVELS.map((level) => {
-    const text = level.level === 1 ? w.one : w.two;
+    const text = { 1: w.one, 2: w.two, 3: w.three }[level.level];
     const total: Partial<Record<ItemId, number>> = {};
     for (const stage of level.stages) for (const [item, n] of Object.entries(stage.cost) as [ItemId, number][]) total[item] = (total[item] ?? 0) + n;
     const rows: Child[][] = level.stages.map((stage, i) => [

@@ -268,4 +268,8 @@ export const PALETTE = {
   washRock: '#b0a48c',
   washRockDark: '#998c74',
   washSnow: '#f6f2e6',
+  washAsh: '#aaa196',
+  washAshDark: '#978e84',
+  washLava: '#d98a5c',
+  washLavaDark: '#c8714a',
 } as const;

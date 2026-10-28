@@ -1,21 +1,24 @@
+import { levelDef } from '../game/defs/levels';
 import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
 import { hash2 } from '../sprites/pixel';
-import { bake, buildSprites, edgeTileName, mixedTile, shoreTileName, type Sprite } from '../sprites';
+import { bake, buildSprites, edgeTileName, mixedTile, type Sprite } from '../sprites';
 import { characterName, fishingName } from '../sprites/characters';
 import type { Animator } from './animator';
 
 export type Body = 'male' | 'female';
 
-/** How long the boat takes to sail away from island 1. */
+/** How long the boat takes to sail away from island 1 (and the balloon to rise off island 3). */
 export const DEPART_MS = 1600;
 
 /**
  * The finished boat sailing off from (x, y) with the explorer on board,
- * `cells` far in direction (dx, dy). Only drawn; the game sails after it.
+ * `cells` far in direction (dx, dy), or the balloon rising (`balloon`).
+ * Only drawn; the game sails after it.
  */
 export interface Departure {
+  balloon?: true;
   x: number;
   y: number;
   dx: number;
@@ -38,6 +41,7 @@ const MAX_CELL_CSS = 48;
 const WATER_FRAME_MS = 750;
 const WATER_TILES = ['water', 'water_2', 'water_3'];
 const RIVER_TILES = ['river', 'river_2'];
+const LAVA_TILES = ['lava', 'lava_2'];
 const FIRE_FRAME_MS = 220;
 /** Animals that flutter along with a little hop; the others walk with step frames. */
 const FLYERS = new Set(['bat', 'wasps']);
@@ -179,7 +183,7 @@ export class Renderer {
     const y0 = Math.floor(-o.y / cell) - 1;
     const x1 = Math.ceil((this.canvas.width - o.x) / cell);
     const y1 = Math.ceil((this.canvas.height - o.y) / cell);
-    const terrain = this.terrainFor(map);
+    const terrain = this.terrainFor(map, levelDef(game.level).biome === 'volcano');
     const waterTick = anim.reducedMotion ? 0 : Math.floor(now / WATER_FRAME_MS);
     const riverTick = anim.reducedMotion ? 0 : Math.floor(now / FIRE_FRAME_MS);
 
@@ -195,7 +199,9 @@ export class Renderer {
         let name = terrain[map.idx(x, y)];
         if (name === '~') name = WATER_TILES[(Math.floor(hash2(x, y, 51) * 3) + waterTick) % 3];
         else if (name === '≈') name = RIVER_TILES[riverTick % 2];
+        else if (name === '^') name = LAVA_TILES[riverTick % 2];
         else if (riverTick % 2 && name.startsWith('mouth_')) name = `mouth2_${name.slice(6)}`;
+        else if (riverTick % 2 && name.startsWith('lava_mouth_')) name = `lava_mouth2_${name.slice(11)}`;
         this.drawTile(name, o.x + x * cell, o.y + y * cell);
       }
     }
@@ -291,7 +297,9 @@ export class Renderer {
 
     // The boat stays in view while it sails out over dim or unknown water.
     if (trip && boat) {
-      const name = `boat_away_${this.body}${trip.dx < 0 ? '_left' : ''}${fireFrame % 2 ? '_2' : ''}`;
+      const name = trip.balloon
+        ? `balloon_away_${this.body}${fireFrame % 2 ? '_2' : ''}`
+        : `boat_away_${this.body}${trip.dx < 0 ? '_left' : ''}${fireFrame % 2 ? '_2' : ''}`;
       this.drawStanding(name, Math.round(o.x + boat.x * cell), Math.round(o.y + boat.y * cell));
     }
 
@@ -313,7 +321,8 @@ export class Renderer {
    * sees a little around themselves (more with the crystal lantern).
    */
   private drawNight(game: Game, o: { x: number; y: number }, x0: number, y0: number, x1: number, y1: number, pose: { x: number; y: number }): void {
-    const lights = game.lights();
+    // Only lights that reach the screen (the lava has many).
+    const lights = game.lights().filter(([lx, ly, r]) => lx + r >= x0 && lx - r <= x1 && ly + r >= y0 && ly - r <= y1);
     const own = game.hasLantern ? LANTERN_LIGHT : OWN_LIGHT;
     const { ctx, cell } = this;
     for (let y = y0; y <= y1; y++) {
@@ -446,38 +455,45 @@ export class Renderer {
     return baked.flash;
   }
 
-  private terrainFor(map: GameMap): string[] {
+  private terrainFor(map: GameMap, volcano: boolean): string[] {
     let names = this.terrain.get(map);
     if (names) return names;
     names = [];
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
-        names.push(this.terrainName(map, x, y));
+        names.push(this.terrainName(map, x, y, volcano));
       }
     }
     this.terrain.set(map, names);
     return names;
   }
 
-  private terrainName(map: GameMap, x: number, y: number): string {
+  private terrainName(map: GameMap, x: number, y: number, volcano: boolean): string {
     const roll = hash2(x, y, 52);
     switch (map.get(x, y)) {
       case Tile.Water:
         return '~';
       case Tile.River:
         return edgeTileName('river', '≈', (dx, dy) => (map.get(x + dx, y + dy) === Tile.Water ? 'w' : '.'));
-      case Tile.Sand: {
-        const shore = shoreTileName((dx, dy) => map.isWet(x + dx, y + dy));
-        if (shore !== 'sand') return shore;
-        return roll < 0.72 ? 'sand' : roll < 0.94 ? 'sand_ripples' : 'sand_shell';
-      }
+      case Tile.Lava:
+        return edgeTileName('lava', '^', (dx, dy) => (map.get(x + dx, y + dy) === Tile.Water ? 'w' : '.'));
+      case Tile.Sand:
+        return edgeTileName('sand', roll < 0.72 ? 'sand' : roll < 0.94 ? 'sand_ripples' : 'sand_shell', (dx, dy) => {
+          const t = map.get(x + dx, y + dy);
+          return map.isWet(x + dx, y + dy) ? 'w' : t === Tile.Lava ? 'l' : t === Tile.Ash ? 'h' : '.';
+        });
       case Tile.Grass:
         return edgeTileName('grass', roll < 0.88 ? 'grass' : 'grass_flowers', (dx, dy) => {
           const t = map.get(x + dx, y + dy);
-          return t === Tile.River ? 'r' : t === Tile.Sand ? 'a' : t === Tile.Scree ? 'c' : '.';
+          return t === Tile.River ? 'r' : t === Tile.Sand ? 'a' : t === Tile.Scree ? 'c' : t === Tile.Ash ? 'h' : t === Tile.Lava ? 'l' : '.';
         });
-      case Tile.Rock:
-        return map.get(x, y + 1) === Tile.Rock ? 'rock_top' : 'rock_face';
+      case Tile.Ash:
+        return edgeTileName('ash', roll < 0.85 ? 'ash' : 'ash_2', (dx, dy) => (map.get(x + dx, y + dy) === Tile.Lava ? 'l' : '.'));
+      case Tile.Rock: {
+        // The cliffs of the volcano are black basalt.
+        const rock = volcano ? 'basalt' : 'rock';
+        return map.get(x, y + 1) === Tile.Rock ? `${rock}_top` : `${rock}_face`;
+      }
       case Tile.Scree:
         return edgeTileName('scree', roll < 0.8 ? 'scree' : 'scree_2', (dx, dy) => (map.get(x + dx, y + dy) === Tile.River ? 'r' : '.'));
       case Tile.Snow:
@@ -486,7 +502,10 @@ export class Renderer {
           return t === Tile.River ? 'r' : t === Tile.Scree ? 'c' : '.';
         });
       default:
-        return edgeTileName('cave', roll < 0.8 ? 'cave_floor' : 'cave_floor_2', (dx, dy) => (map.get(x + dx, y + dy) === Tile.River ? 'r' : '.'));
+        return edgeTileName('cave', roll < 0.8 ? 'cave_floor' : 'cave_floor_2', (dx, dy) => {
+          const t = map.get(x + dx, y + dy);
+          return t === Tile.River ? 'r' : t === Tile.Lava ? 'l' : '.';
+        });
     }
   }
 }

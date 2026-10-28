@@ -681,6 +681,19 @@ function balloonAwaySprite(body: 'male' | 'female', frame: 0 | 1): Sprite {
   return s.outline();
 }
 
+/** Where the balloon stood after it flew off: two stakes with cut ropes. */
+function balloonGone(): Sprite {
+  const s = new Sprite('balloon_gone', BALLOON_W, BALLOON_H);
+  for (const x of [7, 16]) {
+    for (let y = BASKET_FOOT - 4; y <= BASKET_FOOT; y++) {
+      s.set(x, y, y === BASKET_FOOT - 4 ? P.woodCut : P.wood);
+      s.set(x + 1, y, P.woodDark);
+    }
+  }
+  for (const [x, y] of [[9, 27], [10, 28], [11, 28], [14, 27], [13, 28]]) s.set(x, y, P.strawDark);
+  return s.outline().shadow(12, BASKET_FOOT + 1.5, 7, 1.2);
+}
+
 export function balloonAway(): Sprite[] {
   return (['male', 'female'] as const).flatMap((body) => [balloonAwaySprite(body, 0), balloonAwaySprite(body, 1)]);
 }
@@ -693,5 +706,6 @@ export function balloon(): Sprite[] {
     balloonSprite('balloon_envelope', 'envelope'),
     balloonSprite('balloon_ready', 'ready', 0),
     balloonSprite('balloon_ready_2', 'ready', 1),
+    balloonGone(),
   ];
 }

@@ -64,6 +64,10 @@ const NIGHT_EYES = 2;
 const LANTERN_SIGHT = 2;
 /** How much colder it is out in the open on snow, day and night (see warmthTarget). */
 const SNOW_CHILL = 40;
+/** On island 3, Water drops up to this share faster out on the hot ash by day (see tickNeeds). */
+const ASH_HEAT = 0.5;
+/** How far lava lights the night round it. */
+const LAVA_LIGHT = 1;
 /** Energy it costs to climb onto a ladder or a climbing rope. */
 const CLIMB_ENERGY = 2;
 /** Ropes from one rope recipe with Rope maker. */
@@ -228,6 +232,7 @@ export class Game {
   private climbDist: { turn: number; dist: Int32Array } | null = null;
   /** The deep caves of this map (found from its tiles, which never change). */
   private caveCache: { map: GameMap; caves: Cave[]; mask: Uint8Array } | null = null;
+  private lavaCache: { map: GameMap; cells: [number, number, number][] } | null = null;
 
   constructor(seed = (Math.random() * 2 ** 32) >>> 0, save?: SaveData) {
     this.seed = seed;
@@ -254,7 +259,8 @@ export class Game {
       this.skills = new Set(save.skills.filter((id) => id in SKILLS));
       this.level = save.level;
       this.goalGiven = save.goalGiven;
-      this.sailed = save.sailed;
+      // A save from when its island was the last one: the next island is there now.
+      this.sailed = save.sailed && !nextLevel(save.level);
       this.dog = save.dog;
       this.bearSpots = save.bearSpots;
       this.stars = save.stars;
@@ -350,7 +356,7 @@ export class Game {
   /** Floor that nothing solid stands on, or a bridge. Ignores animals. */
   isPassable(x: number, y: number): boolean {
     const obj = this.objectAt(x, y);
-    if (this.map.get(x, y) === Tile.River) return !!obj && !!OBJECTS[obj.kind].bridge;
+    if (this.map.isFlow(x, y)) return !!obj && !!OBJECTS[obj.kind].bridge;
     if (this.map.get(x, y) === Tile.Water) return !!obj && !!OBJECTS[obj.kind].tidal && this.lowTide;
     if (!this.map.isFloor(x, y)) return false;
     return !obj || !!OBJECTS[obj.kind].walkable;
@@ -424,9 +430,9 @@ export class Game {
     return this.inventory.count('lantern') > 0;
   }
 
-  /** Campfires and other light sources (the lit beacon, glowcaps that are not picked): [x, y, radius]. */
+  /** Campfires and other light sources (the lit beacon, glowcaps that are not picked, lava): [x, y, radius]. */
   lights(): [number, number, number][] {
-    const out: [number, number, number][] = [];
+    const out: [number, number, number][] = this.lavaLights();
     for (const [i, obj] of this.objects) {
       const def = OBJECTS[obj.kind];
       if (obj.readyAt !== undefined && obj.readyAt > this.turn) continue;
@@ -434,6 +440,18 @@ export class Game {
       if (r) out.push([i % this.map.width, Math.floor(i / this.map.width), r]);
     }
     return out;
+  }
+
+  /** Every lava cell glows a little at night. Worked out once per island. */
+  private lavaLights(): [number, number, number][] {
+    if (this.lavaCache?.map !== this.map) {
+      const cells: [number, number, number][] = [];
+      for (let i = 0; i < this.map.tiles.length; i++) {
+        if (this.map.tiles[i] === Tile.Lava) cells.push([i % this.map.width, Math.floor(i / this.map.width), LAVA_LIGHT]);
+      }
+      this.lavaCache = { map: this.map, cells };
+    }
+    return [...this.lavaCache.cells];
   }
 
   nearFire(x: number, y: number): boolean {
@@ -557,7 +575,8 @@ export class Game {
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
       if (recipe.onto) return { key: 'noStep', obj: recipe.onto };
-      return OBJECTS[recipe.builds].bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
+      const built = OBJECTS[recipe.builds];
+      return built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
     return null;
   }
@@ -666,6 +685,11 @@ export class Game {
         this.endTurn();
         return true;
       }
+      if (this.map.get(nx, ny) === Tile.Lava) {
+        // Too hot to step on: nothing happens, no time passes.
+        this.message({ key: 'lavaHot' }, 'info');
+        return false;
+      }
       if (obj && OBJECTS[obj.kind].tidal) {
         // High tide: the sandbar is under water until the next low tide.
         this.message({ key: 'tideHigh', turn: nextLowTide(this.turn) }, 'info');
@@ -683,6 +707,7 @@ export class Game {
     }
     this.emit({ type: 'move', id: p.id, fromX: p.x, fromY: p.y, toX: nx, toY: ny });
     const onSnow = this.map.get(p.x, p.y) === Tile.Snow;
+    const onAsh = this.map.get(p.x, p.y) === Tile.Ash;
     const inCave = this.inCave(p.x, p.y);
     p.x = nx;
     p.y = ny;
@@ -693,6 +718,7 @@ export class Game {
       this.message({ key: 'stepInto', obj: obj.kind }, 'info');
     } else if (obj && OBJECTS[obj.kind].climb) this.climb(nx, ny, obj.kind);
     else if (!onSnow && this.map.get(nx, ny) === Tile.Snow) this.message({ key: 'snowCold' }, 'warn');
+    else if (!onAsh && this.map.get(nx, ny) === Tile.Ash && this.daylight > 0.5) this.message({ key: 'ashHot' }, 'warn');
     else if (!inCave && this.inCave(nx, ny)) this.message(this.hasLantern ? { key: 'caveEnter', lantern: true } : { key: 'caveEnter' }, 'info');
     this.endTurn();
     return true;
@@ -983,7 +1009,7 @@ export class Game {
     const def = OBJECTS[obj.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
 
-    if (def.drink) return this.drink(def.drink, { key: 'drink' });
+    if (def.drink) return this.drink(def.drink, obj.kind === 'hot_spring' ? { key: 'drink', warm: true } : { key: 'drink' });
     if (def.goal) return this.workOnGoal(x, y, obj);
     if (def.steep) {
       const recipe = RECIPE_IDS.map((id) => RECIPES[id]).find((r) => r.onto === obj.kind);
@@ -1176,8 +1202,11 @@ export class Game {
     const p = this.player;
     const [fx, fy] = facingDelta(p.facing);
     if (OBJECTS[kind].bridge) {
-      const cells = this.riverAhead(p.x, p.y, fx, fy);
-      return cells ? { kind: fx ? 'bridge_ew' : 'bridge_ns', cells } : null;
+      const lava = !!OBJECTS[kind].onLava;
+      const cells = this.riverAhead(p.x, p.y, fx, fy, lava ? Tile.Lava : Tile.River);
+      if (!cells) return null;
+      const way: ObjectKind = lava ? (fx ? 'lava_stones_ew' : 'lava_stones_ns') : fx ? 'bridge_ew' : 'bridge_ns';
+      return { kind: way, cells };
     }
     const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
     if (onto) {
@@ -1199,13 +1228,13 @@ export class Game {
     return null;
   }
 
-  /** The open river cells straight ahead, if they end on free ground within a bridge's span. */
-  private riverAhead(x: number, y: number, dx: number, dy: number): { x: number; y: number }[] | null {
+  /** The open river (or lava, `flow`) cells straight ahead, if they end on free ground within a bridge's span. */
+  private riverAhead(x: number, y: number, dx: number, dy: number, flow: Tile): { x: number; y: number }[] | null {
     const cells: { x: number; y: number }[] = [];
     for (let k = 1; k <= BRIDGE_SPAN + 1; k++) {
       const cx = x + dx * k;
       const cy = y + dy * k;
-      if (this.map.get(cx, cy) === Tile.River && !this.objectAt(cx, cy)) {
+      if (this.map.get(cx, cy) === flow && !this.objectAt(cx, cy)) {
         cells.push({ x: cx, y: cy });
         continue;
       }
@@ -1223,7 +1252,7 @@ export class Game {
       const obj = this.objectAt(x, y);
       return this.isPassable(x, y) || (!!obj && canBeOpened(obj.kind));
     };
-    const isRiver = (x: number, y: number) => this.map.get(x, y) === Tile.River && !this.objectAt(x, y);
+    const isRiver = (x: number, y: number) => this.map.isFlow(x, y) && !this.objectAt(x, y);
     const reach = reachWithBridges(this.map, sx, sy, open, isRiver);
     for (let i = 0; i < this.map.tiles.length; i++) {
       const x = i % this.map.width;
@@ -1248,6 +1277,7 @@ export class Game {
       hunger: this.has('small_appetite') ? SMALL_APPETITE : 1,
       chill: this.has('thick_skin') ? THICK_SKIN : 1,
       cold: this.map.get(p.x, p.y) === Tile.Snow ? SNOW_CHILL : 0,
+      heat: this.map.get(p.x, p.y) === Tile.Ash ? ASH_HEAT * this.daylight : 0,
       heal: !this.hutHere() ? 1 : this.hasRoom('hearth') ? HEARTH_HEAL : BED_HEAL,
     });
     if (!this.sleeping) this.warnAboutNeeds();
