@@ -307,3 +307,20 @@ export function mapMarkers(): Sprite[] {
   ], key);
   return [you, hut, fire, spring, goal, bear, cave].map(halo);
 }
+
+/** The load mark in the Bag panel: three logs tied in a bundle, cut ends to the front. */
+export function loadIcon(): Sprite {
+  const s = new Sprite('ui_load');
+  for (const [cx, cy] of [[5, 10.5], [11, 10.5], [8, 5.5]]) {
+    for (let y = Math.floor(cy - 3); y <= Math.ceil(cy + 3); y++) {
+      for (let x = Math.floor(cx - 3); x <= Math.ceil(cx + 3); x++) {
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        if (d > 3) continue;
+        s.set(x, y, d < 1 ? P.woodRing : d < 2.2 ? (x + y < cx + cy ? P.woodCut : P.woodRing) : x + y < cx + cy ? P.woodDark : P.woodDeep);
+      }
+    }
+  }
+  // The rope round the bundle.
+  for (let x = 2; x <= 13; x++) s.set(x, 8, x % 3 === 0 ? P.strawDark : P.strawLight);
+  return s.outline();
+}

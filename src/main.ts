@@ -6,7 +6,7 @@ import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { ROOM_IDS, type RoomId } from './game/defs/rooms';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
-import { Game, type SaveData } from './game/game';
+import { Game, ORDER_IDS, RADIO_ORDERS, VOYAGE_DIESEL, type SaveData } from './game/game';
 import { Tile } from './game/map';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
@@ -213,7 +213,7 @@ function updateHud(): void {
   ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}${tide}`;
   const obj = game.objectAt(x, y);
   ui.shelter.textContent = game.hutHere()
-    ? words.ui.inShelter('hut')
+    ? words.ui.inShelter(game.hutHere()!.kind)
     : game.nearFire(x, y)
     ? words.ui.byFire
     : obj && OBJECTS[obj.kind].shelter
@@ -285,9 +285,15 @@ function afterTurn(): void {
   updateHud();
   saveSoon();
   // Walking into the finished boat asks whether to leave (or shows the end again).
-  if (game.takeSailRequest()) openSheet(game.sailed ? 'end' : 'sail');
+  if (game.takeSailRequest()) openSheet(game.goalUsed ? 'end' : 'sail');
   // Walking into the hut goes inside.
   if (game.takeHutRequest()) openSheet('hut');
+  // Walking into a store crate opens it.
+  if (game.takeStoreRequest()) openSheet('store');
+  // Walking into the fishing boat opens the sea chart and the hold.
+  if (game.takeChartRequest()) openSheet('chart');
+  // Walking into the working radio (after the call for help) opens the Radio panel.
+  if (game.takeRadioRequest()) openSheet('radio');
 }
 
 function run(cmd: Command): void {
@@ -356,7 +362,7 @@ function placeGrill(now: number): void {
 
 // ---- Bag and build sheets -----------------------------------------------------------
 
-type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'sail' | 'end' | 'cheats';
+type SheetKind = 'bag' | 'build' | 'skills' | 'map' | 'hut' | 'store' | 'chart' | 'radio' | 'sail' | 'end' | 'cheats';
 let sheetKind: SheetKind = 'bag';
 /** Flickers the hearth in the Hut panel while it is open. */
 let hearthTimer: number | undefined;
@@ -400,13 +406,19 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: words.ui.yourHut, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: game.hutHere()?.kind === 'crew_cabin' ? words.ui.yourCabin : words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, radio: words.ui.radio, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
     cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
   clearInterval(hearthTimer);
   if (sheetKind === 'hut') {
     renderHut(rows);
+  } else if (sheetKind === 'store') {
+    renderStore(rows);
+  } else if (sheetKind === 'chart') {
+    renderChart(rows);
+  } else if (sheetKind === 'radio') {
+    renderRadio(rows);
   } else if (sheetKind === 'sail' || sheetKind === 'end') {
     renderVoyage(rows);
   } else if (sheetKind === 'skills') {
@@ -425,6 +437,7 @@ function renderSheet(): void {
       if (dog.tired) note.append(el('span', { className: 'row-note locked', textContent: words.ui.dogTired }));
       rows.append(row(icon(dog.tired ? 'dog_rest' : 'dog'), words.ui.yourDog, note));
     }
+    rows.append(loadRow());
     if (!entries.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmpty }));
     for (const [id, count] of entries) {
       const food = ITEMS[id].eat;
@@ -447,7 +460,7 @@ function renderSheet(): void {
       }
       const note = food
         ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
-        : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : words.ui.forBuilding;
+        : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : ITEMS[id].heavy ? `${words.ui.heavy} · ${words.ui.forBuilding}` : words.ui.forBuilding;
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), actions.childElementCount ? actions : undefined));
     }
   } else {
@@ -462,15 +475,20 @@ function renderSheet(): void {
           afterTurn();
         }
       });
-      const costs = costList(game.recipeCost(id));
+      // A building that goes up in trips shows what its site will take, or still needs once it stands.
+      const site = 'builds' in recipe ? siteOf(recipe.builds) : null;
+      const costs = costList(site ?? (recipe.siteCost ? game.siteCost(id) : game.recipeCost(id)));
       const { description } = words.recipes[id];
       const makes = game.recipeMakes(id);
       const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
-      if (problem && (problem.key === 'needSkill' || problem.key === 'needFire' || problem.key === 'oneHut')) {
+      const told = ['needSkill', 'needFire', 'needFurnace', 'oneHut', 'oneStore', 'rigOnly', 'holdMax'];
+      if (problem && !site && told.includes(problem.key)) {
         note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
       }
+      if (site) note.insertBefore(el('span', { className: 'row-note goal-step', textContent: words.ui.siteLeft }), costs);
+      else if (recipe.siteCost) note.append(el('span', { className: 'row-note goal-hint', textContent: words.ui.siteNote }));
       // The map on the hut wall needs the Cartographer skill: say so before the hut is built.
       if (id === 'hut' && !game.hasHut() && !game.has('cartographer')) {
         note.append(el('span', { className: 'row-note goal-hint', textContent: words.ui.hutMapRemark }));
@@ -500,6 +518,129 @@ function renderSheet(): void {
     }
   }
   ui.sheetBody.replaceChildren(rows, foot);
+}
+
+/** How many heavy things the explorer carries, of how many the bag holds. */
+function loadRow(): HTMLElement {
+  const words = t();
+  const full = game.load >= game.loadLimit;
+  const note = el('div', {}, [
+    el('div', { className: `row-note${full ? ' locked' : ''}`, textContent: words.ui.loadOf(game.load, game.loadLimit) }),
+    el('div', { className: 'row-note', textContent: words.ui.loadNote }),
+  ]);
+  return row(icon('ui_load'), words.ui.load, note);
+}
+
+/** What the island's building site of this kind still needs, or null when there is none. */
+function siteOf(kind: string): Partial<Record<ItemId, number>> | null {
+  for (const [i, obj] of game.objects) {
+    if (obj.kind !== kind || !OBJECTS[obj.kind].site) continue;
+    const x = i % game.map.width;
+    return game.siteLeft(x, (i - x) / game.map.width);
+  }
+  return null;
+}
+
+/**
+ * The bag and a container (the store crate or the boat's hold) one under
+ * the other, with buttons to move things between them. Moving takes no time.
+ */
+function renderStock(rows: HTMLElement, title: string, empty: string, stock: Partial<Record<ItemId, number>>,
+  put: (id: ItemId, n: number) => boolean, take: (id: ItemId, n: number) => boolean): void {
+  const words = t();
+  const act = (fn: () => boolean) => () => {
+    fn();
+    updateHud();
+    saveSoon();
+  };
+  const buttons = (labels: [string, () => boolean][]) => {
+    const box = el('div', { className: 'row-actions' });
+    for (const [label, fn] of labels) {
+      const b = el('button', { type: 'button', textContent: label });
+      b.addEventListener('click', act(fn));
+      box.append(b);
+    }
+    return box;
+  };
+  const heavy = (id: ItemId) => el('span', { className: 'row-note', textContent: ITEMS[id].heavy ? words.ui.heavy : '' });
+  rows.append(el('h3', { className: 'path', textContent: title }));
+  const kept = (Object.entries(stock) as [ItemId, number][]).filter(([, n]) => n > 0);
+  if (!kept.length) rows.append(el('p', { className: 'empty', textContent: empty }));
+  for (const [id, count] of kept) {
+    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), heavy(id),
+      buttons([[words.ui.takeOne, () => take(id, 1)], [words.ui.takeAll, () => take(id, count)]])));
+  }
+  rows.append(el('h3', { className: 'path', textContent: words.ui.inBag }));
+  const bag = game.inventory.entries();
+  if (!bag.length) rows.append(el('p', { className: 'empty', textContent: words.ui.bagEmptyShort }));
+  for (const [id, count] of bag) {
+    rows.append(row(icon(`item_${id}`), words.itemStack(id, count), heavy(id),
+      buttons([[words.ui.putOne, () => put(id, 1)], [words.ui.putAll, () => put(id, count)]])));
+  }
+}
+
+/** The Store panel: the store crate and the bag. */
+function renderStore(rows: HTMLElement): void {
+  const words = t();
+  const store = game.storeNear();
+  if (!store) {
+    rows.append(el('p', { className: 'empty', textContent: words.ui.notAtStore }));
+    return;
+  }
+  rows.append(loadRow());
+  renderStock(rows, words.ui.inStore, words.ui.storeEmpty, store.store ?? {}, (id, n) => game.storeItem(id, n), (id, n) => game.takeItem(id, n));
+}
+
+/** The Radio panel: order one supply crate each day; the helicopter drops it on the helipad. */
+function renderRadio(rows: HTMLElement): void {
+  const words = t();
+  if (!game.atRadio) {
+    rows.append(el('p', { className: 'empty', textContent: words.message({ key: 'noRadio' }) }));
+    return;
+  }
+  rows.append(el('p', { className: 'empty', textContent: words.ui.radioNote }));
+  const problem = game.orderProblem();
+  if (problem) rows.append(el('p', { className: 'empty locked', textContent: words.message(problem) }));
+  for (const id of ORDER_IDS) {
+    const button = el('button', { type: 'button', textContent: words.ui.order, disabled: !!problem, className: problem ? '' : 'primary' });
+    button.addEventListener('click', () => {
+      if (game.order(id)) saveSoon();
+      updateHud();
+    });
+    const contents = el('div', { className: 'costs' });
+    for (const [item, n] of Object.entries(RADIO_ORDERS[id]) as [ItemId, number][]) {
+      contents.append(el('span', { className: 'cost', title: words.itemCount(item, n) }, [el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, n) }), `${n}`]));
+    }
+    rows.append(row(icon('supply_crate'), words.ui.orders[id], contents, button));
+  }
+}
+
+/** The sea chart: where the fishing boat can sail, then its hold and the bag. */
+function renderChart(rows: HTMLElement): void {
+  const words = t();
+  if (!game.boatNear()) {
+    rows.append(el('p', { className: 'empty', textContent: words.message({ key: 'noBoat' }) }));
+    return;
+  }
+  rows.append(el('p', { className: 'empty', textContent: words.ui.chartNote(VOYAGE_DIESEL, game.dieselAboard) }));
+  for (const level of LEVELS.map((l) => l.level)) {
+    if (level === game.level) continue;
+    const problem = game.voyageProblem(level);
+    const go = el('button', { type: 'button', textContent: words.ui.sailTo, disabled: !!problem, className: problem ? '' : 'primary' });
+    go.addEventListener('click', () => {
+      closeSheet();
+      if (game.voyage(level)) afterTurn();
+      else updateHud();
+    });
+    const note = el('span', { className: 'row-note', textContent: game.visited(level) ? words.ui.beenThere : words.ui.newPlace });
+    rows.append(row(icon(levelDef(level).site), words.ui.islandName(level), note, go));
+  }
+  rows.append(row(icon('ui_load'), words.ui.hold, el('div', {}, [
+    el('div', { className: `row-note${game.holdLoad >= game.holdLimit ? ' locked' : ''}`, textContent: words.ui.loadOf(game.holdLoad, game.holdLimit) }),
+    el('div', { className: 'row-note', textContent: words.ui.holdNote }),
+  ])));
+  rows.append(loadRow());
+  renderStock(rows, words.ui.inHold, words.ui.holdEmpty, game.hold, (id, n) => game.loadItem(id, n), (id, n) => game.unloadItem(id, n));
 }
 
 /** The Cheats panel of preview builds: each row does one cheat, then closes the panel. */
@@ -627,7 +768,7 @@ function starsCard(): HTMLElement {
 function goalDone(): string {
   const kind = levelDef(game.level).stages.at(-1)!.becomes;
   const done = OBJECTS[kind].done;
-  return game.sailed && done ? done.icon ?? done.frames[0] : kind;
+  return game.goalUsed && done ? done.icon ?? done.frames[0] : kind;
 }
 
 /**
@@ -644,7 +785,7 @@ function setSail(): void {
     renderer.departure = null;
     if (!game.sail()) return;
     afterTurn();
-    if (game.sailed) openSheet('end');
+    if (game.goalUsed) openSheet('end');
   };
   if (!trip) return leave();
   stopAuto();
@@ -720,8 +861,20 @@ const bakedRooms = new Map<string, HTMLCanvasElement>();
 
 /** Sprite of a room inside the hut (frame 1 is the hearth's second flame). */
 function roomSprite(room: RoomId | 'main', frame = 0): string {
-  if (room === 'main') return game.canReadMap() ? 'room_main_map' : 'room_main';
-  return room === 'hearth' && frame % 2 ? 'room_hearth_2' : `room_${room}`;
+  // The crew cabin on the rig has its own steel rooms.
+  const kind = inCabin() ? 'cabin' : 'room';
+  if (room === 'main') return game.canReadMap() ? `${kind}_main_map` : `${kind}_main`;
+  return room === 'hearth' && frame % 2 ? `${kind}_hearth_2` : `${kind}_${room}`;
+}
+
+/** The explorer is in the crew cabin, not a hut. */
+function inCabin(): boolean {
+  return game.hutHere()?.kind === 'crew_cabin';
+}
+
+/** A room's name and description: the cabin's rooms have their own. */
+function roomWords(room: RoomId): { name: string; description: string } {
+  return (inCabin() ? t().cabinRooms : t().rooms)[room];
 }
 
 /** Act from inside the hut: a turn passes, and the panel shows the result. */
@@ -754,7 +907,7 @@ function renderHut(rows: HTMLElement): void {
     closeSheet();
     run({ type: 'sleep' });
   });
-  rows.append(row(icon('room_main'), words.ui.bed, note(words.ui.bedNote), bed));
+  rows.append(row(icon(inCabin() ? 'cabin_main' : 'room_main'), words.ui.bed, note(words.ui.bedNote), bed));
 
   // The map on the wall, or the empty nail.
   if (game.canReadMap()) {
@@ -768,7 +921,7 @@ function renderHut(rows: HTMLElement): void {
   }
 
   for (const room of built) {
-    const name = words.rooms[room].name;
+    const name = roomWords(room).name;
     if (room === 'workshop') {
       const problem = game.buildProblem('rope');
       rows.append(row(icon(roomSprite(room)), name, el('div', {}, [
@@ -788,8 +941,8 @@ function renderHut(rows: HTMLElement): void {
   if (missing.length) rows.append(el('h3', { className: 'path', textContent: words.ui.addRoom }));
   for (const room of missing) {
     const problem = game.roomProblem(room);
-    rows.append(row(icon(roomSprite(room)), words.rooms[room].name, el('div', {}, [
-      el('span', { className: 'row-note', textContent: words.rooms[room].description }), costList(game.roomCost(room)),
+    rows.append(row(icon(roomSprite(room)), roomWords(room).name, el('div', {}, [
+      el('span', { className: 'row-note', textContent: roomWords(room).description }), costList(game.roomCost(room)),
     ]), button(words.ui.build, () => game.addRoom(room), !!problem)));
   }
 }
@@ -804,7 +957,7 @@ function hutScene(rooms: (RoomId | 'main')[]): HTMLElement {
   const view = el('canvas', { width: width * scale, height: first.height * scale });
   view.style.width = `${view.width / dpr}px`;
   view.setAttribute('role', 'img');
-  view.setAttribute('aria-label', t().ui.yourHut);
+  view.setAttribute('aria-label', inCabin() ? t().ui.yourCabin : t().ui.yourHut);
   const ctx = view.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
   const draw = (frame: number) => {

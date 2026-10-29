@@ -17,7 +17,7 @@ const MARGIN = 6;
 /** Cells around a bear sighting that the map shades as bear country. */
 export const BEAR_AREA = 5;
 
-type Ground = 'sea' | 'river' | 'sand' | 'forest' | 'rock' | 'scree' | 'snow' | 'ash' | 'lava';
+type Ground = 'sea' | 'river' | 'sand' | 'forest' | 'rock' | 'scree' | 'snow' | 'ash' | 'lava' | 'deck';
 
 const GROUND: Record<Tile, Ground> = {
   [Tile.Water]: 'sea',
@@ -30,6 +30,8 @@ const GROUND: Record<Tile, Ground> = {
   [Tile.Snow]: 'snow',
   [Tile.Ash]: 'ash',
   [Tile.Lava]: 'lava',
+  [Tile.Deck]: 'deck',
+  [Tile.Helipad]: 'deck',
 };
 
 /** Two washes per ground, mixed by noise so the paint looks uneven. */
@@ -43,10 +45,13 @@ const WASH: Record<Ground, [string, string]> = {
   snow: [P.washSnow, P.washSnow],
   ash: [P.washAsh, P.washAshDark],
   lava: [P.washLava, P.washLavaDark],
+  deck: [P.washDeck, P.washDeckDark],
 };
 
 /** Objects that get a sign on the map (besides the island goal). */
-const SIGNS: Partial<Record<ObjectKind, MapSign>> = { hut: 'hut', campfire: 'fire', spring: 'spring', hot_spring: 'spring' };
+const SIGNS: Partial<Record<ObjectKind, MapSign>> = {
+  hut: 'hut', crew_cabin: 'hut', campfire: 'fire', spring: 'spring', hot_spring: 'spring', water_tank: 'spring',
+};
 
 export interface MapMarker {
   /** Drawn with the sprite `map_<sign>`. */
@@ -144,6 +149,22 @@ export function drawMap(
         }
       }
     }
+  }
+
+  // Gangways of the oil rig: thin ink lines over the sea, red where one is broken.
+  const scale = PATCH / MAP_BLOCK;
+  for (const [i, o] of objects) {
+    const def = OBJECTS[o.kind];
+    if (!def.overSea && !def.broken) continue;
+    const x = i % map.width;
+    const y = Math.floor(i / map.width);
+    if (!map.isExplored(x, y)) continue;
+    const across = (def.broken ?? (o.kind === 'gangway_ns' ? 'ns' : 'ew')) === 'ew';
+    const color = def.broken ? P.inkRed : P.ink;
+    const from = Math.floor((across ? x : y) * scale);
+    const to = Math.floor(((across ? x : y) + 1) * scale) - 1;
+    const mid = Math.floor(((across ? y : x) + 0.5) * scale);
+    for (let k = from; k <= to; k++) paper.set(MARGIN + (across ? k : mid), MARGIN + (across ? mid : k), color);
   }
 
   // Bear country: red hatching on the known ground near each sighting.

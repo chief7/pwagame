@@ -1,6 +1,7 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
 import type { LevelId, StageId, StarId } from './defs/levels';
+import type { OrderId } from './game';
 import type { ObjectKind } from './defs/objects';
 import type { RoomId } from './defs/rooms';
 import type { SkillId } from './defs/skills';
@@ -20,11 +21,11 @@ export type Msg =
   /** Stepped into a hut with Cartographer: the map hangs on its wall (old logs only; the Hut panel shows it now). */
   | { key: 'mapHint' }
   /** Walked into the hut: the explorer goes inside. */
-  | { key: 'enterHut' }
+  | { key: 'enterHut'; obj?: ObjectKind }
   /** Tried to build a second hut on this island. */
   | { key: 'oneHut' }
   /** Added a room to the hut. */
-  | { key: 'roomBuilt'; room: RoomId }
+  | { key: 'roomBuilt'; room: RoomId; cabin?: true }
   /** A room action outside the hut (or in a hut without that room). */
   | { key: 'notInHut' }
   | { key: 'drinkBarrel' }
@@ -40,6 +41,45 @@ export type Msg =
   | { key: 'noBridgeSpot' }
   /** Tried to lay stepping stones without lava ahead. */
   | { key: 'noLavaSpot' }
+  /** The bag is too heavy for more heavy things (wood, logs, stone, scrap, diesel). */
+  | { key: 'tooHeavy' }
+  /** Walked into a store crate: the Store panel opens. */
+  | { key: 'openStore' }
+  /** Tried to build a second store crate on this island. */
+  | { key: 'oneStore' }
+  /** A building site: what it still needs, what was given, and that it is finished (`obj` is then the building). */
+  | { key: 'siteNeeds'; obj: ObjectKind; left: [ItemId, number][] }
+  | { key: 'siteGive'; obj: ObjectKind; given: [ItemId, number][]; left: [ItemId, number][] }
+  | { key: 'siteDone'; obj: ObjectKind }
+  /** The radio after the call for help: the Radio panel opens; orders, and the crate on the helipad. */
+  | { key: 'openRadio' }
+  | { key: 'noRadio' }
+  | { key: 'onTheWay' }
+  | { key: 'orderedToday' }
+  | { key: 'ordered'; order: OrderId }
+  | { key: 'delivered'; order: OrderId }
+  /** A new platform cell; or no place for one in front of the explorer. */
+  | { key: 'platformBuilt' }
+  | { key: 'noDeckSpot' }
+  /** The rig's workshop: a rig building elsewhere, smelting away from the furnace, no sea for the fish trap, the hold at its biggest, and the hold made bigger. */
+  | { key: 'rigOnly' }
+  | { key: 'needFurnace' }
+  | { key: 'noSeaSpot' }
+  | { key: 'holdMax' }
+  | { key: 'holdUpgraded'; limit: number }
+  /** Walked into the fishing boat: the sea chart and the hold open. */
+  | { key: 'openChart' }
+  /** The boat cannot sail: no boat here, already on that island, not enough diesel. */
+  | { key: 'noBoat' }
+  | { key: 'hereAlready' }
+  | { key: 'needDiesel'; n: number }
+  /** The boat's hold is full of heavy things. */
+  | { key: 'holdFull' }
+  /** Arrived by boat on this island (or the rig). */
+  | { key: 'voyage'; level: LevelId }
+  /** Walked into a broken gangway end on the oil rig: mend it with scrap. */
+  | { key: 'gangwayBroken' }
+  | { key: 'gangwayMended' }
   /** Walked into the lava: far too hot. */
   | { key: 'lavaHot' }
   /** Stepped onto the ash in the day: it is hot up here, and you get thirsty. */
@@ -52,8 +92,8 @@ export type Msg =
   | { key: 'dozeOff' }
   | { key: 'wake'; reason: WakeReason; turn: number }
   | { key: 'notThirsty' }
-  /** Drank at a spring; `warm` at a hot spring. */
-  | { key: 'drink'; warm?: true }
+  /** Drank at a spring; `warm` at a hot spring, `tank` at a rain water tank on the rig. */
+  | { key: 'drink'; warm?: true; tank?: true }
   | { key: 'drinkRiver' }
   | { key: 'look'; obj: ObjectKind }
   | { key: 'nothingLeft'; obj: ObjectKind }

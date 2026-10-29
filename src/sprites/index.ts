@@ -1,18 +1,20 @@
 import { characterSet } from './characters';
-import { animalSet, caveItemIcons, itemIcons, skillItemIcons } from './creatures';
+import { animalSet, carryItemIcons, caveItemIcons, itemIcons, skillItemIcons } from './creatures';
 import {
   berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
   treeSpruce, treeSpruceSnow,
 } from './forest';
-import { balloon, balloonAway, beacon, boat, boatAway, bridge, campfire, huts, leanTo } from './structures';
+import { balloon, balloonAway, beacon, boat, boatAway, bridge, campfire, huts, hutSite, leanTo, storeCrate } from './structures';
 import { interiors } from './interiors';
 import {
   barrel, barrelEmpty, boulder, chestClosed, chestOpen, crystalCluster, driftwood, glowcap, glowcapPicked, hotSpring, iceWall, lavaStones, ledge, log, logPile,
   mossyStone, pebbles, sandbar, spring, stalagmite, steamVent, steamVentSpent,
 } from './objects';
-import { appIcon, globe, grillButton, mapIcon, mapMarkers, skillIcons, starEmpty } from './ui';
+import { appIcon, globe, grillButton, loadIcon, mapIcon, mapMarkers, skillIcons, starEmpty } from './ui';
 import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from './palms';
 import type { Sprite } from './pixel';
+import { rigSprites } from './rig';
+import { workshopSprites } from './workshop';
 import {
   ash, ashPumice, bankSets, basaltFace, basaltTop, caveFloor, grassAshSet, lava, lavaBankSets, lavaMouthSet, sandAshSet, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, riverMouthSet, rockFace, rockTop,
   sand, sandRipples, sandShell, scree, screeStones, shoreSet, snow, snowEdgeSet, snowTracks, water, waterVariants,
@@ -41,7 +43,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Steep steps', sprites: [ledge(), ledge('ladder'), iceWall(), iceWall('rope')] },
     { title: 'Rock and caves', sprites: [rockTop(), rockFace(), caveFloor(), caveFloorPebbles(), stalagmite(), spring()] },
     { title: 'Deep caves', sprites: [...glowcap(), glowcapPicked(), crystalCluster()] },
-    { title: 'Shelter', sprites: [...campfire(), leanTo(), ...huts()] },
+    { title: 'Shelter', sprites: [...campfire(), leanTo(), ...huts(), hutSite(), storeCrate()] },
     { title: 'Inside the hut', sprites: interiors() },
     { title: 'Sand', sprites: [sand(), sandRipples(), sandShell()] },
     { title: 'Shores', sprites: [water(), ...waterVariants(), ...shoreSet()] },
@@ -51,11 +53,13 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
     { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
     { title: 'Animals', sprites: animalSet() },
-    { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons(), ...caveItemIcons()] },
+    { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons(), ...caveItemIcons(), ...carryItemIcons()] },
     { title: 'Boat', sprites: [...boat(), ...boatAway()] },
     { title: 'Beacon', sprites: beacon() },
     { title: 'Balloon', sprites: [...balloon(), ...balloonAway()] },
-    { title: 'Interface', sprites: [globe(), ...skillIcons(), starEmpty(), ...grillButton(), appIcon()] },
+    { title: 'Interface', sprites: [globe(), ...skillIcons(), starEmpty(), ...grillButton(), loadIcon(), appIcon()] },
+    { title: 'Oil rig', sprites: rigSprites() },
+    { title: 'Rig workshop', sprites: workshopSprites() },
     { title: 'Map', sprites: [mapIcon(), ...mapMarkers()] },
   ];
 }

@@ -244,7 +244,7 @@ function campSection(): HTMLElement {
   return section('camp', c.title, [
     el('div', 'camp-head', [sprite(hutSprite(ROOM_IDS), 3), el('div', undefined, c.paras.map(para))]),
     el('h3', undefined, [c.hutCost]),
-    cost(RECIPES.hut.cost),
+    cost(RECIPES.hut.siteCost ?? RECIPES.hut.cost),
     el('h3', undefined, [c.roomsTitle]),
     para(c.roomsIntro),
     inside,
@@ -327,11 +327,12 @@ function buildSection(): HTMLElement {
     const notes = [
       r.skill && b.skill(t().skills[r.skill].name),
       r.atFire && b.atFire,
-      r.onto && b.onto(t().objectName(r.onto)),
+      r.onto && b.onto(t().objectName(r.onto[0])),
+      r.siteCost && b.site,
     ].filter(Boolean) as string[];
     return [
       el('span', 'named', [sprite(recipeSprite(id), 'builds' in r ? 1.5 : 2), el('span', undefined, [el('strong', undefined, [t().recipes[id].name]), el('br'), el('small', undefined, [t().recipes[id].description])])]),
-      cost(r.cost),
+      cost(r.siteCost ?? r.cost),
       notes.join(' '),
     ];
   });
@@ -359,8 +360,8 @@ function skillsSection(): HTMLElement {
   ]);
 }
 
-const GROUND: Partial<Record<Tile, Ground>> = {
-  [Tile.Sand]: 'sand', [Tile.Grass]: 'grass', [Tile.CaveFloor]: 'cave', [Tile.Scree]: 'scree', [Tile.Snow]: 'snow', [Tile.Ash]: 'ash',
+const GROUND: Partial<Record<Tile, Ground | 'deck'>> = {
+  [Tile.Sand]: 'sand', [Tile.Grass]: 'grass', [Tile.CaveFloor]: 'cave', [Tile.Scree]: 'scree', [Tile.Snow]: 'snow', [Tile.Ash]: 'ash', [Tile.Deck]: 'deck',
 };
 
 function animalCard(kind: AnimalKind): HTMLElement {
@@ -401,7 +402,7 @@ function dogSection(): HTMLElement {
 function islandsSection(): HTMLElement {
   const w = W.islands;
   const parts = LEVELS.map((level) => {
-    const text = { 1: w.one, 2: w.two, 3: w.three }[level.level];
+    const text = { 1: w.one, 2: w.two, 3: w.three, 4: w.four }[level.level];
     const total: Partial<Record<ItemId, number>> = {};
     for (const stage of level.stages) for (const [item, n] of Object.entries(stage.cost) as [ItemId, number][]) total[item] = (total[item] ?? 0) + n;
     const rows: Child[][] = level.stages.map((stage, i) => [

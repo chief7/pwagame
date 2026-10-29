@@ -69,9 +69,16 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
   in a shelter (or a cave) makes it home and rests you faster. A stone axe
   goes in your bag; a bridge goes across the river in front of you. The
   hut, the bridge and the big island goals need logs.
+- **Carrying:** your bag holds 30 heavy things (wood, logs, stone, scrap
+  and diesel). Food, leaves, rope and tools weigh nothing. When the bag is
+  full, you cannot gather more heavy things. Keep the rest in a store crate
+  (6 wood, 2 rope; one on each island): walk into it to put things in or
+  take them out. The skill Strong back adds 10, and a pack frame (a skill
+  and a recipe) adds 15.
 - **The camp:** the hut is big work (24 logs, 12 wood, 30 leaves, 20 stone,
-  8 rope),
-  and each island has only one. Walk into it to go inside. Its bed is the
+  8 rope), more than one bag holds. First build its frame, then walk into
+  the frame to give it the materials, in as many trips as you like. Each
+  island has only one hut. Walk into it to go inside. Its bed is the
   only place for a full rest: sleep elsewhere stops at 50 Energy in the
   open, 60 in a cave and 75 in a lean-to. In the bed, Health also comes back
   faster. From inside, add rooms: a workshop (rope made there gives one
@@ -131,11 +138,12 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
 
 ## The islands
 
-Every island has the same three parts: the home coast where you start, the
-wild forest behind a wall of brambles, and the far side across a river
+Islands 1 to 3 have the same three parts: the home coast where you start,
+the wild forest behind a wall of brambles, and the far side across a river
 (a lava flow on island 3).
-Each island has springs, chests, a few deep caves, a stray dog and room
-for one hut. Each island also has one goal and three stars.
+Each of them has springs, chests, a few deep caves, a stray dog and room
+for one hut. Each island (and the oil rig) also has one goal and three
+stars.
 
 ### Island 1: the tropical island
 
@@ -200,16 +208,57 @@ for one hut. Each island also has one goal and three stars.
   snatch food. Wild: boars, wasps, snakes and scorpions that sting.
 - **The lava flow:** it takes the place of the river. Lava is too hot to
   walk on, so lay stepping stones (8 stones) across it.
-- **Goal: repair the hot-air balloon and fly home.** An old balloon lies on
+- **Goal: repair the hot-air balloon and fly away.** An old balloon lies on
   the crater rim. Fix it in three steps:
   1. Basket: 4 logs, 8 wood, 4 rope.
   2. Balloon cloth: 16 leaves, 4 rope.
   3. Burner: 8 stone, 2 logs, 4 sulphur (from the steam vents near the
      crater).
 
-  Then walk into it to fly home. This is the end of the game for now: you
-  can stay on the island or start a new one.
+  Then walk into it to fly away. The wind turns, and the balloon comes
+  down on an old oil rig.
 - **Stars:** open every chest, catch 5 fish, explore most of the island.
+
+### Island 4: the old oil rig
+
+- **The land:** none. Steel platforms stand on legs in the open sea,
+  joined by gangways. One platform has a helipad.
+- **Water:** 2 rain water tanks. No springs and no river.
+- **Food:** fish from the decks, and mussels on the rig legs at the
+  waterline. There are no trees and no fruit.
+- **Materials:** scrap metal from scrap piles, wood from old pallets, rope
+  from old fishing nets, and diesel from old fuel drums.
+- **Animals:** only seagulls that snatch food.
+- **Camp:** the crew cabin has a bed for a full rest and a stove to cook
+  fish on.
+- **Broken gangways:** 2 to 4 gangways are broken in the middle. Build
+  "Mend gangway" (6 scrap) next to a broken end to cross.
+- **Goal: repair the radio and call for help.** The radio room stands on
+  the platform furthest away. Fix it in three steps:
+  1. Aerial: 8 scrap, 2 rope.
+  2. Generator: 6 scrap, 4 diesel.
+  3. Radio: 4 scrap, 2 rope.
+
+  Then walk into it to call for help. This is the end of the game for now:
+  you can stay on the rig or start a new island.
+- **Stars:** open every chest, catch 5 fish, explore most of the rig.
+- **The derrick and the fishing boat:** repair the old drilling tower (12
+  scrap, 2 rope): its pump gives 2 diesel every half day. Repair the old
+  fishing boat at the dock (10 scrap, 6 wood, 4 rope), then walk into it to
+  open the sea chart. Sail to islands 1, 2 or 3 and back: a trip takes 6
+  hours and 2 diesel. The boat's hold carries 60 heavy things. Every island
+  stays as you left it.
+- **Supply drops:** after the call for help, walk into the radio to order
+  one crate each day: food, building materials or fuel. About 2 hours later
+  a helicopter drops it on the helipad.
+- **New platforms:** build "Platform" (6 scrap, 2 wood) at the edge of the
+  crew platform to add a piece of deck, and "Rain tank" (6 scrap) for
+  water. New deck stays near the cabin and away from gangways.
+- **The rig workshop:** make a pickaxe, a shovel and a crowbar from scrap.
+  Mine iron ore and coal on Pine Ridge, dig clay at the river of island 1,
+  and open sealed crates with spare parts on islands 1 to 3. On the rig,
+  build a furnace (smelt steel plates), a greenhouse (vegetables), a water
+  maker, fish traps, and a bigger hold for the boat (two times).
 
 ## Controls
 
@@ -263,6 +312,7 @@ src/
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
     worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow; island 3: volcano, ash, lava), deep caves, bramble wall, river (lava flow), scenery
+    riggen.ts    the oil rig (island 4): platforms, gangways, helipad, and what stands on the decks
     caves.ts     finds the deep caves (big caves with few ways in) from the tiles
     map.ts       tile grid + explored/visible layers
     fov.ts       recursive shadowcasting field of view

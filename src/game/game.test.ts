@@ -9,7 +9,9 @@ import { LEVELS } from './defs/levels';
 import { RECIPES } from './defs/recipes';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
-import { Game, SAVE_VERSION } from './game';
+import {
+  BAG_LOAD, DELIVERY_TURNS, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
+} from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
 import { distanceMap, reachWithBridges } from './pathing';
@@ -592,7 +594,7 @@ describe('Game: island 3, the volcano', () => {
     expect(burner.cost.sulphur).toBe(4);
   });
 
-  it('builds the balloon in three stages, and flying away ends the game', () => {
+  it('builds the balloon in three stages, and flying away lands on the oil rig', () => {
     const game = volcano(66);
     const at = game.map.idx(game.player.x + 1, game.player.y);
     for (const [i, o] of game.objects) if (o.kind === 'balloon_site') game.objects.delete(i);
@@ -610,10 +612,10 @@ describe('Game: island 3, the volcano', () => {
     expect(game.takeSailRequest()).toBe(true);
     expect(game.log.at(-1)?.msg).toEqual({ key: 'goalReady', level: 3 });
     expect(game.sail()).toBe(true);
-    expect(game.level).toBe(3);
-    expect(game.sailed).toBe(true);
-    expect(game.goal()).toEqual({ state: 'sailed' });
-    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway', level: 3 });
+    expect(game.level).toBe(4);
+    expect(game.sailed).toBe(false);
+    expect(game.map.get(game.player.x, game.player.y)).toBe(Tile.Deck);
+    expect(game.log.slice(-2).map((e) => e.msg)).toEqual([{ key: 'sailAway', level: 3 }, { key: 'landIsland', level: 4 }]);
     expect(OBJECTS.balloon_ready.done?.frames).toEqual(['balloon_gone']);
   });
 
@@ -980,9 +982,11 @@ describe('Game: building and sleeping', () => {
 
   it('sleeping in a hut restores energy, keeps you warm and makes it home', () => {
     const game = sandbox(7);
-    give(game, RECIPES.hut.cost);
+    give(game, RECIPES.hut.siteCost!);
     game.player.facing = 'right';
     game.build('hut');
+    // Hand the frame everything at once (it ignores the carry limit), then step inside.
+    game.move(1, 0);
     game.move(1, 0);
     expect(game.shelterAt(game.player.x, game.player.y)).toBe(1);
     game.turn = nightTurn();
@@ -1158,7 +1162,8 @@ describe('Game: brambles, the axe and the river', () => {
     game.inventory.add('wood', 20);
     game.inventory.add('leaves', 20);
     game.inventory.add('stone', 20);
-    expect(game.buildProblem('hut')).toEqual({ key: 'needMaterials' });
+    expect(game.siteCost('hut').log).toBe(24);
+    expect(game.buildProblem('bridge')).toEqual({ key: 'needMaterials' });
     expect(game.build('axe')).toBe(true);
     game.player.facing = 'right';
     expect(game.build('lean_to')).toBe(true);
@@ -2278,11 +2283,9 @@ describe('Game: the camp (hut, bed and rooms)', () => {
   }
 
   it('costs a lot, and there is only one on each island', () => {
-    const cost = Object.values(RECIPES.hut.cost).reduce((sum, n) => sum + (n ?? 0), 0);
+    const cost = Object.values(RECIPES.hut.siteCost!).reduce((sum, n) => sum + (n ?? 0), 0);
     expect(cost).toBeGreaterThanOrEqual(90);
     const game = sandbox(110);
-    give(game, RECIPES.hut.cost);
-    give(game, RECIPES.hut.cost);
     game.player.facing = 'right';
     expect(game.hasHut()).toBe(false);
     expect(game.build('hut')).toBe(true);
@@ -2410,6 +2413,807 @@ describe('Game: the camp (hut, bed and rooms)', () => {
 });
 
 /** Put a recipe's (or room's) materials in the bag. */
+describe('Game: island 4, the oil rig', () => {
+  function rig(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    game.takeEvents();
+    return game;
+  }
+
+  /**
+   * A clear strip of deck round the explorer, then to the east a broken
+   * gangway over two sea cells and more deck: deck, end_e, end_w, deck.
+   */
+  function gap(game: Game): void {
+    const { map, player: p } = game;
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 5; dx++) {
+        map.set(p.x + dx, p.y + dy, dx === 1 || dx === 2 ? Tile.Water : Tile.Deck);
+        game.objects.delete(map.idx(p.x + dx, p.y + dy));
+      }
+    }
+    place(game, 1, 0, 'gangway_end_e');
+    place(game, 2, 0, 'gangway_end_w');
+    p.facing = 'right';
+  }
+
+  it('is made of decks in the sea, with the radio room behind a broken gangway', () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const game = rig(seed);
+      const { map, player: p } = game;
+      expect(map.get(p.x, p.y)).toBe(Tile.Deck);
+      const kinds = [...game.objects.values()].map((o) => o.kind);
+      const count = (k: string) => kinds.filter((x) => x === k).length;
+      expect(count('radio_hut')).toBe(1);
+      expect(count('crew_cabin')).toBe(1);
+      expect(count('balloon_crashed')).toBe(1);
+      expect(count('chest_closed')).toBe(6);
+      expect(count('water_tank')).toBe(2);
+      expect(count('diesel_drums')).toBe(3);
+      expect(count('gangway_end_e') + count('gangway_end_s')).toBeGreaterThanOrEqual(2);
+      // Enough scrap for every broken gangway and every stage of the radio.
+      const broken = count('gangway_end_e') + count('gangway_end_s');
+      const needed = broken * 6 + LEVELS[3].stages.reduce((n, s) => n + (s.cost.scrap ?? 0), 0);
+      expect(count('scrap_pile') * 2).toBeGreaterThanOrEqual(needed);
+      // Without mending anything, the radio room is out of reach.
+      const radio = [...game.objects].find(([, o]) => o.kind === 'radio_hut')![0];
+      const dist = distanceMap(map, p.x, p.y, (x, y) => game.isPassable(x, y));
+      const rx = radio % map.width;
+      const ry = (radio - rx) / map.width;
+      const next = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => dist[map.idx(rx + dx, ry + dy)] >= 0);
+      expect(next).toBe(false);
+      // The crew cabin can be reached at once.
+      const cabin = [...game.objects].find(([, o]) => o.kind === 'crew_cabin')![0];
+      expect(dist[cabin]).toBeGreaterThan(0);
+    }
+  });
+
+  it('crosses whole gangways over the sea', () => {
+    const game = rig(3);
+    gap(game);
+    const { map, player: p } = game;
+    place(game, 1, 0, 'gangway_ew');
+    place(game, 2, 0, 'gangway_ew');
+    expect(game.isPassable(p.x + 1, p.y)).toBe(true);
+    const x = p.x;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.move(1, 0)).toBe(true);
+    expect(p.x).toBe(x + 3);
+    expect(map.get(p.x, p.y)).toBe(Tile.Deck);
+  });
+
+  it('stops at a broken gangway, and mends the whole gap with scrap', () => {
+    const game = rig(4);
+    gap(game);
+    const { player: p } = game;
+    const turn = game.turn;
+    expect(game.isPassable(p.x + 1, p.y)).toBe(false);
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'gangwayBroken' });
+    expect(game.buildProblem('gangway')).toEqual({ key: 'needMaterials' });
+    game.inventory.add('scrap', 6);
+    const xp = game.xp;
+    expect(game.build('gangway')).toBe(true);
+    expect(game.objectAt(p.x + 1, p.y)?.kind).toBe('gangway_ew');
+    expect(game.objectAt(p.x + 2, p.y)?.kind).toBe('gangway_ew');
+    expect(game.inventory.count('scrap')).toBe(0);
+    expect(game.xp).toBe(xp + 6);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'gangwayMended' });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.move(1, 0)).toBe(true);
+  });
+
+  it('mends a north-south gangway too, and needs a broken end next to the explorer', () => {
+    const game = rig(5);
+    gap(game);
+    const { map, player: p } = game;
+    for (const dx of [1, 2]) map.set(p.x + dx, p.y, Tile.Deck);
+    for (const dx of [1, 2]) game.objects.delete(map.idx(p.x + dx, p.y));
+    game.inventory.add('scrap', 12);
+    expect(game.buildProblem('gangway')).toEqual({ key: 'noStep', obj: 'gangway_end_n' });
+    for (const dy of [1, 2]) map.set(p.x, p.y + dy, Tile.Water);
+    place(game, 0, 1, 'gangway_end_s');
+    place(game, 0, 2, 'gangway_end_n');
+    expect(game.build('gangway')).toBe(true);
+    expect(game.objectAt(p.x, p.y + 1)?.kind).toBe('gangway_ns');
+    expect(game.objectAt(p.x, p.y + 2)?.kind).toBe('gangway_ns');
+  });
+
+  it('gives water at the tanks, mussels at the legs, wood from pallets and rope from old nets', () => {
+    const game = rig(6);
+    gap(game);
+    const { map, player: p } = game;
+    place(game, -1, 0, 'water_tank');
+    game.needs.water = 40;
+    expect(game.move(-1, 0)).toBe(true);
+    expect(game.needs.water).toBeGreaterThan(70);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'drink', tank: true });
+    map.set(p.x, p.y + 1, Tile.Water);
+    place(game, 0, 1, 'mussel_bed');
+    expect(game.move(0, 1)).toBe(true);
+    expect(game.inventory.count('mussels')).toBeGreaterThanOrEqual(2);
+    expect(game.objectAt(p.x, p.y + 1)?.readyAt).toBeGreaterThan(game.turn);
+    place(game, 0, -1, 'pallet');
+    expect(game.move(0, -1)).toBe(true);
+    expect(game.inventory.count('wood')).toBeGreaterThanOrEqual(2);
+    place(game, -1, -1, 'old_net');
+    expect(game.move(-1, -1)).toBe(true);
+    expect(game.inventory.count('rope')).toBeGreaterThanOrEqual(1);
+  });
+
+  it('pours diesel from the drums, and the generator keeps asking for diesel after that', () => {
+    const game = rig(7);
+    gap(game);
+    for (const o of game.objects.values()) if (o.kind === 'diesel_drums') o.kind = 'diesel_drums_empty';
+    place(game, -1, 0, 'diesel_drums');
+    expect(game.move(-1, 0)).toBe(true);
+    expect(game.inventory.count('diesel')).toBe(2);
+    expect(game.objectAt(game.player.x - 1, game.player.y)?.kind).toBe('diesel_drums_empty');
+    expect(game.stageCost(LEVELS[3].stages[1])).toEqual({ scrap: 6, diesel: 4 });
+  });
+
+  it('sleeps and cooks in the crew cabin', () => {
+    const game = rig(8);
+    gap(game);
+    place(game, -1, 0, 'crew_cabin');
+    expect(game.move(-1, 0)).toBe(true);
+    expect(game.restCap(game.player.x, game.player.y)).toBe(100);
+    expect(game.shelterAt(game.player.x, game.player.y)).toBe(1);
+    expect(game.nearFire(game.player.x, game.player.y)).toBe(true);
+    game.inventory.add('fish', 1);
+    expect(game.build('cooked_fish')).toBe(true);
+    expect(game.inventory.count('cooked_fish')).toBe(1);
+  });
+
+  it('repairs the radio in three stages, and calling for help ends the game', () => {
+    const game = rig(9);
+    gap(game);
+    for (const [i, o] of game.objects) if (o.kind === 'radio_hut') game.objects.delete(i);
+    place(game, -1, 0, 'radio_hut');
+    game.map.explored[game.map.idx(game.player.x - 1, game.player.y)] = 1;
+    for (const stage of LEVELS[3].stages) {
+      for (const [item, n] of Object.entries(stage.cost)) game.inventory.add(item as keyof typeof stage.cost, n);
+      expect(game.move(-1, 0)).toBe(true);
+      expect(game.objectAt(game.player.x - 1, game.player.y)?.kind).toBe(stage.becomes);
+    }
+    expect(game.goal()).toEqual({ state: 'ready' });
+    game.move(-1, 0);
+    expect(game.takeSailRequest()).toBe(true);
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(4);
+    expect(game.sailed).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'sailAway', level: 4 });
+  });
+
+  it('flies the balloon again from an old save that ended on island 3', () => {
+    const game = new Game(10);
+    (game as unknown as { landOn(level: number): void }).landOn(3);
+    const save = { ...game.toSave(), sailed: true };
+    expect(Game.fromSave(save).sailed).toBe(false);
+  });
+
+  it('keeps the rig, its gangways and the mended ones in the save', () => {
+    const game = rig(11);
+    gap(game);
+    game.inventory.add('scrap', 6);
+    game.build('gangway');
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.level).toBe(4);
+    expect(loaded.map.get(loaded.player.x, loaded.player.y)).toBe(Tile.Deck);
+    expect(loaded.objectAt(loaded.player.x + 1, loaded.player.y)?.kind).toBe('gangway_ew');
+    expect(loaded.isPassable(loaded.player.x + 1, loaded.player.y)).toBe(true);
+  });
+});
+
+describe('Game: the carry limit, the store crate and the hut frame', () => {
+  it('counts only heavy things, and the skills and the pack frame carry more', () => {
+    const game = sandbox(130);
+    game.inventory.add('wood', 5);
+    game.inventory.add('stone', 4);
+    game.inventory.add('leaves', 20);
+    game.inventory.add('coconut', 6);
+    expect(game.load).toBe(9);
+    expect(game.loadLimit).toBe(BAG_LOAD);
+    game.skills.add('strong_back');
+    expect(game.loadLimit).toBe(BAG_LOAD + STRONG_BACK_LOAD);
+    expect(game.buildProblem('pack_frame')).toEqual({ key: 'needSkill', skill: 'pack_frame' });
+    game.skills.add('pack_frame');
+    give(game, { rope: 3 });
+    expect(game.build('pack_frame')).toBe(true);
+    expect(game.loadLimit).toBe(BAG_LOAD + STRONG_BACK_LOAD + PACK_FRAME_LOAD);
+  });
+
+  it('stops gathering heavy things when the bag is full, but not light things', () => {
+    const game = sandbox(131);
+    game.inventory.add('stone', BAG_LOAD);
+    place(game, 1, 0, 'stone_pebbles');
+    const turn = game.turn;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooHeavy' });
+    place(game, 1, 0, 'bush');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('leaves')).toBe(1);
+  });
+
+  it('lets one gather go a little over the limit', () => {
+    const game = sandbox(132);
+    game.inventory.add('stone', BAG_LOAD - 1);
+    place(game, 1, 0, 'log_pile');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.load).toBeGreaterThan(BAG_LOAD);
+  });
+
+  it('builds one store crate on each island, and keeps things in it', () => {
+    const game = sandbox(133);
+    game.player.facing = 'right';
+    give(game, RECIPES.store_crate.cost);
+    expect(game.build('store_crate')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('store_crate');
+    give(game, RECIPES.store_crate.cost);
+    expect(game.buildProblem('store_crate')).toEqual({ key: 'oneStore' });
+    // Walking into it opens the Store panel; no time passes.
+    const turn = game.turn;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.takeStoreRequest()).toBe(true);
+    game.inventory.add('stone', 20);
+    game.inventory.add('coconut', 3);
+    expect(game.storeItem('stone', 20)).toBe(true);
+    expect(game.storeItem('coconut', 1)).toBe(true);
+    expect(game.inventory.count('stone')).toBe(0);
+    expect(game.storeNear()?.store).toEqual({ stone: 20, coconut: 1 });
+    // Taking out stops at the carry limit.
+    game.inventory.add('wood', BAG_LOAD - 5 - game.load);
+    expect(game.takeItem('stone', 20)).toBe(true);
+    expect(game.inventory.count('stone')).toBe(5);
+    expect(game.storeNear()?.store).toEqual({ stone: 15, coconut: 1 });
+    expect(game.takeItem('stone', 1)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooHeavy' });
+    expect(game.takeItem('coconut', 5)).toBe(true);
+    expect(game.storeNear()?.store).toEqual({ stone: 15 });
+    // The store keeps its things in the save.
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.objectAt(loaded.player.x + 1, loaded.player.y)?.store).toEqual({ stone: 15 });
+    // Away from the crate, nothing moves.
+    game.player.x -= 3;
+    expect(game.storeItem('wood', 1)).toBe(false);
+  });
+
+  it('builds the hut on a frame that takes its materials in trips', () => {
+    const game = sandbox(134);
+    game.player.facing = 'right';
+    expect(game.buildProblem('hut')).toBe(null);
+    expect(game.build('hut')).toBe(true);
+    const x = game.player.x + 1;
+    const y = game.player.y;
+    expect(game.objectAt(x, y)?.kind).toBe('hut_site');
+    expect(game.hasHut()).toBe(true);
+    expect(game.buildProblem('hut')).toEqual({ key: 'oneHut' });
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toMatchObject({ key: 'siteNeeds', obj: 'hut_site' });
+    // First trip: the logs.
+    game.inventory.add('log', 24);
+    const xp = game.xp;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.xp).toBe(xp + 24);
+    expect(game.log.at(-1)?.msg).toMatchObject({ key: 'siteGive', given: [['log', 24]] });
+    expect(game.siteLeft(x, y)).toEqual({ wood: 12, leaves: 30, stone: 20, rope: 8 });
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.siteLeft(x, y)).toEqual({ wood: 12, leaves: 30, stone: 20, rope: 8 });
+    // Second trip: the rest.
+    give(game, { wood: 12, leaves: 30, stone: 20, rope: 8 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(x, y)?.kind).toBe('hut');
+    expect(game.objectAt(x, y)?.given).toBeUndefined();
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'siteDone', obj: 'hut' });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.hutHere()?.kind).toBe('hut');
+  });
+
+  it('loads a version 9 save', () => {
+    const game = sandbox(135);
+    const old = { ...game.toSave(), v: 9 };
+    expect(Game.fromSave(old).turn).toBe(game.turn);
+  });
+});
+
+describe('Game: the fishing boat, voyages and kept islands', () => {
+  /** A fresh rig, with the explorer next to its repaired fishing boat. */
+  function atBoat(seed: number): { game: Game; dock: number } {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    const dock = [...game.objects].find(([, o]) => o.kind === 'fishing_boat_wreck')![0];
+    game.objects.get(dock)!.kind = 'fishing_boat';
+    const x = dock % game.map.width;
+    game.player.x = x;
+    game.player.y = (dock - x) / game.map.width - 1;
+    game.takeEvents();
+    return { game, dock };
+  }
+
+  it('has an old fishing boat at a dock of the rig, and a derrick to repair', () => {
+    for (let seed = 1; seed <= 8; seed++) {
+      const game = new Game(seed);
+      (game as unknown as { landOn(level: number): void }).landOn(4);
+      const dock = [...game.objects].find(([, o]) => o.kind === 'fishing_boat_wreck')![0];
+      const x = dock % game.map.width;
+      const y = (dock - x) / game.map.width;
+      expect(game.map.get(x, y)).toBe(Tile.Water);
+      expect(game.map.get(x, y - 1)).toBe(Tile.Deck);
+      expect([...game.objects.values()].filter((o) => o.kind === 'derrick')).toHaveLength(1);
+    }
+  });
+
+  it('repairs the derrick, which then pumps diesel again and again', () => {
+    const game = sandbox(140);
+    place(game, 1, 0, 'derrick');
+    give(game, { scrap: 12, rope: 2 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('derrick_working');
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'siteDone', obj: 'derrick_working' });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('diesel')).toBe(2);
+    expect(game.move(1, 0)).toBe(false);
+    game.turn += 121;
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('diesel')).toBe(4);
+  });
+
+  it('repairs the old fishing boat; walking into it opens the sea chart', () => {
+    const game = sandbox(141);
+    place(game, 1, 0, 'fishing_boat_wreck');
+    give(game, { scrap: 10, wood: 6, rope: 4 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('fishing_boat');
+    const turn = game.turn;
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.takeChartRequest()).toBe(true);
+    expect(game.boatNear()).toBe(true);
+  });
+
+  it('needs diesel to sail, takes it from the hold first, and the trip takes hours', () => {
+    const { game } = atBoat(142);
+    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: VOYAGE_DIESEL });
+    expect(game.voyageProblem(4)).toEqual({ key: 'hereAlready' });
+    game.inventory.add('diesel', 1);
+    game.hold = { diesel: 1, stone: 10 };
+    const turn = game.turn;
+    expect(game.voyage(1)).toBe(true);
+    expect(game.level).toBe(1);
+    expect(game.turn).toBe(turn + VOYAGE_TURNS);
+    expect(game.inventory.count('diesel')).toBe(0);
+    expect(game.hold).toEqual({ stone: 10 });
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'voyage', level: 1 });
+    // The boat lies next to the explorer, in the sea.
+    expect(game.boatNear()).toBe(true);
+    expect(game.visited(4)).toBe(true);
+  });
+
+  it('keeps the islands as they were left, and moors at the same dock again', () => {
+    const { game, dock } = atBoat(143);
+    const rig = game.map;
+    const mark = game.map.idx(game.player.x - 1, game.player.y);
+    game.objects.set(mark, { kind: 'campfire' });
+    game.inventory.add('diesel', 4);
+    game.voyage(2);
+    expect(game.level).toBe(2);
+    expect(game.map).not.toBe(rig);
+    // The island is kept: save and load it, then sail back to the rig.
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.visited(4)).toBe(true);
+    expect(loaded.voyage(4)).toBe(true);
+    expect(loaded.level).toBe(4);
+    expect(loaded.objects.get(mark)?.kind).toBe('campfire');
+    expect(loaded.objects.get(dock)?.kind).toBe('fishing_boat');
+    expect(loaded.visited(2)).toBe(true);
+    expect(loaded.map.get(loaded.player.x, loaded.player.y)).toBe(Tile.Deck);
+  });
+
+  it('loads and unloads the hold, up to its limit for heavy things', () => {
+    const { game } = atBoat(144);
+    game.inventory.add('scrap', HOLD_LOAD + 5);
+    game.inventory.add('mussels', 4);
+    expect(game.loadItem('scrap', HOLD_LOAD + 5)).toBe(true);
+    expect(game.hold.scrap).toBe(HOLD_LOAD);
+    expect(game.loadItem('scrap', 1)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'holdFull' });
+    expect(game.loadItem('mussels', 4)).toBe(true);
+    expect(game.holdLoad).toBe(HOLD_LOAD);
+    expect(game.unloadItem('scrap', HOLD_LOAD)).toBe(true);
+    expect(game.inventory.count('scrap')).toBe(BAG_LOAD);
+    expect(game.hold.scrap).toBe(HOLD_LOAD - BAG_LOAD + 5);
+  });
+
+  it('remembers islands left on their goal: their goals are used up', () => {
+    const game = sandbox(145);
+    boatNextTo(game);
+    for (const stage of LEVELS[0].stages) give(game, game.stageCost(stage));
+    for (let k = 0; k < 4; k++) game.move(1, 0);
+    expect(game.goal()).toEqual({ state: 'ready' });
+    expect(game.sail()).toBe(true);
+    expect(game.level).toBe(2);
+    expect(game.left.has(1)).toBe(true);
+    // Back on island 1 (as with the boat), the goal is used and the old boat is gone.
+    game.jumpToIsland(1);
+    expect(game.goal()).toEqual({ state: 'sailed' });
+    expect([...game.objects.values()].some((o) => o.kind.startsWith('boat_'))).toBe(false);
+  });
+
+  it('after the radio call, only the rig counts as used', () => {
+    const { game } = atBoat(147);
+    game.sailed = true;
+    expect(game.goalUsed).toBe(true);
+    game.inventory.add('diesel', 2);
+    game.voyage(2);
+    expect(game.goalUsed).toBe(false);
+    expect(game.goal().state).not.toBe('sailed');
+  });
+
+  it('loads a version 10 save on the rig: the islands before are left, and come back new', () => {
+    const { game } = atBoat(146);
+    const old = { ...game.toSave(), v: 10 } as Partial<ReturnType<Game['toSave']>>;
+    delete old.islands;
+    delete old.left;
+    delete old.hold;
+    const loaded = Game.fromSave(old as ReturnType<Game['toSave']>);
+    expect([...loaded.left].sort()).toEqual([1, 2, 3]);
+    expect(loaded.visited(1)).toBe(false);
+    expect(loaded.hold).toEqual({});
+  });
+});
+
+describe('Game: radio supply drops and new platforms', () => {
+  function rigGame(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    game.takeEvents();
+    return game;
+  }
+
+  /** Put the explorer next to the working radio, after the call for help. */
+  function atRadio(seed: number): Game {
+    const game = rigGame(seed);
+    const radio = [...game.objects].find(([, o]) => o.kind === 'radio_hut')![0];
+    game.objects.get(radio)!.kind = 'radio_ready';
+    game.sailed = true;
+    const x = radio % game.map.width;
+    const y = (radio - x) / game.map.width;
+    const spot = [[0, 1], [1, 0], [-1, 0], [0, -1]].find(([dx, dy]) => game.isPassable(x + dx, y + dy))!;
+    game.player.x = x + spot[0];
+    game.player.y = y + spot[1];
+    return game;
+  }
+
+  it('opens the Radio panel at the working radio after the call for help', () => {
+    const game = atRadio(150);
+    const radio = [...game.objects].find(([, o]) => o.kind === 'radio_ready')![0];
+    const rx = radio % game.map.width;
+    expect(game.move(rx - game.player.x, (radio - rx) / game.map.width - game.player.y)).toBe(false);
+    expect(game.takeRadioRequest()).toBe(true);
+    expect(game.takeSailRequest()).toBe(false);
+  });
+
+  it('orders one crate each day; the helicopter drops it on the helipad', () => {
+    const game = atRadio(151);
+    expect(game.orderProblem()).toBe(null);
+    expect(game.order('build')).toBe(true);
+    expect(game.orderProblem()).toEqual({ key: 'onTheWay' });
+    for (let k = 0; k < DELIVERY_TURNS; k++) game.wait();
+    expect(game.delivery).toBe(null);
+    const crate = [...game.objects].find(([, o]) => o.kind === 'supply_crate')!;
+    expect(game.map.tiles[crate[0]]).toBe(Tile.Helipad);
+    expect(crate[1].store).toEqual(RADIO_ORDERS.build);
+    expect(game.log.some((e) => e.msg.key === 'delivered')).toBe(true);
+    // Only one each day.
+    expect(game.orderProblem()).toEqual({ key: 'orderedToday' });
+    game.turn += TURNS_PER_DAY;
+    expect(game.orderProblem()).toBe(null);
+  });
+
+  it('takes things out of the supply crate, and the empty crate is gone', () => {
+    const game = rigGame(152);
+    const { map, player: p } = game;
+    map.set(p.x + 1, p.y, Tile.Helipad);
+    game.objects.set(map.idx(p.x + 1, p.y), { kind: 'supply_crate', store: { coconut: 2, rope: 1 } });
+    expect(game.hasStore()).toBe(false);
+    expect(game.takeItem('coconut', 2)).toBe(true);
+    expect(game.objectAt(p.x + 1, p.y)?.kind).toBe('supply_crate');
+    expect(game.takeItem('rope', 1)).toBe(true);
+    expect(game.objectAt(p.x + 1, p.y)).toBeUndefined();
+  });
+
+  it('keeps the crate waiting while the explorer is away from the rig', () => {
+    const game = atRadio(153);
+    game.order('fuel');
+    game.jumpToIsland(1);
+    for (let k = 0; k < DELIVERY_TURNS + 2; k++) game.wait();
+    expect(game.delivery).not.toBe(null);
+    game.jumpToIsland(4);
+    game.wait();
+    expect(game.delivery).toBe(null);
+    expect([...game.objects.values()].some((o) => o.kind === 'supply_crate')).toBe(true);
+  });
+
+  it('lays new deck at the edge of the crew platform, but not near gangways or out of range', () => {
+    for (const seed of [154, 157, 158]) {
+      const game = rigGame(seed);
+      const { map, player: p } = game;
+      const cabin = [...game.objects].find(([, o]) => o.kind === 'crew_cabin')![0];
+      const cx = cabin % map.width;
+      const cy = (cabin - cx) / map.width;
+      give(game, { scrap: 12, wood: 4 });
+      // Find a free deck cell at the platform's edge where a platform fits in front.
+      let found = false;
+      const sides = [['down', 0, 1], ['up', 0, -1], ['left', -1, 0], ['right', 1, 0]] as const;
+      for (let y = cy - 6; y <= cy + 6 && !found; y++) {
+        for (let x = cx - 6; x <= cx + 6 && !found; x++) {
+          if (map.get(x, y) !== Tile.Deck || game.objectAt(x, y)) continue;
+          for (const [facing, dx, dy] of sides) {
+            if (map.get(x + dx, y + dy) !== Tile.Water) continue;
+            p.x = x;
+            p.y = y;
+            p.facing = facing;
+            if (game.buildProblem('platform') !== null) continue;
+            const version = map.version;
+            expect(game.build('platform')).toBe(true);
+            expect(map.get(x + dx, y + dy)).toBe(Tile.Deck);
+            expect(map.version).toBe(version + 1);
+            expect(Math.max(Math.abs(x + dx - cx), Math.abs(y + dy - cy))).toBeLessThanOrEqual(PLATFORM_RANGE);
+            expect(game.log.at(-1)?.msg).toEqual({ key: 'platformBuilt' });
+            found = true;
+            break;
+          }
+        }
+      }
+      expect(found).toBe(true);
+      // Far from the cabin, on another platform's edge: no.
+      const far = [...game.objects].find(([, o]) => o.kind === 'radio_hut')![0];
+      p.x = far % map.width;
+      p.y = (far - p.x) / map.width + 1;
+      expect(game.buildProblem('platform')).toEqual({ key: 'noDeckSpot' });
+    }
+    // Next to a gangway: no.
+    const game = rigGame(154);
+    const g = sandboxRigEdge(game);
+    expect(g.buildProblem('platform')).toEqual({ key: 'noDeckSpot' });
+  });
+
+  /** The same rig with a gangway right in front of the explorer at the crew platform's edge. */
+  function sandboxRigEdge(game: Game): Game {
+    const { map, player: p } = game;
+    map.set(p.x, p.y + 1, Tile.Water);
+    game.objects.set(map.idx(p.x + 1, p.y + 1), { kind: 'gangway_ns' });
+    give(game, { scrap: 6, wood: 2 });
+    return game;
+  }
+
+  it('builds a rain tank to drink from', () => {
+    const game = rigGame(155);
+    const { map, player: p } = game;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      map.set(p.x + dx, p.y + dy, Tile.Deck);
+      game.objects.delete(map.idx(p.x + dx, p.y + dy));
+    }
+    game.player.facing = 'right';
+    give(game, { scrap: 6 });
+    expect(game.build('rain_tank')).toBe(true);
+    expect(game.objectAt(p.x + 1, p.y)?.kind).toBe('water_tank');
+  });
+
+  it('keeps an order in the save, and loads a version 11 save', () => {
+    const game = atRadio(156);
+    game.order('food');
+    const loaded = Game.fromSave(JSON.parse(JSON.stringify(game.toSave())));
+    expect(loaded.delivery?.order).toBe('food');
+    expect(loaded.orderDay).toBe(game.orderDay);
+    const old = { ...game.toSave(), v: 11 } as Partial<ReturnType<Game['toSave']>>;
+    delete old.delivery;
+    delete old.orderDay;
+    const older = Game.fromSave(old as ReturnType<Game['toSave']>);
+    expect(older.delivery).toBe(null);
+  });
+});
+
+describe('Game: the rig workshop', () => {
+  function rigGame(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    const { map, player: p } = game;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      map.set(p.x + dx, p.y + dy, Tile.Deck);
+      game.objects.delete(map.idx(p.x + dx, p.y + dy));
+    }
+    game.takeEvents();
+    return game;
+  }
+
+  it('puts ore veins on island 2, clay banks on island 1 and sealed crates on islands 1 to 3', () => {
+    const count = (game: Game, kind: string) => [...game.objects.values()].filter((o) => o.kind === kind).length;
+    const one = new Game(160);
+    expect(count(one, 'clay_bank')).toBeGreaterThan(0);
+    expect(count(one, 'sealed_crate')).toBe(4);
+    one.jumpToIsland(2);
+    expect(count(one, 'ore_vein')).toBeGreaterThan(0);
+    expect(count(one, 'sealed_crate')).toBe(4);
+    for (const [i, o] of one.objects) {
+      if (o.kind !== 'ore_vein') continue;
+      const x = i % one.map.width;
+      expect(one.map.get(x, (i - x) / one.map.width)).toBe(Tile.Scree);
+    }
+    one.jumpToIsland(4);
+    expect(count(one, 'sealed_crate')).toBe(0);
+  });
+
+  it('gives each island its resources only once, also an island from an older save', () => {
+    const game = new Game(161);
+    const save = { ...game.toSave(), v: 12 } as Partial<ReturnType<Game['toSave']>>;
+    delete save.holdUpgrades;
+    delete save.stocked;
+    save.objects = save.objects!.filter(([, kind]) => kind !== 'clay_bank' && kind !== 'sealed_crate');
+    const loaded = Game.fromSave(save as ReturnType<Game['toSave']>);
+    expect([...loaded.objects.values()].filter((o) => o.kind === 'sealed_crate')).toHaveLength(4);
+    const again = Game.fromSave(JSON.parse(JSON.stringify(loaded.toSave())));
+    expect([...again.objects.values()].filter((o) => o.kind === 'sealed_crate')).toHaveLength(4);
+  });
+
+  it('needs the right tool for ore veins, clay banks and sealed crates', () => {
+    const game = sandbox(162);
+    place(game, 1, 0, 'ore_vein');
+    expect(game.move(1, 0)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'needTool', obj: 'ore_vein', item: 'pickaxe' });
+    give(game, { scrap: 4, wood: 2 });
+    expect(game.build('pickaxe')).toBe(true);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('iron_ore')).toBeGreaterThanOrEqual(1);
+    place(game, 0, 1, 'sealed_crate');
+    give(game, { scrap: 3 });
+    expect(game.build('crowbar')).toBe(true);
+    expect(game.move(0, 1)).toBe(true);
+    expect(game.inventory.count('spare_part')).toBe(1);
+    expect(game.objectAt(game.player.x, game.player.y + 1)).toBeUndefined();
+  });
+
+  it('builds rig buildings only on the rig', () => {
+    const island = sandbox(163);
+    give(island, { clay: 12, stone: 6 });
+    expect(island.buildProblem('furnace')).toEqual({ key: 'rigOnly' });
+    const game = rigGame(163);
+    give(game, { clay: 12, stone: 6 });
+    game.player.facing = 'right';
+    expect(game.build('furnace')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('furnace');
+  });
+
+  it('smelts steel plates next to the furnace only', () => {
+    const game = rigGame(164);
+    give(game, { iron_ore: 4, coal: 2 });
+    expect(game.buildProblem('smelt')).toEqual({ key: 'needFurnace' });
+    place(game, 1, 0, 'furnace');
+    expect(game.build('smelt')).toBe(true);
+    expect(game.inventory.count('steel_plate')).toBe(1);
+    expect(game.inventory.count('iron_ore')).toBe(2);
+  });
+
+  it('grows vegetables in the greenhouse, and makes water from the sea', () => {
+    const game = rigGame(165);
+    place(game, 1, 0, 'greenhouse');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('vegetables')).toBeGreaterThanOrEqual(2);
+    expect(game.move(1, 0)).toBe(false);
+    game.turn += 121;
+    expect(game.move(1, 0)).toBe(true);
+    place(game, -1, 0, 'water_maker');
+    game.needs.water = 30;
+    expect(game.move(-1, 0)).toBe(true);
+    expect(game.needs.water).toBeGreaterThan(60);
+  });
+
+  it('builds a fish trap on the sea in front of a deck, and it catches fish', () => {
+    const game = rigGame(166);
+    const { map, player: p } = game;
+    map.set(p.x + 1, p.y, Tile.Water);
+    game.player.facing = 'right';
+    give(game, { steel_plate: 2, rope: 2 });
+    expect(game.build('fish_trap')).toBe(true);
+    expect(game.objectAt(p.x + 1, p.y)?.kind).toBe('fish_trap');
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.inventory.count('fish')).toBeGreaterThanOrEqual(1);
+    // No sea next to the explorer: no trap.
+    map.set(p.x + 1, p.y, Tile.Deck);
+    game.objects.delete(map.idx(p.x + 1, p.y));
+    give(game, { steel_plate: 2, rope: 2 });
+    for (const [dx, dy] of [[0, 1], [0, -1], [-1, 0]]) map.set(p.x + dx, p.y + dy, Tile.Deck);
+    expect(game.buildProblem('fish_trap')).toEqual({ key: 'noSeaSpot' });
+  });
+
+  it('makes the hold bigger next to the boat, two times', () => {
+    const game = rigGame(167);
+    const { map, player: p } = game;
+    map.set(p.x, p.y + 1, Tile.Water);
+    game.objects.set(map.idx(p.x, p.y + 1), { kind: 'fishing_boat' });
+    for (let k = 0; k < 3; k++) give(game, { steel_plate: 4, spare_part: 2 });
+    expect(game.holdLimit).toBe(HOLD_LOAD);
+    expect(game.build('hold_upgrade')).toBe(true);
+    expect(game.holdLimit).toBe(HOLD_LOAD + HOLD_UPGRADE);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'holdUpgraded', limit: HOLD_LOAD + HOLD_UPGRADE });
+    expect(game.build('hold_upgrade')).toBe(true);
+    expect(game.buildProblem('hold_upgrade')).toEqual({ key: 'holdMax' });
+    expect(Game.fromSave(JSON.parse(JSON.stringify(game.toSave()))).holdLimit).toBe(HOLD_LOAD + 2 * HOLD_UPGRADE);
+    // Away from the boat, the hold cannot be changed.
+    const other = rigGame(168);
+    give(other, { steel_plate: 4, spare_part: 2 });
+    expect(other.buildProblem('hold_upgrade')).toEqual({ key: 'noBoat' });
+  });
+});
+
+describe('Game: the crew cabin is the camp on the rig', () => {
+  function inCabin(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    const cabin = [...game.objects].find(([, o]) => o.kind === 'crew_cabin')![0];
+    const x = cabin % game.map.width;
+    game.player.x = x;
+    game.player.y = (cabin - x) / game.map.width + 1;
+    game.objects.delete(game.map.idx(game.player.x, game.player.y));
+    game.move(0, -1);
+    return game;
+  }
+
+  it('goes inside, like a hut, and has a bed that heals faster', () => {
+    const game = inCabin(170);
+    expect(game.hutHere()?.kind).toBe('crew_cabin');
+    expect(game.takeHutRequest()).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'enterHut', obj: 'crew_cabin' });
+    expect(game.hasHut()).toBe(true);
+    give(game, { log: 24, wood: 12, leaves: 30, stone: 20, rope: 8 });
+    expect(game.buildProblem('hut')).toEqual({ key: 'oneHut' });
+    game.needs.health = 50;
+    game.needs.energy = 20;
+    game.needs.food = game.needs.water = 100;
+    game.turn = nightTurn();
+    game.sleep();
+    expect(game.needs.health).toBeGreaterThan(80);
+  });
+
+  it('takes rooms, and with Cartographer its wall has the map', () => {
+    const game = inCabin(171);
+    give(game, ROOMS.hearth.cost);
+    expect(game.addRoom('hearth')).toBe(true);
+    expect(game.hutHere()?.rooms).toEqual(['hearth']);
+    expect(game.log.map((e) => e.msg)).toContainEqual({ key: 'roomBuilt', room: 'hearth', cabin: true });
+    expect(game.canReadMap()).toBe(false);
+    game.skills.add('cartographer');
+    expect(game.canReadMap()).toBe(true);
+  });
+
+  it('a supply drop sends the helicopter (an event for the UI)', () => {
+    const game = inCabin(172);
+    const radio = [...game.objects].find(([, o]) => o.kind === 'radio_hut')![0];
+    game.objects.get(radio)!.kind = 'radio_ready';
+    game.sailed = true;
+    game.delivery = { order: 'food', at: game.turn + 1 };
+    game.takeEvents();
+    game.wait();
+    const drop = game.takeEvents().find((e) => e.type === 'drop');
+    expect(drop).toBeDefined();
+    expect(game.objectAt((drop as { x: number }).x, (drop as { y: number }).y)?.kind).toBe('supply_crate');
+  });
+});
+
 function give(game: Game, cost: Partial<Record<Parameters<Game['inventory']['add']>[0], number>>): void {
   for (const [item, n] of Object.entries(cost)) game.inventory.add(item as Parameters<Game['inventory']['add']>[0], n);
 }

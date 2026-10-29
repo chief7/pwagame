@@ -9,7 +9,10 @@ export type ItemId =
   | 'wood' | 'log' | 'leaves' | 'stone' | 'fish' | 'rope'
   | 'axe' | 'fishing_rod'
   | 'tar' | 'resin' | 'sulphur'
-  | 'glowcap' | 'crystal' | 'lantern';
+  | 'glowcap' | 'crystal' | 'lantern'
+  | 'scrap' | 'diesel' | 'mussels'
+  | 'pack_frame'
+  | 'pickaxe' | 'shovel' | 'crowbar' | 'iron_ore' | 'coal' | 'clay' | 'spare_part' | 'steel_plate' | 'vegetables';
 
 export interface Food {
   food?: number;
@@ -23,6 +26,8 @@ export interface ItemDef {
   eat?: Food;
   /** Kept in the bag and used by gathering; you only ever need one. */
   tool?: true;
+  /** Heavy: each one counts 1 towards what the bag can carry (see Game.loadLimit). */
+  heavy?: true;
   /** Not edible yet: it has to be cooked at a campfire first. */
   raw?: true;
   /**
@@ -38,11 +43,11 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   mushroom: { id: 'mushroom', eat: { food: 9, energy: 5 } },
   cooked_fish: { id: 'cooked_fish', eat: { food: 40, energy: 10 } },
   apple: { id: 'apple', eat: { food: 12, water: 8 } },
-  wood: { id: 'wood' },
+  wood: { id: 'wood', heavy: true },
   // Chopped from trees with the axe; the big builds need them.
-  log: { id: 'log' },
+  log: { id: 'log', heavy: true },
   leaves: { id: 'leaves' },
-  stone: { id: 'stone' },
+  stone: { id: 'stone', heavy: true },
   fish: { id: 'fish', raw: true },
   rope: { id: 'rope' },
   axe: { id: 'axe', tool: true },
@@ -57,6 +62,26 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   glowcap: { id: 'glowcap', eat: { food: 6, water: 4, energy: 15 } },
   crystal: { id: 'crystal' },
   lantern: { id: 'lantern', tool: true },
+  // Island 4, the oil rig: scrap metal to repair gangways and the radio, diesel
+  // from old drums for its generator, and mussels from the rig's legs.
+  scrap: { id: 'scrap', heavy: true },
+  diesel: { id: 'diesel', heavy: true, rareFrom: ['diesel_drums', 'diesel_drums_empty', 'derrick', 'derrick_working'] },
+  mussels: { id: 'mussels', eat: { food: 12, water: 2 } },
+  // A wooden frame on your back: you carry more heavy things (see Game.loadLimit).
+  pack_frame: { id: 'pack_frame', tool: true },
+  // The rig's workshop: metal tools from scrap, and what they bring back from
+  // the islands (ore and coal from island 2, clay from island 1, spare parts
+  // from sealed crates). The furnace makes steel plates from ore and coal.
+  pickaxe: { id: 'pickaxe', tool: true },
+  shovel: { id: 'shovel', tool: true },
+  crowbar: { id: 'crowbar', tool: true },
+  iron_ore: { id: 'iron_ore', heavy: true },
+  coal: { id: 'coal', heavy: true },
+  clay: { id: 'clay', heavy: true },
+  spare_part: { id: 'spare_part' },
+  steel_plate: { id: 'steel_plate', heavy: true },
+  // From the greenhouse on the rig.
+  vegetables: { id: 'vegetables', eat: { food: 15, water: 6 } },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];

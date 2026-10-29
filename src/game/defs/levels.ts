@@ -6,15 +6,15 @@ import type { ObjectKind } from './objects';
 // start (an old wreck, a broken bridge…); walking into it hands over what it
 // still needs. Stage names and messages live in src/i18n/.
 
-export type StageId = 'hull' | 'mast' | 'sail' | 'supplies' | 'base' | 'pyre' | 'tinder' | 'basket' | 'envelope' | 'burner';
-export type LevelId = 1 | 2 | 3;
+export type StageId = 'hull' | 'mast' | 'sail' | 'supplies' | 'base' | 'pyre' | 'tinder' | 'basket' | 'envelope' | 'burner' | 'aerial' | 'generator' | 'radio_set';
+export type LevelId = 1 | 2 | 3 | 4;
 /**
  * Optional island tasks, each worth a star: open every chest, catch fish,
  * explore most of the island, or go some days without fainting.
  */
 export type StarId = 'chests' | 'fish' | 'explore' | 'safe';
-/** How world generation shapes the island: palms and beaches, forest and mountains, or a volcano. */
-export type Biome = 'tropical' | 'mountain' | 'volcano';
+/** How world generation shapes the island: palms and beaches, forest and mountains, a volcano, or the steel decks of an oil rig. */
+export type Biome = 'tropical' | 'mountain' | 'volcano' | 'rig';
 
 export interface GoalStage {
   id: StageId;
@@ -71,6 +71,19 @@ export const LEVELS: LevelDef[] = [
       { id: 'envelope', cost: { leaves: 16, rope: 4 }, becomes: 'balloon_envelope' },
       // Sulphur from the steam vents makes the burner burn hot.
       { id: 'burner', cost: { stone: 8, log: 2, sulphur: 4 }, becomes: 'balloon_ready' },
+    ],
+    stars: ['chests', 'fish', 'explore'],
+  },
+  {
+    // The old oil rig, where the balloon came down: repair its radio and call for help.
+    level: 4,
+    biome: 'rig',
+    site: 'radio_hut',
+    stages: [
+      { id: 'aerial', cost: { scrap: 8, rope: 2 }, becomes: 'radio_aerial' },
+      // Diesel from the old drums runs the generator.
+      { id: 'generator', cost: { scrap: 6, diesel: 4 }, becomes: 'radio_power' },
+      { id: 'radio_set', cost: { scrap: 4, rope: 2 }, becomes: 'radio_ready' },
     ],
     stars: ['chests', 'fish', 'explore'],
   },

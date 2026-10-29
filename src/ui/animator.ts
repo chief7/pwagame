@@ -6,6 +6,8 @@ import { t as strings } from '../i18n';
 // actor right now?" on any frame.
 
 export const STEP_MS = 130;
+/** How long the helicopter takes to fly in, hover and drop a crate, and fly off. */
+const DROP_MS = 3200;
 const LATE_DELAY_MS = 90;
 const LUNGE_MS = 160;
 const FLASH_MS = 140;
@@ -54,6 +56,13 @@ export interface Sparkle {
   start: number;
 }
 
+/** The helicopter's flight over a cell where it drops a crate. */
+export interface Drop {
+  x: number;
+  y: number;
+  start: number;
+}
+
 export interface ActorPose {
   /** Fractional cell position. */
   x: number;
@@ -75,6 +84,8 @@ export class Animator {
   private strides = new Map<number, number>();
   floats: FloatingText[] = [];
   sparkles: Sparkle[] = [];
+  /** Helicopter flights that are playing (none with reduced motion). */
+  drops: Drop[] = [];
   private fadeStart = -Infinity;
   private busyUntil = 0;
   /** With reduced motion, positions snap and only informative effects remain. */
@@ -122,6 +133,12 @@ export class Animator {
         case 'sparkle':
           this.sparkles.push({ x: e.x, y: e.y, start: t });
           this.extend(t + SPARKLE_MS);
+          break;
+        case 'drop':
+          // Only a show: the crate is there either way, and the log says so.
+          if (this.reducedMotion) break;
+          this.drops.push({ x: e.x, y: e.y, start: t });
+          this.extend(t + DROP_MS);
           break;
         case 'fade':
           this.reset();
@@ -197,6 +214,7 @@ export class Animator {
 
   readonly floatMs = FLOAT_MS;
   readonly sparkleMs = SPARKLE_MS;
+  readonly dropMs = DROP_MS;
 
   /** Opacity of the dark cover after sleeping or fainting (1 → 0). */
   fade(now: number): number {
@@ -208,6 +226,7 @@ export class Animator {
   busy(now: number): boolean {
     this.floats = this.floats.filter((f) => now - f.start < FLOAT_MS);
     this.sparkles = this.sparkles.filter((s) => now - s.start < SPARKLE_MS);
+    this.drops = this.drops.filter((d) => now - d.start < DROP_MS);
     return now < this.busyUntil || this.floats.length > 0;
   }
 

@@ -77,9 +77,15 @@ export function cheats(game: Game): { title: string; cheats: Cheat[] }[] {
       run: (g) => goTo(g, (i) => g.map.isFlow(i % g.map.width, Math.floor(i / g.map.width)) && !g.objects.has(i)),
     });
   }
-  const spots: [ObjectKind, string][] = [['steam_vent', 'a steam vent'], ['hot_spring', 'a hot spring'], ['sandbar_ns', 'the sandbar'], ['barrel', 'the tar barrels']];
+  const spots: [ObjectKind, string][] = [
+    ['steam_vent', 'a steam vent'], ['hot_spring', 'a hot spring'], ['sandbar_ns', 'the sandbar'], ['barrel', 'the tar barrels'],
+    ['gangway_end_e', 'a broken gangway'], ['crew_cabin', 'the crew cabin'], ['diesel_drums', 'the fuel drums'],
+    ['fishing_boat_wreck', 'the fishing boat'], ['derrick', 'the derrick'],
+    ['ore_vein', 'an ore vein'], ['clay_bank', 'a clay bank'], ['sealed_crate', 'a sealed crate'],
+  ];
   for (const [kind, name] of spots) {
-    const same = (k: ObjectKind) => k === kind || (kind === 'sandbar_ns' && k === 'sandbar_ew');
+    const same = (k: ObjectKind) => k === kind || (kind === 'sandbar_ns' && k === 'sandbar_ew') || (kind === 'gangway_end_e' && !!OBJECTS[k].broken)
+      || (kind === 'fishing_boat_wreck' && k === 'fishing_boat') || (kind === 'derrick' && k === 'derrick_working');
     if (has(same)) places.push({ icon: kind, label: `Go to ${name}`, note: 'Tap again for the next one.', run: (g) => goTo(g, objectIs(g, same)) });
   }
   if (game.caves().length) {

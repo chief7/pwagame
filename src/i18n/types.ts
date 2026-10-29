@@ -5,6 +5,7 @@ import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
 import type { RoomId } from '../game/defs/rooms';
 import type { PathId, SkillId } from '../game/defs/skills';
+import type { OrderId } from '../game/game';
 import type { FloatWhat, Msg } from '../game/messages';
 import type { NeedId } from '../game/needs';
 
@@ -90,6 +91,8 @@ export interface Strings {
     /** The Hut button and the Hut panel: the bed, the map wall, the rooms and adding a room. */
     hut: string;
     yourHut: string;
+    /** The Hut panel title in the crew cabin on the oil rig. */
+    yourCabin: string;
     bed: string;
     bedNote: string;
     lookAtMap: string;
@@ -106,9 +109,46 @@ export interface Strings {
     barrelNote: string;
     drink: string;
     addRoom: string;
+    /** The load row in the Bag and Store panels: "Load", "18 / 30 heavy things". */
+    load: string;
+    loadOf(have: number, limit: number): string;
+    loadNote: string;
+    /** The Store panel. */
+    store: string;
+    notAtStore: string;
+    inBag: string;
+    inStore: string;
+    bagEmptyShort: string;
+    storeEmpty: string;
+    heavy: string;
+    putOne: string;
+    putAll: string;
+    takeOne: string;
+    takeAll: string;
+    /** A building that goes up in trips (the hut): how it works, and what its site still needs. */
+    siteNote: string;
+    siteLeft: string;
+    /** The sea chart of the fishing boat, and its hold. */
+    chart: string;
+    chartNote(diesel: number, aboard: number): string;
+    islandName(level: LevelId): string;
+    sailTo: string;
+    beenThere: string;
+    newPlace: string;
+    hold: string;
+    holdNote: string;
+    inHold: string;
+    holdEmpty: string;
+    /** The Radio panel: supply crates by helicopter. */
+    radio: string;
+    radioNote: string;
+    order: string;
+    orders: Record<OrderId, string>;
   };
   /** Rooms the explorer can add to the hut. */
   rooms: Record<RoomId, { name: string; description: string }>;
+  /** The same rooms in the crew cabin on the oil rig: a workbench, a stove, a water tank. */
+  cabinRooms: Record<RoomId, { name: string; description: string }>;
   /** Each island star: its name, and what to do for it. */
   stars: Record<StarId, { name: string; task: string }>;
   /** Goal card hints for the rare materials: where to find them. */

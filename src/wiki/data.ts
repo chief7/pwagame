@@ -3,12 +3,14 @@ import { ITEMS, ITEM_IDS, type ItemId } from '../game/defs/items';
 import { LEVELS, type StageId } from '../game/defs/levels';
 import { OBJECTS, type Gather, type ObjectKind, type Yield } from '../game/defs/objects';
 import { RECIPES, RECIPE_IDS, type RecipeId } from '../game/defs/recipes';
+import { WORKSHOP_STOCK } from '../game/game';
+import { RIG_OBJECTS } from '../game/riggen';
 import { CAVE_OBJECTS, ISLET_OBJECTS, SCATTER } from '../game/worldgen';
 
 // What the compendium shows, read from the game's own registries so its
 // tables never fall behind the game. No DOM here, so it can be tested.
 
-/** Objects that the world generator places on every island outside its scatter table. */
+/** Objects that the world generator places on every island (not the oil rig) outside its scatter table. */
 const EVERYWHERE: ObjectKind[] = ['chest_closed', 'spring', 'bramble', ...CAVE_OBJECTS];
 
 /** The islands where an object can be found in the wild. */
@@ -18,7 +20,10 @@ export function objectIslands(kind: ObjectKind): number[] {
     const scatter = Object.values(SCATTER[level.biome]).flat().some(([k]) => k === kind);
     const islet = level.level === 1 && ISLET_OBJECTS.includes(kind);
     const goalMaterial = (level.biome === 'mountain' && kind === 'tree_spruce_snow') || (level.biome === 'volcano' && (kind === 'steam_vent' || kind === 'hot_spring'));
-    if (scatter || islet || goalMaterial || EVERYWHERE.includes(kind)) islands.push(level.level);
+    const stock = WORKSHOP_STOCK[level.level]?.some(([k]) => k === kind);
+    // Things the explorer builds on the rig that can be gathered from.
+    const rigBuilt = level.biome === 'rig' && (kind === 'greenhouse' || kind === 'fish_trap');
+    if (level.biome === 'rig' ? RIG_OBJECTS.includes(kind) || rigBuilt : scatter || islet || goalMaterial || stock || EVERYWHERE.includes(kind)) islands.push(level.level);
   }
   return islands;
 }

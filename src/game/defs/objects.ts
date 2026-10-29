@@ -11,7 +11,7 @@ export type ObjectKind =
   | 'stone_boulder' | 'stone_pebbles' | 'stone_mossy' | 'stalagmite'
   | 'log' | 'log_pile' | 'log_driftwood'
   | 'chest_closed' | 'chest_open' | 'spring'
-  | 'campfire' | 'lean_to' | 'hut'
+  | 'campfire' | 'lean_to' | 'hut' | 'hut_site' | 'store_crate'
   | 'bramble' | 'bridge_ns' | 'bridge_ew'
   | 'boat_wreck' | 'boat_hull' | 'boat_mast' | 'boat_sail' | 'boat_ready'
   | 'tree_spruce' | 'tree_spruce_snow' | 'tree_birch' | 'tree_apple' | 'fern'
@@ -20,7 +20,14 @@ export type ObjectKind =
   | 'barrel' | 'barrel_empty' | 'sandbar_ns' | 'sandbar_ew'
   | 'glowcap' | 'crystal_cluster'
   | 'lava_stones_ns' | 'lava_stones_ew' | 'steam_vent' | 'hot_spring'
-  | 'balloon_site' | 'balloon_basket' | 'balloon_envelope' | 'balloon_ready';
+  | 'balloon_site' | 'balloon_basket' | 'balloon_envelope' | 'balloon_ready'
+  | 'gangway_ns' | 'gangway_ew' | 'gangway_end_n' | 'gangway_end_s' | 'gangway_end_e' | 'gangway_end_w'
+  | 'scrap_pile' | 'rig_container' | 'diesel_drums' | 'diesel_drums_empty' | 'pallet' | 'old_net' | 'water_tank'
+  | 'mussel_bed' | 'life_ring' | 'derrick' | 'crane' | 'crew_cabin' | 'balloon_crashed'
+  | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready'
+  | 'derrick_working' | 'fishing_boat_wreck' | 'fishing_boat'
+  | 'supply_crate' | 'platform_deck'
+  | 'ore_vein' | 'clay_bank' | 'sealed_crate' | 'furnace' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade';
 
 export interface Yield {
   item: ItemId;
@@ -70,6 +77,35 @@ export interface ObjectDef {
   climb?: true;
   /** The island's goal (see levels.ts): walking into it hands over materials. */
   goal?: true;
+  /**
+   * A building site: walking into it hands over what the recipe that builds
+   * it still needs (its `siteCost`), and then it becomes this object.
+   */
+  site?: ObjectKind;
+  /** What a site placed by world generation (an old wreck to repair) takes; a built site takes its recipe's `siteCost`. */
+  siteCost?: Partial<Record<ItemId, number>>;
+  /** The fishing boat: walking into it opens the sea chart and the cargo hold. */
+  boat?: true;
+  /** A crate the helicopter dropped: a store that goes away when it is empty. */
+  dropped?: true;
+  /** Built on a sea cell next to a rig deck, in front of the explorer (the fish trap). */
+  onSea?: true;
+  /** Smelting needs one of these next to the explorer. */
+  furnace?: true;
+  /** Not an object: building it makes the boat's hold bigger. */
+  holdUpgrade?: true;
+  /** Not an object: building it lays a new deck cell on the sea (a platform on the rig). */
+  deck?: true;
+  /** A store: walking into it opens the Store panel (see Game.storeItem). */
+  store?: true;
+  /** Walkable over the sea: a gangway between the platforms of the oil rig. */
+  overSea?: true;
+  /**
+   * A broken end of a gangway, on a sea cell: it blocks the way until the
+   * explorer repairs the gangway (the recipe with `onto`). The value is the
+   * way the gangway runs, so the repair fills the whole gap.
+   */
+  broken?: 'ns' | 'ew';
   /**
    * A sandbar on sea cells: walkable at low tide only (see clock.ts). At
    * high tide it shows its `<kind>_wet` sprite.
@@ -155,6 +191,9 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   campfire: def({ kind: 'campfire', warmthRadius: 2, lightRadius: 5, frames: ['campfire', 'campfire_2'] }),
   lean_to: def({ kind: 'lean_to', walkable: true, shelter: 0.6, rest: 75 }),
   hut: def({ kind: 'hut', walkable: true, shelter: 1, rest: 100 }),
+  // The hut goes up in trips: its frame first, then the materials.
+  hut_site: def({ kind: 'hut_site', site: 'hut' }),
+  store_crate: def({ kind: 'store_crate', store: true }),
   bramble: def({
     kind: 'bramble',
     gather: { yields: [{ item: 'wood', min: 1, max: 1 }, { item: 'leaves', min: 1, max: 1 }], needs: 'axe', after: { remove: true } },
@@ -238,11 +277,95 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     kind: 'balloon_ready', goal: true, frames: ['balloon_ready', 'balloon_ready_2'],
     done: { frames: ['balloon_gone'], lightRadius: 0, icon: 'balloon_ready' },
   }),
+  // Island 4, the old oil rig: gangways between the platforms, some broken.
+  gangway_ns: def({ kind: 'gangway_ns', walkable: true, overSea: true }),
+  gangway_ew: def({ kind: 'gangway_ew', walkable: true, overSea: true }),
+  gangway_end_n: def({ kind: 'gangway_end_n', broken: 'ns' }),
+  gangway_end_s: def({ kind: 'gangway_end_s', broken: 'ns' }),
+  gangway_end_e: def({ kind: 'gangway_end_e', broken: 'ew' }),
+  gangway_end_w: def({ kind: 'gangway_end_w', broken: 'ew' }),
+  scrap_pile: def({
+    kind: 'scrap_pile',
+    gather: { yields: [{ item: 'scrap', min: 2, max: 3 }], after: { remove: true } },
+  }),
+  rig_container: def({ kind: 'rig_container', blocksSight: true }),
+  diesel_drums: def({
+    kind: 'diesel_drums',
+    gather: { yields: [{ item: 'diesel', min: 2, max: 2 }], after: { becomes: 'diesel_drums_empty' } },
+  }),
+  diesel_drums_empty: def({ kind: 'diesel_drums_empty' }),
+  pallet: def({
+    kind: 'pallet',
+    gather: { yields: [{ item: 'wood', min: 2, max: 3 }], after: { remove: true } },
+  }),
+  old_net: def({
+    kind: 'old_net',
+    gather: { yields: [{ item: 'rope', min: 1, max: 2 }], after: { remove: true } },
+  }),
+  // Rain water caught in a tank: drink like at a spring.
+  water_tank: def({ kind: 'water_tank', drink: 35 }),
+  // Mussels grow on the rig's legs, in the sea under the edge of a deck.
+  mussel_bed: def({
+    kind: 'mussel_bed', depletedSprite: 'mussel_bed_picked',
+    gather: { yields: [{ item: 'mussels', min: 2, max: 3 }], after: { regrow: 200 } },
+  }),
+  life_ring: def({ kind: 'life_ring' }),
+  // The old drilling tower: repaired, its pump brings up diesel again and again.
+  derrick: def({ kind: 'derrick', blocksSight: true, site: 'derrick_working', siteCost: { scrap: 12, rope: 2 } }),
+  derrick_working: def({
+    kind: 'derrick_working', blocksSight: true, depletedSprite: 'derrick_idle', frames: ['derrick_working', 'derrick_working_2'],
+    gather: { yields: [{ item: 'diesel', min: 2, max: 2 }], after: { regrow: 120 } },
+  }),
+  // An old fishing boat at the rig's dock: repaired, it sails between the rig and the islands.
+  fishing_boat_wreck: def({ kind: 'fishing_boat_wreck', site: 'fishing_boat', siteCost: { scrap: 10, wood: 6, rope: 4 } }),
+  fishing_boat: def({ kind: 'fishing_boat', boat: true }),
+  // A supply crate from the radio, on the helipad: take out what you need.
+  supply_crate: def({ kind: 'supply_crate', store: true, dropped: true }),
+  // Only for the recipe: the platform recipe lays a deck cell, not an object.
+  platform_deck: def({ kind: 'platform_deck', deck: true }),
+  // Island 2: rocks with iron and coal (the pickaxe); island 1: clay at the river (the shovel);
+  // every island: old crates the crowbar opens. They grow back slowly, the crates do not.
+  ore_vein: def({
+    kind: 'ore_vein', blocksSight: true, depletedSprite: 'ore_vein_mined',
+    gather: { yields: [{ item: 'iron_ore', min: 1, max: 2 }, { item: 'coal', min: 1, max: 1, chance: 0.5 }], needs: 'pickaxe', after: { regrow: 300 } },
+  }),
+  clay_bank: def({
+    kind: 'clay_bank', depletedSprite: 'clay_bank_dug',
+    gather: { yields: [{ item: 'clay', min: 2, max: 3 }], needs: 'shovel', after: { regrow: 200 } },
+  }),
+  sealed_crate: def({
+    kind: 'sealed_crate',
+    gather: {
+      yields: [{ item: 'spare_part', min: 1, max: 1 }, { item: 'coconut', min: 1, max: 2, chance: 0.5 }, { item: 'rope', min: 1, max: 2, chance: 0.5 }],
+      needs: 'crowbar', after: { remove: true },
+    },
+  }),
+  // The rig's buildings.
+  furnace: def({ kind: 'furnace', furnace: true, lightRadius: 2, frames: ['furnace', 'furnace_2'] }),
+  greenhouse: def({
+    kind: 'greenhouse', blocksSight: true, depletedSprite: 'greenhouse_picked',
+    gather: { yields: [{ item: 'vegetables', min: 2, max: 3 }], after: { regrow: 120 } },
+  }),
+  water_maker: def({ kind: 'water_maker', drink: 35 }),
+  fish_trap: def({
+    kind: 'fish_trap', onSea: true, depletedSprite: 'fish_trap_empty',
+    gather: { yields: [{ item: 'fish', min: 1, max: 2 }], after: { regrow: 100 } },
+  }),
+  hold_upgrade: def({ kind: 'hold_upgrade', holdUpgrade: true }),
+  crane: def({ kind: 'crane', blocksSight: true }),
+  // The camp on the rig: a bed for a full rest, and a little stove to cook on.
+  crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),
+  balloon_crashed: def({ kind: 'balloon_crashed' }),
+  radio_hut: def({ kind: 'radio_hut', goal: true }),
+  radio_aerial: def({ kind: 'radio_aerial', goal: true }),
+  radio_power: def({ kind: 'radio_power', goal: true }),
+  radio_ready: def({ kind: 'radio_ready', goal: true, frames: ['radio_ready', 'radio_ready_2'], lightRadius: 2 }),
 };
 
-/** Objects the explorer can get past by building, clearing or waiting for low tide: brambles, steep steps, sandbars. */
+/** Objects the explorer can get past by building, clearing or waiting for low tide: brambles, steep steps, sandbars, broken gangways. */
 export function canBeOpened(kind: ObjectKind): boolean {
-  return kind === 'bramble' || !!OBJECTS[kind].steep || !!OBJECTS[kind].tidal;
+  const def = OBJECTS[kind];
+  return kind === 'bramble' || !!def.steep || !!def.tidal || !!def.broken;
 }
 
 export interface WorldObject {
@@ -251,4 +374,8 @@ export interface WorldObject {
   readyAt?: number;
   /** The rooms added to a hut (see rooms.ts). */
   rooms?: RoomId[];
+  /** What a store crate holds. */
+  store?: Partial<Record<ItemId, number>>;
+  /** What a building site already got. */
+  given?: Partial<Record<ItemId, number>>;
 }

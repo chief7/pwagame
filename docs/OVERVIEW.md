@@ -88,6 +88,7 @@ flowchart TB
 | `src/game/clock.ts` | Time of day, daylight, day and night phases. |
 | `src/game/inventory.ts` | What the player carries (a count per item). |
 | `src/game/worldgen.ts` | Makes a new island: terrain, caves, objects. |
+| `src/game/riggen.ts` | Makes the oil rig of level 4: platforms, gangways (some broken), the helipad and what stands on the decks (see §5). |
 | `src/game/caves.ts` | Finds the deep caves (big caves with few ways in) from the tiles (see 4.18). |
 | `src/game/map.ts` | The tile grid, plus the "explored" and "visible" layers. |
 | `src/game/fov.ts` | Field of view (recursive shadowcasting). |
@@ -231,8 +232,8 @@ is the normal rate. Stepping onto ash in the day (daylight above 0.5) logs
 time. The warning resets when the need is above 35 again. The HUD bar of a
 low need pulses. The Water warning gives a tip for the island: a spring or a
 coconut on island 1, a spring or the river on island 2 (no coconuts there),
-a spring, a hot spring or a coconut on island 3. The `low` message carries
-the `level` for this.
+a spring, a hot spring or a coconut on island 3, and a rain water tank on
+the oil rig (island 4). The `low` message carries the `level` for this.
 
 ### 4.2 Fainting (no death)
 
@@ -423,9 +424,16 @@ Special recipes:
   `onLava`. It works the same, but over lava cells (`lava_stones_ew` or
   `lava_stones_ns`). With no lava ahead, the message is `noLavaSpot`. A
   bridge does not go over lava, and stepping stones do not go over a river.
-- **On a step** (a recipe with `onto`): the building replaces that object.
-  It goes on such an object in front of the player, else on the nearest one
-  next to the player. If there is none, the message is `noStep` (see 4.14).
+- **On a step** (a recipe with `onto`, a list of kinds): the building
+  replaces that object. It goes on such an object in front of the player,
+  else on the nearest one next to the player. If there is none, the message
+  is `noStep` with the first kind of the list (see 4.14).
+- **Mend gangway** (island 4, `gangway`, 6 scrap): a recipe with `onto` the
+  four broken gangway ends (`gangway_end_n/s/e/w`, which have `broken`).
+  It mends the whole gap: every broken end in a row along the gangway
+  (`brokenRun()`) becomes `gangway_ns` or `gangway_ew`, and the message is
+  `gangwayMended`. Walking into a broken end logs `gangwayBroken`; no turn
+  passes.
 
 ### 4.9 Animals
 
@@ -464,6 +472,8 @@ turtle, monkey, piglet, bat, boar, snake, wasps, bear. Island 2: crab, bat,
 boar, wasps, bear, rabbit, squirrel, mountain goat. Island 3: crab, turtle,
 monkey, bat, boar, snake, wasps, lizard (shy, ash and sand), gull (cheeky,
 sand), scorpion (grumpy and wild, ash and caves: 50%, −6). No cave bears.
+Island 4, the oil rig: only gulls (also on `Deck`). No wild animals and no
+stray dog.
 
 **Wild animals** (`wild: true`: boar, snake, wasps, cave bear, mountain goat, scorpion) only appear
 at least `minHomeDistance` (25) cells from home. A new hurt message is
@@ -507,7 +517,7 @@ earned, the log says so (`skillPoint`) and the player sparkles.
 **Skills.** Three paths: Building (skills to build things), Explorer (skills
 that change the explorer) and Improving (skills that make things work
 better). In a path, a skill needs the skill before it. The first two skills
-on a path cost 1 point, the third, fourth and fifth cost 2.
+on a path cost 1 point, the third and later ones cost 2.
 
 | Path | Skill | Effect | Where |
 |---|---|---|---|
@@ -515,11 +525,13 @@ on a path cost 1 point, the third, fourth and fifth cost 2.
 | | Handy builder | Recipes cost 1 wood less | `Game.recipeCost()` |
 | | Rope maker | The rope recipe makes 2 rope, not 1. The Build panel shows "Rope ×2". | `Game.recipeMakes()` |
 | | Cartographer | In a hut, a map of the explored island hangs on the wall (see 4.15) | `Game.canReadMap()`, `mapview.ts` |
+| | Pack frame | Unlocks the pack frame recipe (a tool: +15 load, see 4.21) | `recipes.ts` (`skill`), `Game.loadLimit` |
 | Explorer | Small sips | Water drops 20% slower | `needs.ts` (`thirst`) |
 | | Small appetite | Food drops 20% slower | `needs.ts` (`hunger`) |
 | | Thick skin | Warmth drops 30% slower | `needs.ts` (`chill`) |
 | | Night eyes | Up to 2 more cells of sight at night | `Game.sightRadius` |
 | | Sure foot | A climb onto a ladder or a rope costs no Energy (see 4.14) | `Game.climb()` |
+| | Strong back | The bag holds 10 more heavy things (see 4.21) | `Game.loadLimit` |
 | Improving | Green thumb | Plants regrow in 70% of the time | `Game.interact()` |
 | | Patient angler | Bite chance 40% → 70% | `Game.fish()` |
 | | Animal friend | Crabs do not pinch, monkeys do not take food. Wild animals notice the player 2 cells later (at least 1) | `Game.noticeRange()`, `Game.animalAct()` |
@@ -553,8 +565,8 @@ path. The Skills button shows a star when there are free points.
 Each island is a **level** with one big goal: something the player builds
 in stages to leave the island. `src/game/defs/levels.ts` (`LEVELS`) holds
 each level's `biome` (how world generation shapes it, see §5), its goal
-object (`site`) and its stages. Three levels exist: 1 (`tropical`), 2
-(`mountain`) and 3 (`volcano`). §4.20 describes each island and its goal as
+object (`site`) and its stages. Four levels exist: 1 (`tropical`), 2
+(`mountain`), 3 (`volcano`) and 4 (`rig`, the oil rig). §4.20 describes each island and its goal as
 a whole.
 
 Level 1: an old boat wreck (`boat_wreck`) lies on a beach of the far side.
@@ -605,21 +617,26 @@ How it works:
   sends the balloon straight up for 10 cells, and the renderer draws
   `balloon_away_<body>` (2 frames for the flame). The beacon (level 2) has
   no trip.
-- **On levels 1 and 2**, `sail()` then lands the player on the next level
-  (`landOn()`): a new island from `generateWorld(…, level)`, the player on
+- **On levels 1 to 3**, `sail()` then adds the level to `left` and lands the
+  player on the next level (`landOn()`): the kept island if the player was
+  there before (see 4.22), else a new island from `generateWorld(…, level)`, the player on
   its start point (also the new home), new animals for that island,
   `goalGiven` cleared, and the clock at 8:00 the next day. The bag, XP,
   skills and needs stay. The log says `sailAway`, then `landIsland` (with
   the new level). `sailed` stays false.
-- **On the last level** (3), `sail()` sets `sailed`. The balloon is gone:
-  `done.frames` of `balloon_ready` is `balloon_gone` (two stakes), and
-  `done.icon` (`balloon_ready`) is the picture on the goal card and the end
-  screen. The end screen says that the balloon carried the player home. The
-  player can stay on the island or start a new island.
+- **The crash.** After the balloon flight from island 3, the player lands
+  on the oil rig (level 4), next to the crashed balloon
+  (`balloon_crashed`), with `landIsland` level 4. On island 3 the balloon
+  is gone: `done.frames` of `balloon_ready` is `balloon_gone` (two stakes),
+  and `done.icon` (`balloon_ready`) is the picture on the goal card.
+- **On the last level** (4), `sail()` sets `sailed`: the player called for
+  help on the radio. There is no trip. The end screen says that help is on
+  its way and that this is the end of the story for now. The player can
+  stay on the rig or start a new island.
   `nextLevel(level)` gives the next level, or null on the last one.
-- **Old saves** from when island 2 was the last one can have `sailed` set
-  on level 2. They load with `sailed` false, so the lit beacon asks again
-  and takes the player to island 3. (A `done` object with `lightRadius`
+- **Old saves** from when island 2 or island 3 was the last one can have
+  `sailed` set on that level. They load with `sailed` false, so the lit
+  beacon or the ready balloon asks again and takes the player on. (A `done` object with `lightRadius`
   keeps its look only while `sailed` is set.)
 - `game.goal()` gives the state for the goal card at the top of the Build
   panel: `missing` (an old island without a boat), `find`, `build` (with
@@ -652,6 +669,20 @@ All stages together need 6 logs, 8 wood, 8 stone, 32 leaves (16 of them for
 rope) and 4 sulphur. **Sulphur** is the rare material of island 3: only
 steam vents give it (`steam_vent`: 1–2 sulphur, regrows in 150 turns,
 `steam_vent_spent` until then).
+
+Level 4 (the oil rig): the old radio room (`radio_hut`) stands on the
+platform furthest from the main deck, behind a broken gangway. The player
+repairs it and calls for help.
+
+| Stage | Cost | The radio room becomes |
+|---|---|---|
+| Aerial | 8 scrap, 2 rope | `radio_aerial` |
+| Generator | 6 scrap, 4 diesel | `radio_power` |
+| Radio | 4 scrap, 2 rope | `radio_ready` (2 frames: its light blinks; lights 2 cells) |
+
+All stages together need 18 scrap, 4 rope and 4 diesel. **Diesel** is the
+rare material of the rig: only the old fuel drums give it (`diesel_drums`:
+2 diesel, then `diesel_drums_empty`).
 
 ### 4.13 The dog
 
@@ -738,6 +769,9 @@ keeps a map on the wall of every hut. There is no map anywhere else.
   once its cell is explored (`cave`, see 4.18), and bear areas. A list under
   the map names the signs that are on it. The panel draws the map at the
   largest whole-number scale that fits.
+- **Gangways** (on the oil rig) are thin ink lines over the sea, red where
+  a gangway is broken: the map draws them from the objects (`overSea`,
+  `broken`), because the tiles under them are sea.
 - **Bear areas.** After each sight update, `updateFov()` stores the cell of
   every visible cave bear in `game.bearSpots`, unless a stored cell is 6 cells
   or closer (`BEAR_SPOT_GAP`). So bears the explorer never saw are not on the
@@ -841,9 +875,29 @@ wall of rock all round, and one way in (see §5).
 
 ### 4.19 The camp: the hut and its rooms
 
-The hut is the camp. It costs 24 logs, 12 wood, 30 leaves, 20 stone and 8 rope, and
+On the oil rig, the crew cabin is the camp: `isCamp()` is true for the hut
+and the crew cabin. The cabin works like a hut in every way below (going
+inside, the Hut panel titled "Your crew cabin", the bed, rooms, the map wall,
+healing, one camp on each island), and it has its own stove. Its rooms
+have their own steel pictures (`cabin_main`, `cabin_main_map`,
+`cabin_workshop`, `cabin_hearth` with 2 frames, `cabin_barrel`: riveted
+walls, a grating floor, a porthole and a bunk bed) and their own names
+(`Strings.cabinRooms`: Workbench, Stove, Water tank). The rooms work the
+same as in a hut.
+
+The hut is the camp. It takes 24 logs, 12 wood, 30 leaves, 20 stone and 8 rope, and
 each island has only one (see 4.8). It is the only place for a full rest and
 heals faster (see 4.4).
+
+- **The frame.** The hut is more than a bag can carry (see 4.21), so it is
+  built in trips. The `hut` recipe costs nothing and places a `hut_site`
+  (the frame; it has `site: 'hut'`). Walking into the frame gives it what
+  the recipe's `siteCost` still needs (`Game.workOnSite()`; Handy builder
+  makes it 1 wood less, `Game.siteCost()`), 1 XP for each item, with
+  `siteGive` or `siteNeeds`. The frame keeps what it got in `given`. When
+  it has everything, it becomes the hut, with sparkles and `siteDone`. The
+  one-hut rule counts the frame too. The Build panel shows what the frame
+  still needs (`Game.siteLeft()`).
 
 - **Inside.** Walking into a hut logs `enterHut` and sets a flag that the UI
   reads with `game.takeHutRequest()`: `main.ts` opens the **Hut panel**. While
@@ -874,15 +928,158 @@ heals faster (see 4.4).
   fire frame.
 - The HUD line in a hut says "In your hut" (also with a hearth).
 
+### 4.21 The carry limit and the store crate
+
+The bag holds only so many **heavy** things (`heavy: true` on the item):
+wood, logs, stone, scrap and diesel, 1 load each. Everything else (food,
+leaves, rope, tools, tar, resin, sulphur, crystals) has no load.
+
+- `game.load` is the load in the bag. `game.loadLimit` is 30 (`BAG_LOAD`),
+  +10 with Strong back (`STRONG_BACK_LOAD`), +15 while the pack frame is in
+  the bag (`PACK_FRAME_LOAD`): 55 with both.
+- **A full bag.** When the load is at the limit or more, gathering from an
+  object that would give a heavy item (with the tools the player carries)
+  logs `tooHeavy`, and no turn passes. One gather can still go a little over
+  the limit. Light things can always be gathered. Chests use the same rule.
+- Saves from before keep everything in the bag, also over the limit; only
+  gathering waits until the load is lower. The cheats ignore the limit.
+- **The store crate** (`store_crate`, 6 wood and 2 rope, one on each
+  island, else `oneStore`) has `store: true`. Walking into it logs
+  `openStore` and sets a flag that the UI reads with
+  `game.takeStoreRequest()`: the **Store panel** opens. No turn passes.
+  The panel shows the load, the bag and the crate (`WorldObject.store`),
+  with "Put in 1", "Put in all", "Take 1" and "Take all". `game.storeItem()`
+  and `game.takeItem()` need a store crate next to the player and take no
+  time. Taking heavy things stops at the limit (`tooHeavy` when there is no
+  room). The crate has no limit.
+- **The pack frame** (`pack_frame`, a tool) is a recipe (4 wood, 3 rope)
+  that needs the Pack frame skill (Building path, after Cartographer).
+- The Bag panel shows a load row (`ui_load`) and marks heavy items.
+
+### 4.22 The fishing boat and the kept islands
+
+On the oil rig, an old fishing boat (`fishing_boat_wreck`) lies in the sea
+at the south edge of the crew platform (else the main deck). With it, the
+explorer sails between the rig and islands 1 to 3 to fetch what the rig
+does not have.
+
+- **Sites placed by the world.** An object can carry its own `siteCost` and
+  `site` (the object it becomes): walking into it works like the hut frame
+  (see 4.19). The fishing boat wreck takes 10 scrap, 6 wood and 4 rope and
+  becomes `fishing_boat`. The derrick takes 12 scrap and 2 rope and becomes
+  `derrick_working`: its pump gives 2 diesel, then refills in 120 turns
+  (`derrick_idle` until then; 2 frames, its lamp blinks).
+- **The sea chart.** Walking into the fishing boat (`boat: true`) logs
+  `openChart` and sets a flag that the UI reads with
+  `game.takeChartRequest()`. The panel lists the other islands (1, 2, 3 and
+  the rig), says whether the explorer was there before
+  (`game.visited()`), shows the hold, and has a Sail button for each.
+- **A voyage** (`game.voyage(level)`, `voyageProblem()`: `noBoat`,
+  `hereAlready`, `needDiesel`) burns 2 diesel (`VOYAGE_DIESEL`), from the
+  hold first, then the bag, and takes 60 turns (`VOYAGE_TURNS`, 6 hours):
+  needs go down as if awake in light shelter (0.6). The boat leaves its
+  cell, the explorer lands, the boat moors on a free sea cell next to them
+  (`moor()`): where it lay when they left that island, else the sea cell
+  nearest to the island's home. Then `voyage` with the level. If Health ran
+  out on the way, the explorer faints on arrival.
+- **The cargo hold** (`game.hold`) goes with the boat. It carries 60 heavy
+  things (`HOLD_LOAD`); light things do not count. `loadItem()` and
+  `unloadItem()` need the boat next to the explorer and take no time
+  (`holdFull` when the hold is full, `tooHeavy` when the bag is). The sea
+  chart shows the hold and the bag like the Store panel.
+- **Kept islands.** When the explorer leaves an island (on its goal or by
+  boat), `landOn()` keeps it as it is (map, explored cells, objects, home,
+  goal progress, bear spots, fish caught, and the boat's dock) in
+  `islands`. Going there again brings it back; animals are made new. An
+  island never visited is generated new.
+- **Used goals.** `game.left` lists the islands the explorer left on their
+  goal. `game.goalUsed` is true there, and on the last island after the
+  radio call (`sailed`). A used goal shows its `done` look; the boat of
+  island 1 sails off and is gone. Walking into a used goal only names it.
+
+### 4.23 Supply drops and new platforms (the oil rig)
+
+- **The Radio panel.** After the call for help (`sailed`), walking into the
+  working radio (`radio_ready`) logs `openRadio` and sets a flag that the UI
+  reads with `game.takeRadioRequest()`. `game.atRadio` is true next to it.
+- **Orders** (`RADIO_ORDERS`, `game.order(id)`, no time passes): a food
+  crate (3 cooked fish, 4 coconuts, 3 apples), a building crate (10 logs,
+  6 wood, 12 leaves, 6 stone) or a fuel crate (4 diesel, 4 rope). One order
+  each day (`orderDay`, else `orderedToday`), and one at a time (`onTheWay`).
+- **Delivery.** 20 turns later (`DELIVERY_TURNS`), at the end of a turn on
+  the rig, the helicopter drops a `supply_crate` on a free cell of the
+  helipad (its middle if it can), with sparkles and `delivered`. While the
+  explorer is away from the rig, the crate waits for them.
+- **The helicopter.** A delivery also sends a `drop` event. The animator
+  plays it for 3.2 s (`DROP_MS`; not with reduced motion): the helicopter
+  (`helicopter`, 2 frames for the rotor) flies in from 14 cells to the left,
+  hovers 3 cells above the pad and lowers the crate on a rope, lets it go at
+  55% of the flight, and flies off to the right. Until then the renderer
+  does not draw the crate on the pad.
+- **The supply crate** is a store (`store`, `dropped`): walking into it
+  opens the Store panel. When it is empty, it is gone. It does not count as
+  the island's store crate.
+- **New platforms.** The `platform` recipe (6 scrap, 2 wood) builds
+  `platform_deck` (`deck: true`): no object, but the sea cell in front of
+  the explorer becomes `Deck` (`map.change()`, which raises `map.version`, so
+  the renderer draws the terrain again). The cell must touch the deck of the
+  crew platform (joined to the crew cabin), be within 6 cells of the cabin
+  (`PLATFORM_RANGE`), have no gangway (whole or broken) next to it, and no
+  deck of another platform within 2 cells. Else `noDeckSpot`. So new decks
+  give room at the camp, never a way past a broken gangway.
+- **The rain tank** (`rain_tank`, 6 scrap) builds a `water_tank`.
+
+### 4.24 The rig workshop
+
+The rig makes metal tools from scrap. With them the explorer gets new
+resources on islands 1 to 3, and builds new things on the rig with them.
+
+| Tool (`makes`) | Cost | Use |
+|---|---|---|
+| Pickaxe | 4 scrap, 2 wood | `needs` of ore veins |
+| Shovel | 3 scrap, 2 wood | `needs` of clay banks |
+| Crowbar | 3 scrap | `needs` of sealed crates |
+
+| Object | Where | Gives | After |
+|---|---|---|---|
+| Ore vein (`ore_vein`) | Island 2: scree next to rock, 8 | 1–2 iron ore, 50% 1 coal | Regrows in 300 turns (`ore_vein_mined`) |
+| Clay bank (`clay_bank`) | Island 1: grass or sand next to the river, 6 | 2–3 clay | Regrows in 200 turns (`clay_bank_dug`) |
+| Sealed crate (`sealed_crate`) | Islands 1–3: floor (no cave) 12+ cells from home, 4 | 1 spare part, 50% 1–2 coconuts, 50% 1–2 rope | Removed |
+
+- **Placing them** (`WORKSHOP_STOCK`, `Game.stockIsland()`): the first time
+  the explorer is on an island (a new game, `landOn()`, or loading a save
+  from before), the game puts them on free cells that fit, at random. Each
+  must leave the whole island reachable (`allReachableFrom()`), else it
+  goes elsewhere. `stocked` remembers the islands that got them.
+- **The `needTool` message** says "too thorny" only for brambles; for the
+  others it names the tool and says to make it on the rig.
+- Iron ore, coal, clay and steel plates are heavy; spare parts are not.
+
+Rig buildings (`rigOnly`: elsewhere `rigOnly`, and the Build panel says so):
+
+| Building | Cost | What it does |
+|---|---|---|
+| Furnace (`furnace`, `furnace: true`, 2 frames, light 2) | 12 clay, 6 stone | Smelt (`smelt`, `atFurnace`): 2 iron ore + 1 coal → 1 steel plate, only next to a furnace (else `needFurnace`) |
+| Greenhouse | 4 steel plates, 10 clay, 4 wood | 2–3 vegetables (15 food, 6 water), regrows in 120 turns (`greenhouse_picked`) |
+| Water maker | 4 steel plates, 2 spare parts | Drink 35, as often as you like |
+| Fish trap (`onSea`) | 2 steel plates, 2 rope | Built on the sea cell in front of the explorer, who stands on a deck (else `noSeaSpot`). 1–2 fish, regrows in 100 turns (`fish_trap_empty`) |
+
+- **The bigger hold** (`hold_upgrade`: 4 steel plates, 2 spare parts; any
+  island) is a recipe that builds `hold_upgrade` (`holdUpgrade: true`): no
+  object, but the hold carries 30 more (`HOLD_UPGRADE`), at most two times
+  (`HOLD_UPGRADES`, then `holdMax`). It needs the fishing boat next to the
+  explorer (else `noBoat`). `game.holdLimit` is 60, 90 or 120.
+
 ### 4.20 The islands
 
 This section brings together, for each island, what is on it and what its
 goal is. The details are in the sections it links to. All islands are
 104 × 80 cells and have the same three regions (home coast, wild forest,
 far side), split by a bramble wall and a river (a lava flow on island 3)
-(see §5). The explorer always starts on a beach of the home coast.
+(see §5). The explorer always starts on a beach of the home coast. The oil
+rig (island 4) is different: it has no land at all (see below).
 
-What all islands share:
+What islands 1 to 3 share:
 
 - Springs, 2 or more of them on the home coast.
 - 8 chests in the open (2 home coast, 3 wild forest, 3 far side) and one
@@ -896,7 +1093,8 @@ What all islands share:
 |---|---|---|---|---|
 | 1 | `tropical` | Repair the boat and sail away | Tar | Treasure hunter, Angler, Safe and sound |
 | 2 Pine Ridge | `mountain` | Light a signal beacon on the peak | Resin | Treasure hunter, Explorer, Safe and sound |
-| 3 Ember Isle | `volcano` | Repair the hot-air balloon and fly home | Sulphur | Treasure hunter, Angler, Explorer |
+| 3 Ember Isle | `volcano` | Repair the hot-air balloon and fly away | Sulphur | Treasure hunter, Angler, Explorer |
+| 4 the oil rig | `rig` | Repair the radio and call for help | Diesel | Treasure hunter, Angler, Explorer |
 
 #### Island 1: the tropical island (`tropical`)
 
@@ -975,7 +1173,7 @@ with the bag, XP, skills, stars, needs and the dog (see 4.12).
 | Rare material | Sulphur, from at least 3 steam vents near the crater (1–2 each, regrows in 150 turns) |
 | Stars | Treasure hunter, Angler (catch 5 fish), Explorer (explore 75% of the island) |
 
-**Goal: repair the hot-air balloon and fly home.** An old balloon
+**Goal: repair the hot-air balloon and fly away.** An old balloon
 (`balloon_site`) lies on the crater rim, on the highest ash. The player
 repairs it in three stages:
 
@@ -986,9 +1184,38 @@ repairs it in three stages:
 To reach the crater, the player lays stepping stones across the lava flow.
 Bring water or drink at the hot springs, because the ash is hot in the day.
 When the balloon is ready, walking into it asks "Fly away?". The balloon
-rises and flies the explorer home. Island 3 is the last level for now: the
-end screen shows the stars earned, and the player can stay on the island
-or start a new one (see 4.12).
+rises and flies the explorer away over the sea. The wind turns, and it
+comes down on an old oil rig: island 4 (see 4.12).
+
+#### Island 4: the old oil rig (`rig`)
+
+| | |
+|---|---|
+| Land | None. 6 to 8 steel platforms (`Deck`) on legs in the sea, joined by gangways over the water; 340 to 680 deck cells. One platform has a helipad (`Helipad`, 3 × 3; no use yet) |
+| Things on the decks | The old drilling tower (derrick), a deck crane, rusty containers, life rings, the crashed balloon |
+| Water | 2 rain water tanks (drink 35). No springs, no river |
+| Food | Fish (fish from the deck edges and gangways), mussels (`mussel_bed` on the legs at the waterline: 2–3 mussels, regrows in 200 turns; 12 food, 2 water, eaten raw), what the explorer brings |
+| Materials | Scrap metal from scrap piles (2–3 each, 19 to 25 piles), wood from wooden pallets (2–3), rope from old fishing nets (1–2), diesel from the old fuel drums (2 each, 3 drums) |
+| Animals | Gulls (cheeky: they snatch food). No wild animals |
+| Camp | The crew cabin (`crew_cabin`) stands on a platform next to the main deck, over a whole gangway: a bed for a full rest (shelter 1, rest 100) and a stove (cook on its cell, `warmthRadius` 0), light 2 cells. It is not a hut: it has no rooms and no map wall |
+| Chests | 6 |
+| Special places | Gangways (`gangway_ns`, `gangway_ew`, `overSea`): walkable over the sea. 2 to 4 of them are broken in the middle: two broken ends (`gangway_end_*`) block the way until the player builds "Mend gangway" (6 scrap) next to one (see 4.8) |
+| Rare material | Diesel, from the old fuel drums |
+| Stars | Treasure hunter (6 chests), Angler (catch 5 fish), Explorer (explore 75% of the decks) |
+
+**Goal: repair the radio and call for help.** The explorer starts on the
+big main deck next to the crashed balloon. The radio room (`radio_hut`)
+stands on the platform furthest away; every gangway into its platform is
+broken. The player gathers scrap, mends the gangways, and repairs the radio
+room in three stages:
+
+1. **Aerial** (8 scrap, 2 rope).
+2. **Generator** (6 scrap, 4 diesel).
+3. **Radio** (4 scrap, 2 rope).
+
+When the radio works, walking into it asks "Call for help?". A voice
+answers. The rig is the last level for now: the end screen shows the stars
+earned, and the player can stay on the rig or start a new island (see 4.12).
 
 ---
 
@@ -1000,7 +1227,7 @@ makes the same island.
 Tiles: `Water`, `Sand`, `Grass`, `Rock` (blocks movement and sight),
 `CaveFloor` and `River` (fresh water: blocks movement, not sight). Island 2
 adds `Scree` and `Snow`, island 3 `Ash` (walkable) and `Lava` (blocks
-movement, not sight). `map.isWet()` is true for sea and river;
+movement, not sight), the oil rig `Deck` and `Helipad` (both walkable). `map.isWet()` is true for sea and river;
 `map.isLand()` is the opposite (lava counts as land). `map.isFlow()` is true
 for river and lava: the bands that a bridge or stepping stones cross.
 
@@ -1159,6 +1386,57 @@ A typical island 3 has about 1,250 sand, 1,150 forest, 580 ash, 290 basalt,
 90 cave floor and 70 to 260 lava cells. Generation takes 0.1 to 0.4
 seconds.
 
+### Island 4: the oil rig
+
+`generateWorld(rng, width, height, 4)` calls `generateRig()` in
+`riggen.ts` (`biome: 'rig'`). The map is all sea, with steel platforms:
+
+1. **Slots.** The platforms sit on a 3 × 3 grid of slots, 18 cells apart
+   across and 15 down (`SLOT_GAP`), round the middle of the map. The middle
+   slot is the main deck. Then the generator adds a random free slot next
+   to one it has, until there are 6 to 8 (`PLATFORMS`). Each new slot is
+   joined to the one it grew from, so the gangways make a tree. Half the
+   time one more gangway between two neighbours makes a loop.
+2. **Platforms.** Rectangles of `Deck` round each slot's middle (moved by
+   up to 1 cell), 7 to 11 cells wide and 5 to 9 high (`HALF`); the main
+   deck is 11 to 13 by 9 to 11 (`MAIN_HALF`).
+3. **Gangways.** Each one runs straight across the sea between two
+   platforms, on a row (or column) inside both of them but not on their
+   corners. Its cells are `gangway_ew` or `gangway_ns` objects on sea cells.
+4. **Where things are.** The radio platform is the one with the most
+   gangways between it and the main deck. The crew platform is next to the
+   main deck (not the radio's). Every gangway into the radio platform is
+   broken; then more, until 2 to 4 are broken (`BROKEN`), but never the
+   crew's. A broken gangway has its two middle cells as broken ends
+   (`gangway_end_e` and `_w`, or `_s` and `_n`).
+5. **Helipad.** On a platform that is not the main deck, the crew's or the
+   radio's, and at least 5 × 5: 3 × 3 `Helipad` cells in its middle.
+6. **Objects** go on free cells inside a platform's edge, not within 2
+   cells of a gangway: on the main deck the derrick (middle), the crashed
+   balloon with the start next to it, a crane, a container, a life ring,
+   fuel drums and a chest; on the crew platform the crew cabin (middle), a
+   water tank, a pallet and a net; on the radio platform the radio room
+   (middle), fuel drums and a chest. Then spread over the platforms: 4 more
+   chests (6 in all), 3 more nets, 1 more fuel drums (3 in all), 1 more
+   water tank (2 in all), 2 pallets, containers and life rings.
+7. **Scrap.** Enough piles for every broken gangway (6 each) and the radio
+   (18), plus 8 spare (`SPARE_SCRAP`), at 2 scrap a pile (the least a pile
+   gives). The first 4 (`START_PILES`) go on platforms the player can reach
+   without mending anything.
+8. **Dock.** The fishing boat wreck goes on a sea cell under the south edge
+   of the crew platform (else the main deck), not under a leg. Scrap for the
+   boat and the derrick is counted in the piles too.
+9. **Mussels.** 8 mussel beds (`MUSSEL_BEDS`) on sea cells under a deck's
+   south edge where a leg stands (`rigLegAt(x)`: every third cell).
+10. **Check.** Every free deck cell must be reachable from the start, with
+   broken gangways counted as mended. Else the generator starts again.
+
+The renderer draws a deck with a yellow and black safety line along each
+side that meets the sea (`deck_n`, `deck_rust_ew`…), and the sea cell under
+a deck's south edge as the platform's face (`deck_side`, or `deck_side_leg`
+with a leg). A typical rig has about 500 deck cells, 50 gangway cells and
+22 scrap piles. Generation takes about 1 ms.
+
 ---
 
 ## 6. Content registries
@@ -1212,13 +1490,16 @@ coconut: { id: 'coconut', eat: { food: 10, water: 18 } },
 | `steep` | A steep step: blocks the way until a recipe with `onto` builds on it (see 4.14). Counts as open for placement checks. |
 | `climb` | A way up a step: stepping onto it costs Energy (see 4.14). |
 | `goal` | The island goal: walking into it gives it materials (see 4.12). |
+| `overSea` | Walkable on sea cells: the gangways of the oil rig. |
+| `broken` | A broken gangway end on a sea cell (`'ns'` or `'ew'`, the way the gangway runs): it blocks the way until "Mend gangway" mends the whole gap (see 4.8). Counts as open for placement checks. |
 | `tidal` | A sandbar on sea cells: walkable at low tide only, `<kind>_wet` sprite at high tide (see 4.16). Counts as open for placement checks. |
 | `done` | A finished goal after `sail()` (the lit beacon, the balloon that flew off): `frames` to show instead, its `lightRadius`, and `icon` for the goal card and end screen when that is not the first frame. |
 
 Also add the kind to the `ObjectKind` type.
 
 To put a new object in the world, add it to `SCATTER` in `worldgen.ts` with
-a chance per biome. Or make it buildable with a recipe.
+a chance per biome (the oil rig places its objects in `riggen.ts` and lists
+them in `RIG_OBJECTS`). Or make it buildable with a recipe.
 
 ### Recipes
 
@@ -1229,8 +1510,8 @@ axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },
 
 A recipe has `builds` (an object) or `makes` (an item for the bag).
 Optional: `skill` (a skill must be learned first), `atFire` (the player
-must be next to a campfire) and `onto` (it builds on this object next to the
-player and replaces it, see 4.8).
+must be next to a campfire) and `onto` (a list of objects: it builds on one
+of them next to the player and replaces it, see 4.8).
 
 ### Skills
 
@@ -1255,15 +1536,15 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin, sulphur (rare goal materials); stone axe, fishing rod, crystal lantern (tools) |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (every island): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope; one on each island), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope), stepping stones (8 stone; over lava) |
+| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin, sulphur, diesel (rare goal materials); scrap metal (rig material); mussels (food: 12 food, 2 water); stone axe, fishing rod, crystal lantern, pack frame (tools). Heavy: wood, logs, stone, scrap, diesel |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, hut frame, store crate, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (islands 1 to 3): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals). Island 4, the oil rig: gangway (2 directions), broken gangway end (4 directions), scrap pile (2–3 scrap), rusty container, fuel drums (2 diesel, then empty), wooden pallet (2–3 wood), old fishing net (1–2 rope), rain water tank (drink 35), mussel bed (2–3 mussels, regrows in 200 turns), life ring, derrick, deck crane, crew cabin (bed and stove), crashed balloon, radio room (site, aerial, power, ready), derrick (broken, then working: 2 diesel, refills in 120 turns), fishing boat (wreck, then repaired: sea chart and hold), supply crate (from the radio, on the helipad) |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope, given in trips to its frame; one on each island), store crate (6 wood, 2 rope; one on each island), pack frame (4 wood, 3 rope; needs the skill), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope), stepping stones (8 stone; over lava), mend gangway (6 scrap; on a broken gangway end), platform (6 scrap, 2 wood; a new deck cell at the crew platform), rain tank (6 scrap), pickaxe, shovel, crowbar, furnace, smelt steel, greenhouse, water maker, fish trap, bigger hold (see 4.24) |
 | Hut rooms | workshop (12 wood, 6 stone, 2 rope), hearth (12 stone, 4 wood), rain barrel (8 wood, 3 rope) (see 4.19) |
-| Skills | Building: fishing rod, handy builder, rope maker, cartographer. Explorer: small sips, small appetite, thick skin, night eyes, sure foot. Improving: green thumb, patient angler, animal friend, wild sense |
-| Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder). 3: repair the hot-air balloon on the crater rim (basket, balloon cloth, burner) |
-| Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound. 3: Treasure hunter, Angler, Explorer (see 4.17) |
+| Skills | Building: fishing rod, handy builder, rope maker, cartographer, pack frame. Explorer: small sips, small appetite, thick skin, night eyes, sure foot, strong back. Improving: green thumb, patient angler, animal friend, wild sense |
+| Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder). 3: repair the hot-air balloon on the crater rim (basket, balloon cloth, burner). 4: repair the radio room on the oil rig (aerial, generator, radio) |
+| Stars | 1: Treasure hunter, Angler, Safe and sound. 2: Treasure hunter, Explorer, Safe and sound. 3 and 4: Treasure hunter, Angler, Explorer (see 4.17) |
 | Dog | A stray dog on each island; adopt it with food. It follows you, barks crabs, monkeys, squirrels and snakes away, and needs food and water (see 4.13) |
-| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves; sleeps by day). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps). Island 3: crab, turtle, monkey, bat, lizard (shy, ash and sand), gull (cheeky, beach); wild: boar, wasps, snake, scorpion (grumpy, ash and caves) |
+| Animals | Island 1: crab, turtle (beach); monkey (forest and beach); piglet (forest); bat (caves); wild: boar, wasps (forest), snake (forest and beach), cave bear (caves; sleeps by day). Island 2: crab, rabbit (shy, forest), squirrel (cheeky, forest), bat; wild: boar, wasps, cave bear, mountain goat (charger, scree and snow; climbs over steps). Island 3: crab, turtle, monkey, bat, lizard (shy, ash and sand), gull (cheeky, beach); wild: boar, wasps, snake, scorpion (grumpy, ash and caves). Island 4: gull (beach and deck) |
 
 ---
 
@@ -1402,8 +1683,21 @@ Auto-walk (travel and hold) stops when:
   (`safeSince`), warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 9. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 9 added the
+- `SAVE_VERSION` is 13. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 13 added
+  `holdUpgrades` and `stocked`; version 12 saves load with 0 and none, and
+  each island gets its workshop resources when the explorer is there.
+  Version 12 added the
+  radio order (`delivery`, `orderDay`); version 11 saves load with none.
+  Version 11 added the
+  kept islands (`islands`: each with its own map, objects, home, goal
+  progress, bear spots, fish and dock), `left` and the boat's `hold`.
+  Version 10 saves load with no kept islands, an empty hold, and `left` set
+  to every island before the current one: those islands are new when the
+  explorer sails there. The save is about 30 KB for each island. Version 10 added what
+  a store crate holds and what a building site got: an object is then
+  `[cell, kind, readyAt or 0, rooms, { store, given }]`. Version 9 saves load
+  as they are. Version 9 added the
   rooms of a hut: an object is `[cell, kind, readyAt or 0, rooms]` when it
   has rooms. Version 8 saves load as they are; their huts have a bed and no
   rooms. Version 8 added
@@ -1442,14 +1736,20 @@ Auto-walk (travel and hold) stops when:
   `Lava` 9) are new numbers, and level 3 is a new value. `SAVE_VERSION`
   stays 9. A save with `sailed` on a level that now has a next level loads
   with `sailed` false (see 4.12).
+- The oil rig (level 4) needs no change to the save shape: its tiles
+  (`Deck` 10, `Helipad` 11) are new numbers, and its gangways and other
+  things are normal objects. `SAVE_VERSION` stays 9. A save that ended on
+  island 3 (`sailed`) loads with `sailed` false, so the ready balloon asks
+  again and flies on to the rig.
 
 **Cheats (preview builds only).** A preview build (`VITE_PREVIEW`) and the
 dev server (`npm run dev`) show a "Cheats (preview only)" button in the Bag
 panel; the published game on `main` does not. The panel (`src/cheats.ts`,
-English only like the other developer tools) can: go to island 1, 2 or 3
+English only like the other developer tools) can: go to island 1, 2, 3 or 4
 (`game.jumpToIsland()`, keeps the bag, XP, skills and dog); go to the island
 goal, the river or lava flow, a steam vent, a hot spring, the sandbar, the
-tar barrels or a deep cave (`game.teleportNear()`; tap again for the next
+tar barrels, a broken gangway, the crew cabin, the fuel drums, the fishing
+boat, the derrick, an ore vein, a clay bank, a sealed crate or a deep cave (`game.teleportNear()`; tap again for the next
 one); give a starter kit, the goal materials for every stage left, or 5 of
 every item; fill all needs; give 50 XP; reveal the map
 (`game.revealMap()`); and skip to 7:00, 12:00 or 22:00
@@ -1483,7 +1783,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable; island 3: ash, basalt and lava, reach with stepping stones, the balloon on the crater rim, vents and hot springs, volcano edges drawable), the island goal (stages, many trips, sailing to island 2, the beacon, on to island 3, old saves that lit the beacon), snow cold, island 3 (lava blocks, stepping stones, hot ash, hot springs, steam vents and sulphur, the balloon and the flight, lava light, saves), steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable; island 3: ash, basalt and lava, reach with stepping stones, the balloon on the crater rim, vents and hot springs, volcano edges drawable; the oil rig: its platforms, the radio behind a broken gangway, enough scrap), the island goal (stages, many trips, sailing to island 2, the beacon, on to island 3, old saves that lit the beacon), snow cold, island 3 (lava blocks, stepping stones, hot ash, hot springs, steam vents and sulphur, the balloon and the flight to the rig, lava light, saves), the oil rig (gangways, mending a broken gangway, tanks, mussels, pallets, nets, diesel, the crew cabin, the radio stages and the end, old saves that ended on island 3, saves), steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the carry limit (load, skills, pack frame, full bag, the store crate, the hut frame in trips, saves), the fishing boat (the dock, repairing the derrick and the boat, diesel, voyages, the hold, kept islands, used goals, saves), the rig workshop (resources on the islands once, old saves, tools, rig-only buildings, smelting, greenhouse, water maker, fish trap, the bigger hold), the radio and platforms (orders, delivery on the helipad, one each day, waiting while away, the supply crate, new deck cells and their limits, the rain tank, saves), the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each set of hut rooms has its hut sprites (both smoke frames), and each room its inside sprite. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching, cave signs |
@@ -1517,7 +1817,9 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Longest sleep | `game.ts` → `SLEEP_LIMIT` | 200 turns |
 | Rest limits | `game.ts` → `OPEN_REST`, `CAVE_REST`; `objects.ts` → `rest` | 50, 60; lean-to 75, hut 100 |
 | Healing asleep in a hut | `game.ts` → `BED_HEAL`, `HEARTH_HEAL` | ×2, ×3 |
-| Hut cost, room costs | `recipes.ts` → `hut`; `rooms.ts` → `ROOMS` | see 4.19 |
+| Hut cost, room costs | `recipes.ts` → `hut` (`siteCost`); `rooms.ts` → `ROOMS` | see 4.19 |
+| Carry limit | `game.ts` → `BAG_LOAD`, `STRONG_BACK_LOAD`, `PACK_FRAME_LOAD`; `items.ts` → `heavy` | 30; +10; +15 |
+| Store crate, pack frame | `recipes.ts` → `store_crate`, `pack_frame` | 6 wood, 2 rope; 4 wood, 3 rope |
 | Workbench rope, barrel drink, hearth light | `game.ts` → `WORKSHOP_ROPE`, `BARREL_DRINK`, `HEARTH_LIGHT` | +1 rope, 35, 2 cells |
 | Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 104 × 80 |
 | Region sizes | `worldgen.ts` → `HOME_SHARE`, `FOREST_SHARE`, `MIN_FAR_SHARE` | 0.38, 0.7, 0.15 |
@@ -1530,6 +1832,14 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Ash heat, lava light | `game.ts` → `ASH_HEAT`, `LAVA_LIGHT` | Water up to ×1.5 by day; 1 cell |
 | Island 3 forest line, crater | `worldgen.ts` → `VOLCANO_FOREST_LINE`, `CRATER_LINE` | 0.55, 0.98 |
 | Island 3 water and vents | `worldgen.ts` → `SPRINGS_ON`, `HOT_SPRINGS`, `HOT_SPRING_GAP`, `VENTS`, `VENT_GAP` | 4 springs; 3 hot springs 8 apart; 3 vents 3 apart |
+| Oil rig layout | `riggen.ts` → `SLOT_GAP`, `PLATFORMS`, `MAIN_HALF`, `HALF`, `BROKEN` | slots 18 × 15 apart; 6–8 platforms; half sizes 5–6 × 4–5 (main), 3–5 × 2–4; 2–4 broken gangways |
+| Oil rig things | `riggen.ts` → `SPARE_SCRAP`, `START_PILES`, `CHESTS`, `NETS`, `DRUMS`, `TANKS`, `MUSSEL_BEDS`, `RIG_LEG_EVERY` | 8 spare scrap; 4 piles in reach at the start; 6 chests, 4 nets, 3 fuel drums, 2 tanks, 8 mussel beds; a leg every 3 cells |
+| Mend gangway | `recipes.ts` → `gangway` | 6 scrap |
+| Fishing boat, derrick | `objects.ts` → `siteCost` of `fishing_boat_wreck`, `derrick`; `derrick_working` regrow | 10 scrap, 6 wood, 4 rope; 12 scrap, 2 rope; 2 diesel every 120 turns |
+| Voyages and hold | `game.ts` → `VOYAGE_TURNS`, `VOYAGE_DIESEL`, `HOLD_LOAD` | 60 turns, 2 diesel; 60 heavy things |
+| Radio orders | `game.ts` → `RADIO_ORDERS`, `DELIVERY_TURNS` | 3 crates, one each day; 20 turns |
+| New platforms | `recipes.ts` → `platform`, `rain_tank`; `game.ts` → `PLATFORM_RANGE` | 6 scrap, 2 wood; 6 scrap; 6 cells from the cabin |
+| Rig workshop | `recipes.ts` → tools and buildings; `game.ts` → `WORKSHOP_STOCK`, `CRATE_DISTANCE`, `HOLD_UPGRADE`, `HOLD_UPGRADES` | see 4.24 |
 | Climb cost | `game.ts` → `CLIMB_ENERGY` | 2 Energy |
 | Rings of steps round the goal | `worldgen.ts` → `LEDGE_RING`, `ICE_RING` | 6–10 and 3–4 cells of walking |
 | Dog hunger, thirst | `game.ts` → `DOG_HUNGER`, `DOG_THIRST` | 0.3, 0.35 per turn |
@@ -1576,8 +1886,18 @@ Also run `npm run build` (typecheck and build) before you commit.
   while it walks.
 - Only one dog: after the first is adopted, no other stray dog appears.
 - Objects that are removed (logs, pebbles, mushrooms) do not come back.
-- Three levels exist. After the balloon on island 3, the game ends: the
-  player stays on the island or starts a new one.
+- Four levels exist. After the radio on the oil rig (island 4), the end
+  screen shows; the player can stay and go on (boat trips, the derrick).
+  The helicopter of a supply drop is only a show: the crate is on the pad at
+  once (the renderer hides it until the helicopter lets go).
+- Rigs from saves before the fishing boat have no boat wreck: their player
+  cannot sail.
+- The crew cabin shows its rooms only inside (in the Hut panel), not on the
+  cabin outside.
+- A deck's safety line also runs across the end of a gangway.
+- The derrick is 32 × 48 pixels and the fishing boat 48 × 28, larger than
+  other tall sprites (24 × 32). The boat covers part of the explorer when they
+  stand on the land cell above it.
 - The crater lake and the lava flow repeat the same lava pattern, so a big
   lake looks a little like a grid.
 - Lava stepping stones have no edge drawing of their own: lava shows round

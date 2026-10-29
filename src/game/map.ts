@@ -15,6 +15,10 @@ export const Tile = {
   Ash: 8,
   /** Island 3: molten rock (the lava flow and the crater lake). Blocks movement; stepping stones cross the flow. */
   Lava: 9,
+  /** Island 4: the steel deck of the old oil rig. Walkable. */
+  Deck: 10,
+  /** Island 4: the painted landing circle on a deck. Walkable, like the deck. */
+  Helipad: 11,
 } as const;
 export type Tile = (typeof Tile)[keyof typeof Tile];
 
@@ -22,6 +26,8 @@ export class GameMap {
   readonly width: number;
   readonly height: number;
   readonly tiles: Uint8Array;
+  /** Goes up when a tile changes during play (a new platform), so drawings of the tiles are made again. */
+  version = 0;
   /** Cells the player has ever seen. */
   readonly explored: Uint8Array;
   /** Cells the player can see this turn. */
@@ -51,6 +57,12 @@ export class GameMap {
     if (this.inBounds(x, y)) this.tiles[this.idx(x, y)] = tile;
   }
 
+  /** Change a tile during play: the renderer draws the terrain again. */
+  change(x: number, y: number, tile: Tile): void {
+    this.set(x, y, tile);
+    this.version++;
+  }
+
   /** Anything that isn't sea or river (rock and lava count as land). */
   isLand(x: number, y: number): boolean {
     return !this.isWet(x, y);
@@ -70,7 +82,7 @@ export class GameMap {
   /** Ground you can stand on, ignoring objects. */
   isFloor(x: number, y: number): boolean {
     const t = this.get(x, y);
-    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow || t === Tile.Ash;
+    return t === Tile.Sand || t === Tile.Grass || t === Tile.CaveFloor || t === Tile.Scree || t === Tile.Snow || t === Tile.Ash || t === Tile.Deck || t === Tile.Helipad;
   }
 
   isOpaque(x: number, y: number): boolean {

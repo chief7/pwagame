@@ -2,6 +2,7 @@ import { levelDef } from '../game/defs/levels';
 import { OBJECTS } from '../game/defs/objects';
 import type { Game } from '../game/game';
 import { Tile, type GameMap } from '../game/map';
+import { rigLegAt } from '../game/riggen';
 import { hash2 } from '../sprites/pixel';
 import { bake, buildSprites, edgeTileName, mixedTile, type Sprite } from '../sprites';
 import { characterName, fishingName } from '../sprites/characters';
@@ -43,6 +44,10 @@ const WATER_TILES = ['water', 'water_2', 'water_3'];
 const RIVER_TILES = ['river', 'river_2'];
 const LAVA_TILES = ['lava', 'lava_2'];
 const FIRE_FRAME_MS = 220;
+/** The helicopter flies in from this many cells to the side, hovers this high above the pad, and lets the crate go at this share of its flight. */
+const HELI_FLIGHT = 14;
+const HELI_HEIGHT = 3;
+const DROP_LET_GO = 0.55;
 /** Animals that flutter along with a little hop; the others walk with step frames. */
 const FLYERS = new Set(['bat', 'wasps']);
 /** Night tint; its alpha comes from how dark a cell is. */
@@ -78,7 +83,7 @@ export class Renderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly sprites = new Map<string, Baked>();
   /** Terrain sprite per cell, worked out once per island ('~' is animated sea, '≈' the river). */
-  private readonly terrain = new WeakMap<GameMap, string[]>();
+  private readonly terrain = new WeakMap<GameMap, { version: number; names: string[] }>();
   private scale = 2;
   private dpr = 1;
   body: Body = 'male';
@@ -264,8 +269,10 @@ export class Renderer {
         if (!map.isExplored(x, y)) continue;
         const obj = game.objectAt(x, y);
         if (!obj || (trip && trip.x === x && trip.y === y)) continue;
+        // A dropped crate hangs under the helicopter until it lets go.
+        if (anim.drops.some((d) => d.x === x && d.y === y && (now - d.start) / anim.dropMs < DROP_LET_GO)) continue;
         const def = OBJECTS[obj.kind];
-        const frames = game.sailed && def.done ? def.done.frames : def.frames;
+        const frames = game.goalUsed && def.done ? def.done.frames : def.frames;
         // A picked plant shows its bare sprite, not its animation (picked glowcaps don't glow).
         const regrowing = obj.readyAt !== undefined && obj.readyAt > game.turn;
         const name = frames && !regrowing ? frames[fireFrame % frames.length] : game.objectSprite(obj, fireFrame);
@@ -285,6 +292,7 @@ export class Renderer {
     }
 
     this.drawNight(game, o, x0, y0, x1, y1, playerPose);
+    this.drawHelicopters(anim, o, now, fireFrame);
 
     // Remembered cells dim; unknown cells stay hidden, even under overhanging crowns.
     for (let y = y0; y <= y1; y++) {
@@ -338,6 +346,31 @@ export class Renderer {
         ctx.fillStyle = `rgba(${NIGHT_RGB}, ${dark.toFixed(3)})`;
         ctx.fillRect(o.x + x * cell, o.y + y * cell, cell, cell);
       }
+    }
+  }
+
+  /**
+   * The helicopter flies in from the left, hovers over the helipad while the
+   * crate hangs below it, lets go, and flies off to the right.
+   */
+  private drawHelicopters(anim: Animator, o: { x: number; y: number }, now: number, frame: number): void {
+    const { cell } = this;
+    for (const d of anim.drops) {
+      const p = (now - d.start) / anim.dropMs;
+      if (p < 0 || p >= 1) continue;
+      const ease = (t: number) => t * t * (3 - 2 * t);
+      const dx = p < 0.35 ? -HELI_FLIGHT * (1 - ease(p / 0.35)) : p > 0.65 ? HELI_FLIGHT * ease((p - 0.65) / 0.35) : 0;
+      const hx = Math.round(o.x + (d.x + dx) * cell);
+      const hy = Math.round(o.y + (d.y - HELI_HEIGHT) * cell);
+      if (p < DROP_LET_GO) {
+        // The crate on its rope, coming down as the helicopter hovers.
+        const lower = p < 0.35 ? 0 : Math.min(1, (p - 0.35) / (DROP_LET_GO - 0.35));
+        const cy = Math.round(o.y + (d.y - HELI_HEIGHT + 1 + lower * (HELI_HEIGHT - 1)) * cell);
+        this.ctx.fillStyle = '#3a2a1a';
+        this.ctx.fillRect(hx + cell / 2 - this.scale / 2, hy + cell - 2 * this.scale, this.scale, cy - hy - cell / 2);
+        this.drawStanding('supply_crate', hx, cy);
+      }
+      this.drawStanding(`helicopter${frame % 2 ? '_2' : ''}`, hx, hy);
     }
   }
 
@@ -456,15 +489,15 @@ export class Renderer {
   }
 
   private terrainFor(map: GameMap, volcano: boolean): string[] {
-    let names = this.terrain.get(map);
-    if (names) return names;
-    names = [];
+    const cached = this.terrain.get(map);
+    if (cached && cached.version === map.version) return cached.names;
+    const names: string[] = [];
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
         names.push(this.terrainName(map, x, y, volcano));
       }
     }
-    this.terrain.set(map, names);
+    this.terrain.set(map, { version: map.version, names });
     return names;
   }
 
@@ -472,7 +505,22 @@ export class Renderer {
     const roll = hash2(x, y, 52);
     switch (map.get(x, y)) {
       case Tile.Water:
+        // Under the south edge of a rig platform: its steel face, sometimes with a leg.
+        if (isDeck(map, x, y - 1)) return rigLegAt(x) ? 'deck_side_leg' : 'deck_side';
         return '~';
+      case Tile.Deck: {
+        // A safety line along the sides that meet the sea.
+        const sides = ([['n', 0, -1], ['e', 1, 0], ['w', -1, 0]] as const).filter(([, dx, dy]) => !isDeck(map, x + dx, y + dy)).map(([s]) => s).join('');
+        return `deck${roll < 0.12 ? '_rust' : ''}${sides ? `_${sides}` : ''}`;
+      }
+      case Tile.Helipad: {
+        // The landing circle is 3 × 3 cells: find this cell's place in it.
+        let dx = 0;
+        let dy = 0;
+        while (dx < 2 && map.get(x - dx - 1, y) === Tile.Helipad) dx++;
+        while (dy < 2 && map.get(x, y - dy - 1) === Tile.Helipad) dy++;
+        return `helipad_${dy * 3 + dx}`;
+      }
       case Tile.River:
         return edgeTileName('river', '≈', (dx, dy) => (map.get(x + dx, y + dy) === Tile.Water ? 'w' : '.'));
       case Tile.Lava:
@@ -508,4 +556,10 @@ export class Renderer {
         });
     }
   }
+}
+
+/** A rig deck (the helipad is a deck too). */
+function isDeck(map: GameMap, x: number, y: number): boolean {
+  const t = map.get(x, y);
+  return t === Tile.Deck || t === Tile.Helipad;
 }

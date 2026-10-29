@@ -1,6 +1,6 @@
 import { facingDelta, facingFor, PLAYER_ID, type Animal, type Dog, type Player } from './actors';
 import { CAVE_FLOOR, caveMask, findCaves, type Cave } from './caves';
-import { daylight, isLowTide, isNight, minuteOfDay, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
+import { daylight, dayNumber, isLowTide, isNight, minuteOfDay, nextLowTide, phase, turnsUntilMorning, TURNS_PER_DAY } from './clock';
 import { ANIMALS, islandAnimals, type AnimalKind } from './defs/animals';
 import { ITEMS, type ItemId } from './defs/items';
 import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId, type StarId } from './defs/levels';
@@ -103,7 +103,44 @@ const STAR_FISH = 5;
 const STAR_EXPLORE = 0.75;
 const STAR_SAFE_DAYS = 3;
 const STAR_XP = 5;
-export const SAVE_VERSION = 9;
+/** How many heavy things the bag holds, and how many more with Strong back and with the pack frame. */
+export const BAG_LOAD = 30;
+export const STRONG_BACK_LOAD = 10;
+export const PACK_FRAME_LOAD = 15;
+/** How many heavy things the fishing boat's hold carries. */
+export const HOLD_LOAD = 60;
+/** A boat trip between the rig and an island: how long it takes (6 hours), and the diesel it burns. */
+export const VOYAGE_TURNS = 60;
+export const VOYAGE_DIESEL = 2;
+/** What the radio can order: a crate the helicopter drops on the helipad, one each day. */
+export type OrderId = 'food' | 'build' | 'fuel';
+export const RADIO_ORDERS: Record<OrderId, Partial<Record<ItemId, number>>> = {
+  food: { cooked_fish: 3, coconut: 4, apple: 3 },
+  build: { log: 10, wood: 6, leaves: 12, stone: 6 },
+  fuel: { diesel: 4, rope: 4 },
+};
+export const ORDER_IDS = Object.keys(RADIO_ORDERS) as OrderId[];
+/** How long after an order the helicopter comes (2 hours). */
+export const DELIVERY_TURNS = 20;
+/** A new platform cell must be this close to the crew cabin. */
+export const PLATFORM_RANGE = 6;
+/** The bigger hold: 30 more heavy things each time, at most two times. */
+export const HOLD_UPGRADE = 30;
+export const HOLD_UPGRADES = 2;
+/**
+ * What the rig's tools find on the islands, placed when the explorer first
+ * comes to an island (also one from before the rig): ore veins on scree by
+ * the cliffs of island 2, clay banks by the river of island 1, and sealed
+ * crates on islands 1 to 3, far from home.
+ */
+export const WORKSHOP_STOCK: Partial<Record<LevelId, [ObjectKind, number][]>> = {
+  1: [['clay_bank', 6], ['sealed_crate', 4]],
+  2: [['ore_vein', 8], ['sealed_crate', 4]],
+  3: [['sealed_crate', 4]],
+};
+/** Sealed crates are at least this far from home. */
+const CRATE_DISTANCE = 12;
+export const SAVE_VERSION = 13;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -115,6 +152,17 @@ export interface LogEntry {
 export type TravelResult = 'moved' | 'arrived' | 'blocked';
 
 type Items = Partial<Record<ItemId, number>>;
+
+/** The camp of an island: the hut, or the crew cabin on the oil rig. Both have a bed, rooms and a map wall. */
+export function isCamp(kind: ObjectKind): boolean {
+  return kind === 'hut' || kind === 'crew_cabin';
+}
+
+/** What a store crate holds, and what a building site already got (in the save). */
+export interface ObjectStock {
+  store?: Items;
+  given?: Items;
+}
 
 /** How far the island's goal has come, for the goal card in the Build panel. */
 export type GoalState =
@@ -146,12 +194,87 @@ export type GameEvent = { late: boolean } & (
   | { type: 'hit'; id: number; x: number; y: number; damage: number }
   | { type: 'float'; x: number; y: number; amount: number; what: FloatWhat; tone: Tone }
   | { type: 'sparkle'; x: number; y: number }
+  /** The helicopter flies over the rig and drops a supply crate at (x, y). */
+  | { type: 'drop'; x: number; y: number }
   | { type: 'fade' }
 );
 type EventData = GameEvent extends infer E ? (E extends GameEvent ? Omit<E, 'late'> : never) : never;
 
 /** Needs that get a warning when they run low. */
 const WARN_NEEDS = ['food', 'water', 'energy', 'warmth'] as const;
+
+/** An island the explorer is not on, as they left it. */
+interface Island {
+  level: LevelId;
+  map: GameMap;
+  objects: Map<number, WorldObject>;
+  home: { x: number; y: number };
+  goalGiven: Items;
+  bearSpots: number[];
+  fishHere: number;
+  /** The sea cell where the fishing boat lay when the explorer sailed off. */
+  dock?: number;
+}
+
+/** An island in the save: its map as text, like the island the explorer is on. */
+export interface SavedIsland {
+  level: LevelId;
+  width: number;
+  height: number;
+  tiles: string;
+  explored: string;
+  objects: SavedObject[];
+  home: { x: number; y: number };
+  goalGiven: Items;
+  bearSpots: number[];
+  fishHere: number;
+  dock?: number;
+}
+
+/** Cell, kind, then the turn it regrows (0: none), a hut's rooms, and what a store or site holds. */
+type SavedObject = [number, ObjectKind, number?, RoomId[]?, ObjectStock?];
+
+function saveObjects(objects: Map<number, WorldObject>): SavedObject[] {
+  return [...objects].map(([i, o]): SavedObject => {
+    if (o.store || o.given) {
+      const stock: ObjectStock = {};
+      if (o.store) stock.store = { ...o.store };
+      if (o.given) stock.given = { ...o.given };
+      return [i, o.kind, o.readyAt ?? 0, [...(o.rooms ?? [])], stock];
+    }
+    if (o.rooms?.length) return [i, o.kind, o.readyAt ?? 0, [...o.rooms]];
+    return o.readyAt ? [i, o.kind, o.readyAt] : [i, o.kind];
+  });
+}
+
+function loadObjects(saved: SavedObject[]): Map<number, WorldObject> {
+  return new Map(saved.map(([i, kind, readyAt, rooms, stock]) => {
+    const obj: WorldObject = { kind };
+    if (readyAt) obj.readyAt = readyAt;
+    if (rooms?.length) obj.rooms = rooms;
+    if (stock?.store) obj.store = stock.store;
+    if (stock?.given) obj.given = stock.given;
+    return [i, obj];
+  }));
+}
+
+function saveMap(map: GameMap): { width: number; height: number; tiles: string; explored: string } {
+  return {
+    width: map.width,
+    height: map.height,
+    tiles: String.fromCharCode(...map.tiles.map((t) => t + 48)),
+    explored: Array.from(map.explored, (e) => (e ? '1' : '0')).join(''),
+  };
+}
+
+function loadMap(saved: { width: number; height: number; tiles: string; explored: string }): GameMap {
+  const map = new GameMap(saved.width, saved.height);
+  for (let i = 0; i < map.tiles.length; i++) {
+    map.tiles[i] = saved.tiles.charCodeAt(i) - 48;
+    map.explored[i] = saved.explored.charCodeAt(i) === 49 ? 1 : 0;
+  }
+  return map;
+}
 
 export interface SaveData {
   v: number;
@@ -163,8 +286,11 @@ export interface SaveData {
   height: number;
   tiles: string;
   explored: string;
-  /** Cell, kind, then the turn it regrows (0: none) and a hut's rooms, when there are any. */
-  objects: [number, ObjectKind, number?, RoomId[]?][];
+  /**
+   * Cell, kind, then the turn it regrows (0: none) and a hut's rooms, when
+   * there are any, then what a store crate holds and a building site got.
+   */
+  objects: SavedObject[];
   animals: Animal[];
   player: Player;
   home: { x: number; y: number };
@@ -188,6 +314,19 @@ export interface SaveData {
   safeSince: number;
   warned: NeedId[];
   log: LogEntry[];
+  /** The other islands the explorer has been to (not the one they are on). */
+  islands: SavedIsland[];
+  /** Islands the explorer left on their goal. */
+  left: LevelId[];
+  /** What the fishing boat's hold carries. */
+  hold: Items;
+  /** The crate ordered on the radio and the turn it comes, and the day of the last order. */
+  delivery: { order: OrderId; at: number } | null;
+  orderDay: number;
+  /** How often the boat's hold was made bigger. */
+  holdUpgrades: number;
+  /** Islands that got their ore veins, clay banks and sealed crates. */
+  stocked: LevelId[];
 }
 
 export class Game {
@@ -207,8 +346,22 @@ export class Game {
   skills = new Set<SkillId>();
   level: LevelId = 1;
   goalGiven: Items = {};
-  /** The explorer left the island on the finished goal. */
+  /** The explorer used the last island's goal (called for help on the rig's radio). */
   sailed = false;
+  /** Islands the explorer left on their goal: those goals are used up. */
+  left = new Set<LevelId>();
+  /** What the fishing boat's hold carries; it goes wherever the boat goes. */
+  hold: Items = {};
+  /** The other islands the explorer has been to, as they left them. */
+  private islands = new Map<LevelId, Island>();
+  /** The crate ordered on the radio, and the turn the helicopter brings it. */
+  delivery: { order: OrderId; at: number } | null = null;
+  /** The day of the last order (0: none yet). */
+  orderDay = 0;
+  /** How often the boat's hold was made bigger (see HOLD_UPGRADE). */
+  holdUpgrades = 0;
+  /** Islands that got their ore veins, clay banks and sealed crates. */
+  private stocked = new Set<LevelId>();
   /** The adopted dog, or null before you find one. */
   dog: Dog | null = null;
   /** Cells where the explorer saw a cave bear on this island, at least BEAR_SPOT_GAP apart. */
@@ -228,6 +381,12 @@ export class Game {
   private sailAsked = false;
   /** The explorer walked into the hut: the UI shows its inside. */
   private hutAsked = false;
+  /** The explorer walked into a store crate: the UI shows the Store panel. */
+  private storeAsked = false;
+  /** The explorer walked into the fishing boat: the UI shows the sea chart and the hold. */
+  private chartAsked = false;
+  /** The explorer walked into the working radio after calling for help: the UI shows the Radio panel. */
+  private radioAsked = false;
   /** climberDist() of this turn. */
   private climbDist: { turn: number; dist: Int32Array } | null = null;
   /** The deep caves of this map (found from its tiles, which never change). */
@@ -239,17 +398,26 @@ export class Game {
     this.rng = new Rng(seed);
     if (save) {
       this.rng.state32 = save.rng;
-      this.map = new GameMap(save.width, save.height);
-      for (let i = 0; i < this.map.tiles.length; i++) {
-        this.map.tiles[i] = save.tiles.charCodeAt(i) - 48;
-        this.map.explored[i] = save.explored.charCodeAt(i) === 49 ? 1 : 0;
+      this.map = loadMap(save);
+      this.objects = loadObjects(save.objects);
+      for (const island of save.islands) {
+        this.islands.set(island.level, {
+          level: island.level,
+          map: loadMap(island),
+          objects: loadObjects(island.objects),
+          home: island.home,
+          goalGiven: island.goalGiven,
+          bearSpots: island.bearSpots,
+          fishHere: island.fishHere,
+          dock: island.dock,
+        });
       }
-      this.objects = new Map(save.objects.map(([i, kind, readyAt, rooms]) => {
-        const obj: WorldObject = { kind };
-        if (readyAt) obj.readyAt = readyAt;
-        if (rooms?.length) obj.rooms = rooms;
-        return [i, obj];
-      }));
+      this.left = new Set(save.left);
+      this.hold = save.hold;
+      this.delivery = save.delivery;
+      this.orderDay = save.orderDay;
+      this.holdUpgrades = save.holdUpgrades;
+      this.stocked = new Set(save.stocked);
       this.animals = save.animals;
       this.player = save.player;
       this.home = save.home;
@@ -277,9 +445,11 @@ export class Game {
       this.player = { id: PLAYER_ID, x: world.start.x, y: world.start.y, facing: 'down' };
       this.home = { ...world.start };
       this.inventory.add('coconut', 2);
+      this.stockIsland();
       this.populate();
       this.message({ key: 'arrive' }, 'info');
     }
+    if (save) this.stockIsland();
     this.updateFov();
   }
 
@@ -410,7 +580,11 @@ export class Game {
   isPassable(x: number, y: number): boolean {
     const obj = this.objectAt(x, y);
     if (this.map.isFlow(x, y)) return !!obj && !!OBJECTS[obj.kind].bridge;
-    if (this.map.get(x, y) === Tile.Water) return !!obj && !!OBJECTS[obj.kind].tidal && this.lowTide;
+    if (this.map.get(x, y) === Tile.Water) {
+      if (!obj) return false;
+      const def = OBJECTS[obj.kind];
+      return def.tidal ? this.lowTide : !!def.overSea;
+    }
     if (!this.map.isFloor(x, y)) return false;
     return !obj || !!OBJECTS[obj.kind].walkable;
   }
@@ -427,7 +601,7 @@ export class Game {
   /** The hut the explorer is in, or null. */
   hutHere(): WorldObject | null {
     const obj = this.objectAt(this.player.x, this.player.y);
-    return obj?.kind === 'hut' ? obj : null;
+    return obj && isCamp(obj.kind) ? obj : null;
   }
 
   /** The explorer is in a hut that has this room. */
@@ -435,10 +609,41 @@ export class Game {
     return !!this.hutHere()?.rooms?.includes(id);
   }
 
-  /** This island already has a hut (the camp): there is only one. */
+  /** This island already has a hut (the camp), or its building site: there is only one. */
   hasHut(): boolean {
-    for (const obj of this.objects.values()) if (obj.kind === 'hut') return true;
+    for (const obj of this.objects.values()) if (isCamp(obj.kind) || obj.kind === 'hut_site') return true;
     return false;
+  }
+
+  /** This island already has a store crate: there is only one. */
+  hasStore(): boolean {
+    for (const obj of this.objects.values()) if (OBJECTS[obj.kind].store && !OBJECTS[obj.kind].dropped) return true;
+    return false;
+  }
+
+  /** The cell of the store (a store crate or a dropped supply crate) next to the explorer, or -1. */
+  private storeCell(): number {
+    for (const [dx, dy] of DIRS) {
+      const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
+      if (obj && OBJECTS[obj.kind].store) return this.map.idx(this.player.x + dx, this.player.y + dy);
+    }
+    return -1;
+  }
+
+  /** The store next to the explorer, or null. */
+  storeNear(): WorldObject | null {
+    const i = this.storeCell();
+    return i < 0 ? null : this.objects.get(i)!;
+  }
+
+  /** How many heavy things the explorer carries (see ITEMS `heavy`). */
+  get load(): number {
+    return this.inventory.entries().reduce((sum, [id, n]) => sum + (ITEMS[id].heavy ? n : 0), 0);
+  }
+
+  /** How many heavy things the bag holds: more with Strong back and with the pack frame. */
+  get loadLimit(): number {
+    return BAG_LOAD + (this.has('strong_back') ? STRONG_BACK_LOAD : 0) + (this.inventory.count('pack_frame') > 0 ? PACK_FRAME_LOAD : 0);
   }
 
   /** The most Energy a sleep at (x, y) gives: only the bed in a hut gives a full rest. */
@@ -489,7 +694,7 @@ export class Game {
     for (const [i, obj] of this.objects) {
       const def = OBJECTS[obj.kind];
       if (obj.readyAt !== undefined && obj.readyAt > this.turn) continue;
-      const r = this.sailed && def.done ? def.done.lightRadius : obj.rooms?.includes('hearth') ? HEARTH_LIGHT : def.lightRadius;
+      const r = this.goalUsed && def.done ? def.done.lightRadius : obj.rooms?.includes('hearth') ? HEARTH_LIGHT : def.lightRadius;
       if (r) out.push([i % this.map.width, Math.floor(i / this.map.width), r]);
     }
     return out;
@@ -505,6 +710,49 @@ export class Game {
       this.lavaCache = { map: this.map, cells };
     }
     return [...this.lavaCache.cells];
+  }
+
+  /** A furnace stands next to the explorer (for smelting). */
+  nearFurnace(): boolean {
+    return DIRS.some(([dx, dy]) => {
+      const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
+      return !!obj && !!OBJECTS[obj.kind].furnace;
+    });
+  }
+
+  /**
+   * Put what the rig's tools find on this island (see WORKSHOP_STOCK), the
+   * first time the explorer is here. Nothing may cut off part of the island.
+   */
+  private stockIsland(): void {
+    const stock = WORKSHOP_STOCK[this.level];
+    if (!stock || this.stocked.has(this.level)) return;
+    this.stocked.add(this.level);
+    const { map } = this;
+    const w = map.width;
+    const near = (x: number, y: number, tile: Tile) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.get(x + dx, y + dy) === tile);
+    const fits: Partial<Record<ObjectKind, (x: number, y: number) => boolean>> = {
+      ore_vein: (x, y) => map.get(x, y) === Tile.Scree && near(x, y, Tile.Rock),
+      clay_bank: (x, y) => (map.get(x, y) === Tile.Grass || map.get(x, y) === Tile.Sand) && near(x, y, Tile.River),
+      sealed_crate: (x, y) => map.isFloor(x, y) && map.get(x, y) !== Tile.CaveFloor &&
+        Math.max(Math.abs(x - this.home.x), Math.abs(y - this.home.y)) >= CRATE_DISTANCE,
+    };
+    for (const [kind, count] of stock) {
+      const fit = fits[kind]!;
+      const cells: number[] = [];
+      for (let i = 0; i < map.tiles.length; i++) {
+        const x = i % w;
+        const y = (i - x) / w;
+        if (!this.objects.has(i) && fit(x, y) && !this.animalAt(x, y) && !(x === this.player.x && y === this.player.y)) cells.push(i);
+      }
+      let placed = 0;
+      for (const i of this.rng.shuffle(cells)) {
+        if (placed >= count) break;
+        this.objects.set(i, { kind });
+        if (this.allReachableFrom(this.home.x, this.home.y)) placed++;
+        else this.objects.delete(i);
+      }
+    }
   }
 
   nearFire(x: number, y: number): boolean {
@@ -588,6 +836,11 @@ export class Game {
     return this.withSkills(RECIPES[id].cost);
   }
 
+  /** What a building site of this recipe takes, in trips (Handy builder works here too). */
+  siteCost(id: RecipeId): Items {
+    return this.withSkills(RECIPES[id].siteCost ?? {});
+  }
+
   /** What a hut room costs the explorer now (Handy builder works here too). */
   roomCost(id: RoomId): Items {
     return this.withSkills(ROOMS[id].cost);
@@ -620,16 +873,22 @@ export class Game {
   buildProblem(id: RecipeId): Msg | null {
     const recipe = RECIPES[id];
     if (recipe.skill && !this.has(recipe.skill)) return { key: 'needSkill', skill: recipe.skill };
-    if ('builds' in recipe && recipe.builds === 'hut' && this.hasHut()) return { key: 'oneHut' };
+    if ('builds' in recipe && (recipe.builds === 'hut' || recipe.builds === 'hut_site') && this.hasHut()) return { key: 'oneHut' };
+    if ('builds' in recipe && OBJECTS[recipe.builds].store && this.hasStore()) return { key: 'oneStore' };
     if ('makes' in recipe && ITEMS[recipe.makes].tool && this.inventory.count(recipe.makes) > 0) {
       return { key: 'haveTool', item: recipe.makes };
     }
+    if (recipe.rigOnly && levelDef(this.level).biome !== 'rig') return { key: 'rigOnly' };
+    if ('builds' in recipe && OBJECTS[recipe.builds].holdUpgrade && this.holdUpgrades >= HOLD_UPGRADES) return { key: 'holdMax' };
     if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
+    if (recipe.atFurnace && !this.nearFurnace()) return { key: 'needFurnace' };
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
-      if (recipe.onto) return { key: 'noStep', obj: recipe.onto };
+      if (recipe.onto) return { key: 'noStep', obj: recipe.onto[0] };
       const built = OBJECTS[recipe.builds];
-      return built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
+      if (built.holdUpgrade) return { key: 'noBoat' };
+      if (built.onSea) return { key: 'noSeaSpot' };
+      return built.deck ? { key: 'noDeckSpot' } : built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
     return null;
   }
@@ -640,8 +899,13 @@ export class Game {
     return -1;
   }
 
+  /** This island's goal is used: the explorer left on it, or called for help on the last one. */
+  get goalUsed(): boolean {
+    return this.left.has(this.level) || (this.sailed && !nextLevel(this.level));
+  }
+
   goal(): GoalState {
-    if (this.sailed) return { state: 'sailed' };
+    if (this.goalUsed) return { state: 'sailed' };
     const i = this.goalCell();
     if (i < 0) return { state: 'missing' };
     if (!this.map.explored[i]) return { state: 'find' };
@@ -764,8 +1028,8 @@ export class Game {
     const inCave = this.inCave(p.x, p.y);
     p.x = nx;
     p.y = ny;
-    if (obj?.kind === 'hut') {
-      this.message({ key: 'enterHut' }, 'info');
+    if (obj && isCamp(obj.kind)) {
+      this.message(obj.kind === 'hut' ? { key: 'enterHut' } : { key: 'enterHut', obj: obj.kind }, 'info');
       this.hutAsked = true;
     } else if (obj && OBJECTS[obj.kind].shelter) {
       this.message({ key: 'stepInto', obj: obj.kind }, 'info');
@@ -887,13 +1151,34 @@ export class Game {
       return true;
     }
     const spot = this.buildSpot(recipe.builds, recipe.onto)!;
+    if (OBJECTS[spot.kind].holdUpgrade) {
+      this.holdUpgrades++;
+      const [boat] = spot.cells;
+      this.emit({ type: 'sparkle', x: boat.x, y: boat.y });
+      this.message({ key: 'holdUpgraded', limit: this.holdLimit }, 'good');
+      this.gainXp(xp, boat.x, boat.y);
+      this.endTurn();
+      return true;
+    }
+    if (OBJECTS[spot.kind].deck) {
+      // A new cell of deck: the tile changes, nothing stands on it.
+      const [cell] = spot.cells;
+      this.map.change(cell.x, cell.y, Tile.Deck);
+      this.emit({ type: 'sparkle', x: cell.x, y: cell.y });
+      this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: cell.x, targetY: cell.y });
+      this.message({ key: 'platformBuilt' }, 'good');
+      this.gainXp(xp, cell.x, cell.y);
+      this.endTurn();
+      return true;
+    }
+    const mends = !!OBJECTS[this.objectAt(spot.cells[0].x, spot.cells[0].y)?.kind ?? spot.kind].broken;
     for (const cell of spot.cells) {
       this.objects.set(this.map.idx(cell.x, cell.y), { kind: spot.kind });
       this.emit({ type: 'sparkle', x: cell.x, y: cell.y });
     }
     const [first] = spot.cells;
     this.emit({ type: 'lunge', id: p.id, x: p.x, y: p.y, targetX: first.x, targetY: first.y });
-    this.message({ key: 'build', obj: spot.kind }, 'good');
+    this.message(mends ? { key: 'gangwayMended' } : { key: 'build', obj: spot.kind }, 'good');
     this.gainXp(xp, first.x, first.y);
     this.endTurn();
     return true;
@@ -912,7 +1197,7 @@ export class Game {
     hut.rooms = [...(hut.rooms ?? []), id];
     const p = this.player;
     this.emit({ type: 'sparkle', x: p.x, y: p.y });
-    this.message({ key: 'roomBuilt', room: id }, 'good');
+    this.message(hut.kind === 'crew_cabin' ? { key: 'roomBuilt', room: id, cabin: true } : { key: 'roomBuilt', room: id }, 'good');
     this.gainXp(Object.values(cost).reduce((sum, n) => sum + (n ?? 0), 0), p.x, p.y);
     this.endTurn();
     return true;
@@ -929,6 +1214,102 @@ export class Game {
     return true;
   }
 
+  /** True once after the explorer walked into a store crate: the UI then shows the Store panel. */
+  takeStoreRequest(): boolean {
+    const asked = this.storeAsked;
+    this.storeAsked = false;
+    return asked;
+  }
+
+  /** Put up to n of an item from the bag into the store crate next to the explorer. Takes no time. */
+  storeItem(id: ItemId, n: number): boolean {
+    const store = this.storeNear();
+    const count = Math.min(n, this.inventory.count(id));
+    if (!store || count <= 0) return false;
+    this.inventory.take(id, count);
+    store.store = { ...store.store, [id]: (store.store?.[id] ?? 0) + count };
+    return true;
+  }
+
+  /** Take up to n of an item from the store crate into the bag, as much as the bag can carry. Takes no time. */
+  takeItem(id: ItemId, n: number): boolean {
+    const store = this.storeNear();
+    const have = store?.store?.[id] ?? 0;
+    if (!store || have <= 0) return false;
+    const room = ITEMS[id].heavy ? this.loadLimit - this.load : Infinity;
+    if (room <= 0) {
+      this.message({ key: 'tooHeavy' }, 'info');
+      return false;
+    }
+    const count = Math.min(n, have, room);
+    this.inventory.add(id, count);
+    const left = have - count;
+    const rest = { ...store.store };
+    if (left > 0) rest[id] = left;
+    else delete rest[id];
+    store.store = rest;
+    // An empty supply crate is folded up and gone.
+    if (OBJECTS[store.kind].dropped && !Object.keys(rest).length) this.objects.delete(this.storeCell());
+    return true;
+  }
+
+  // ---- The radio ---------------------------------------------------------------------
+
+  /** True once after the explorer walked into the working radio: the UI then shows the Radio panel. */
+  takeRadioRequest(): boolean {
+    const asked = this.radioAsked;
+    this.radioAsked = false;
+    return asked;
+  }
+
+  /** The explorer stands at the working radio and has called for help: they can order crates. */
+  get atRadio(): boolean {
+    if (!this.sailed || this.level !== 4) return false;
+    return DIRS.some(([dx, dy]) => this.objectAt(this.player.x + dx, this.player.y + dy)?.kind === 'radio_ready');
+  }
+
+  /** Why a crate cannot be ordered now, or null if it can. */
+  orderProblem(): Msg | null {
+    if (!this.atRadio) return { key: 'noRadio' };
+    if (this.delivery) return { key: 'onTheWay' };
+    if (this.orderDay === dayNumber(this.turn)) return { key: 'orderedToday' };
+    return null;
+  }
+
+  /** Order a crate on the radio: the helicopter drops it on the helipad a little later. Takes no time. */
+  order(id: OrderId): boolean {
+    const problem = this.orderProblem();
+    if (problem) {
+      this.message(problem, 'info');
+      return false;
+    }
+    this.delivery = { order: id, at: this.turn + DELIVERY_TURNS };
+    this.orderDay = dayNumber(this.turn);
+    this.message({ key: 'ordered', order: id }, 'good');
+    return true;
+  }
+
+  /** The helicopter drops the ordered crate on a free cell of the helipad (the middle if it can). */
+  private deliver(): void {
+    if (!this.delivery || this.turn < this.delivery.at || this.level !== 4) return;
+    const pad: number[] = [];
+    for (let i = 0; i < this.map.tiles.length; i++) {
+      if (this.map.tiles[i] !== Tile.Helipad || this.objects.has(i)) continue;
+      // Not on anyone's head.
+      const someone = [this.player, ...this.animals, ...(this.dog ? [this.dog] : [])].some((a) => this.map.idx(a.x, a.y) === i);
+      if (!someone) pad.push(i);
+    }
+    const middle = (i: number) => [1, -1, this.map.width, -this.map.width].every((d) => this.map.tiles[i + d] === Tile.Helipad);
+    const at = pad.find(middle) ?? pad[0];
+    if (at === undefined) return;
+    this.objects.set(at, { kind: 'supply_crate', store: { ...RADIO_ORDERS[this.delivery.order] } });
+    const x = at % this.map.width;
+    this.emit({ type: 'drop', x, y: (at - x) / this.map.width });
+    this.emit({ type: 'sparkle', x, y: (at - x) / this.map.width });
+    this.message({ key: 'delivered', order: this.delivery.order }, 'good');
+    this.delivery = null;
+  }
+
   /** True once after the explorer walked into a hut: the UI then shows its inside. */
   takeHutRequest(): boolean {
     const asked = this.hutAsked;
@@ -941,42 +1322,233 @@ export class Game {
    * explorer to the next island; on the last island play can go on here.
    */
   sail(): boolean {
-    if (!this.sailed && this.goal().state !== 'ready') return false;
+    if (!this.goalUsed && this.goal().state !== 'ready') return false;
     this.emit({ type: 'fade' });
-    if (this.sailed) return true;
+    if (this.goalUsed) return true;
     this.checkStars();
     this.message({ key: 'sailAway', level: this.level }, 'good');
     const next = nextLevel(this.level);
-    if (next) this.landOn(next);
-    else this.sailed = true;
+    if (!next) {
+      this.sailed = true;
+      return true;
+    }
+    this.left.add(this.level);
+    // The boat of island 1 sails off with the explorer; the lit beacon and the balloon's stakes stay.
+    const goal = this.goalCell();
+    if (goal >= 0 && !OBJECTS[this.objects.get(goal)!.kind].done) this.objects.delete(goal);
+    this.landOn(next);
     return true;
+  }
+
+  // ---- The fishing boat --------------------------------------------------------------
+
+  /** The fishing boat next to the explorer, as its cell, or -1. */
+  private boatCell(): number {
+    for (const [dx, dy] of DIRS) {
+      const x = this.player.x + dx;
+      const y = this.player.y + dy;
+      const obj = this.objectAt(x, y);
+      if (obj && OBJECTS[obj.kind].boat) return this.map.idx(x, y);
+    }
+    return -1;
+  }
+
+  /** The explorer stands next to the fishing boat. */
+  boatNear(): boolean {
+    return this.boatCell() >= 0;
+  }
+
+  /** True once after the explorer walked into the fishing boat: the UI then shows the sea chart. */
+  takeChartRequest(): boolean {
+    const asked = this.chartAsked;
+    this.chartAsked = false;
+    return asked;
+  }
+
+  /** The islands the explorer has been to, besides this one. */
+  visited(level: LevelId): boolean {
+    return this.islands.has(level);
+  }
+
+  /** How many heavy things the hold can carry: more with each upgrade. */
+  get holdLimit(): number {
+    return HOLD_LOAD + this.holdUpgrades * HOLD_UPGRADE;
+  }
+
+  /** How many heavy things the hold carries. */
+  get holdLoad(): number {
+    return (Object.entries(this.hold) as [ItemId, number][]).reduce((sum, [id, n]) => sum + (ITEMS[id].heavy ? n : 0), 0);
+  }
+
+  /** Diesel for a trip: in the bag and in the hold. */
+  get dieselAboard(): number {
+    return this.inventory.count('diesel') + (this.hold.diesel ?? 0);
+  }
+
+  /** Why the boat cannot sail to this island now, or null if it can. */
+  voyageProblem(to: LevelId): Msg | null {
+    if (!this.boatNear()) return { key: 'noBoat' };
+    if (to === this.level) return { key: 'hereAlready' };
+    if (this.dieselAboard < VOYAGE_DIESEL) return { key: 'needDiesel', n: VOYAGE_DIESEL };
+    return null;
+  }
+
+  /**
+   * Sail the fishing boat to another island (or back to the rig). The trip
+   * burns diesel (from the hold first) and takes hours, and needs go down on
+   * the way. The boat moors next to the explorer on arrival; its hold comes along.
+   */
+  voyage(to: LevelId): boolean {
+    const problem = this.voyageProblem(to);
+    if (problem) {
+      this.message(problem, 'info');
+      return false;
+    }
+    const fromHold = Math.min(VOYAGE_DIESEL, this.hold.diesel ?? 0);
+    this.takeFromHold('diesel', fromHold);
+    this.inventory.take('diesel', VOYAGE_DIESEL - fromHold);
+    const dock = this.boatCell();
+    this.objects.delete(dock);
+    for (let i = 0; i < VOYAGE_TURNS; i++) {
+      this.turn++;
+      tickNeeds(this.needs, {
+        sleeping: false,
+        shelter: 0.6,
+        nearFire: false,
+        daylight: this.daylight,
+        thirst: this.has('small_sips') ? SMALL_SIPS : 1,
+        hunger: this.has('small_appetite') ? SMALL_APPETITE : 1,
+        chill: this.has('thick_skin') ? THICK_SKIN : 1,
+        cold: 0,
+        heat: 0,
+        heal: 1,
+      });
+    }
+    this.emit({ type: 'fade' });
+    this.landOn(to, dock);
+    this.message({ key: 'voyage', level: to }, 'good');
+    if (this.needs.health <= 0) this.faint();
+    return true;
+  }
+
+  private takeFromHold(id: ItemId, n: number): void {
+    const left = (this.hold[id] ?? 0) - n;
+    const hold = { ...this.hold };
+    if (left > 0) hold[id] = left;
+    else delete hold[id];
+    this.hold = hold;
+  }
+
+  /** Put up to n of an item from the bag into the boat's hold, as much as it carries. Takes no time. */
+  loadItem(id: ItemId, n: number): boolean {
+    const room = ITEMS[id].heavy ? this.holdLimit - this.holdLoad : Infinity;
+    if (!this.boatNear() || this.inventory.count(id) <= 0) return false;
+    if (room <= 0) {
+      this.message({ key: 'holdFull' }, 'info');
+      return false;
+    }
+    const count = Math.min(n, this.inventory.count(id), room);
+    this.inventory.take(id, count);
+    this.hold = { ...this.hold, [id]: (this.hold[id] ?? 0) + count };
+    return true;
+  }
+
+  /** Take up to n of an item from the hold into the bag, as much as the bag can carry. Takes no time. */
+  unloadItem(id: ItemId, n: number): boolean {
+    const have = this.hold[id] ?? 0;
+    if (!this.boatNear() || have <= 0) return false;
+    const room = ITEMS[id].heavy ? this.loadLimit - this.load : Infinity;
+    if (room <= 0) {
+      this.message({ key: 'tooHeavy' }, 'info');
+      return false;
+    }
+    const count = Math.min(n, have, room);
+    this.inventory.add(id, count);
+    this.takeFromHold(id, count);
+    return true;
+  }
+
+  /**
+   * Put the fishing boat on a sea cell next to land, near (x, y), and the
+   * explorer on that land: at `dock` if it is given and still free.
+   */
+  private moor(x: number, y: number, dock?: number): void {
+    const free = (i: number) => this.map.tiles[i] === Tile.Water && !this.objects.has(i);
+    let sea = dock !== undefined && free(dock) ? dock : -1;
+    if (sea < 0) {
+      // The nearest sea cell (no sandbar, no gangway) next to free floor.
+      const dist = distanceMap(this.map, x, y, (cx, cy) => this.isPassable(cx, cy));
+      let best = Infinity;
+      for (let i = 0; i < this.map.tiles.length; i++) {
+        if (!free(i)) continue;
+        const cx = i % this.map.width;
+        const cy = (i - cx) / this.map.width;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const d = dist[this.map.idx(cx + dx, cy + dy)];
+          if (this.map.inBounds(cx + dx, cy + dy) && d >= 0 && d < best && !this.objectAt(cx + dx, cy + dy)) {
+            best = d;
+            sea = i;
+          }
+        }
+      }
+    }
+    if (sea < 0) return;
+    this.objects.set(sea, { kind: 'fishing_boat' });
+    const sx = sea % this.map.width;
+    const sy = (sea - sx) / this.map.width;
+    const land = [[0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]
+      .map(([dx, dy]) => ({ x: sx + dx, y: sy + dy }))
+      .find((c) => this.isPassable(c.x, c.y) && !this.animalAt(c.x, c.y));
+    if (land) {
+      this.player.x = land.x;
+      this.player.y = land.y;
+    }
   }
 
   /**
    * Arrive on a new island with everything you carry, your XP and skills,
    * and your needs as they are, at 8:00 the next day.
    */
-  private landOn(level: LevelId): void {
-    const world = generateWorld(this.rng, WORLD_WIDTH, WORLD_HEIGHT, level);
+  private landOn(level: LevelId, dock?: number): void {
+    // Keep the island the explorer leaves, as it is.
+    this.islands.set(this.level, {
+      level: this.level, map: this.map, objects: this.objects, home: this.home,
+      goalGiven: this.goalGiven, bearSpots: this.bearSpots, fishHere: this.fishHere, ...(dock !== undefined && { dock }),
+    });
+    const kept = this.islands.get(level);
+    this.islands.delete(level);
     this.level = level;
-    this.map = world.map;
-    this.objects = world.objects;
-    this.player.x = world.start.x;
-    this.player.y = world.start.y;
+    if (kept) {
+      this.map = kept.map;
+      this.objects = kept.objects;
+      this.home = kept.home;
+      this.goalGiven = kept.goalGiven;
+      this.bearSpots = kept.bearSpots;
+      this.fishHere = kept.fishHere;
+    } else {
+      const world = generateWorld(this.rng, WORLD_WIDTH, WORLD_HEIGHT, level);
+      this.map = world.map;
+      this.objects = world.objects;
+      this.home = { ...world.start };
+      this.goalGiven = {};
+      this.bearSpots = [];
+      this.fishHere = 0;
+    }
+    this.player.x = this.home.x;
+    this.player.y = this.home.y;
     this.player.facing = 'down';
-    this.home = { ...world.start };
-    this.goalGiven = {};
+    // By boat, the explorer lands where the boat moors (where it was left, if they were here before).
+    if (dock !== undefined) this.moor(this.home.x, this.home.y, kept?.dock);
+    this.stockIsland();
     this.sailAsked = false;
-    this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
+    if (dock === undefined) this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
     this.animals = [];
-    this.bearSpots = [];
-    this.fishHere = 0;
     this.safeSince = this.turn;
     this.dogToPlayer();
     this.populate();
     this.warned.clear();
     this.updateFov();
-    this.message({ key: 'landIsland', level }, 'good');
+    if (dock === undefined) this.message({ key: 'landIsland', level }, 'good');
   }
 
   /** Fill a new island with its animals (no stray dog once you have one). */
@@ -1062,10 +1634,37 @@ export class Game {
     const def = OBJECTS[obj.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
 
-    if (def.drink) return this.drink(def.drink, obj.kind === 'hot_spring' ? { key: 'drink', warm: true } : { key: 'drink' });
-    if (def.goal) return this.workOnGoal(x, y, obj);
+    if (def.store) {
+      this.storeAsked = true;
+      this.message({ key: 'openStore' }, 'info');
+      return false;
+    }
+    if (def.site) return this.workOnSite(x, y, obj);
+    if (def.drink) {
+      const msg: Msg = obj.kind === 'hot_spring' ? { key: 'drink', warm: true } : obj.kind === 'water_tank' ? { key: 'drink', tank: true } : { key: 'drink' };
+      return this.drink(def.drink, msg);
+    }
+    if (def.goal) {
+      if (this.atRadio && obj.kind === 'radio_ready') {
+        this.radioAsked = true;
+        this.message({ key: 'openRadio' }, 'info');
+        return false;
+      }
+      if (!this.left.has(this.level)) return this.workOnGoal(x, y, obj);
+      this.message({ key: 'look', obj: obj.kind }, 'info');
+      return false;
+    }
+    if (def.boat) {
+      this.chartAsked = true;
+      this.message({ key: 'openChart' }, 'info');
+      return false;
+    }
+    if (def.broken) {
+      this.message({ key: 'gangwayBroken' }, 'info');
+      return false;
+    }
     if (def.steep) {
-      const recipe = RECIPE_IDS.map((id) => RECIPES[id]).find((r) => r.onto === obj.kind);
+      const recipe = RECIPE_IDS.map((id) => RECIPES[id]).find((r) => r.onto?.includes(obj.kind));
       const way = recipe && 'builds' in recipe ? recipe.builds : obj.kind;
       this.message({ key: 'tooSteep', obj: obj.kind, way }, 'info');
       return false;
@@ -1082,6 +1681,12 @@ export class Game {
     }
     if (obj.readyAt !== undefined && obj.readyAt > this.turn) {
       this.message({ key: 'nothingLeft', obj: obj.kind }, 'info');
+      return false;
+    }
+    // A full bag takes no more heavy things (one gather can still go a little over).
+    const heavy = gather.yields.some((y) => ITEMS[y.item].heavy && (!y.tool || this.inventory.count(y.tool) > 0));
+    if (heavy && this.load >= this.loadLimit) {
+      this.message({ key: 'tooHeavy' }, 'info');
       return false;
     }
 
@@ -1156,6 +1761,68 @@ export class Game {
     this.emit({ type: 'sparkle', x, y });
     this.message({ key: 'goalStage', stage: stage.id }, 'good');
     return true;
+  }
+
+  /**
+   * Hand a building site what it still needs from the bag. When it has
+   * everything, it becomes its building (the hut).
+   */
+  private workOnSite(x: number, y: number, obj: WorldObject): boolean {
+    const cost = this.siteCostOf(obj.kind);
+    if (!cost) return false;
+    const leftOf = () => (Object.entries(cost) as [ItemId, number][])
+      .map(([item, n]): [ItemId, number] => [item, n - (obj.given?.[item] ?? 0)])
+      .filter(([, n]) => n > 0);
+    const given: [ItemId, number][] = [];
+    for (const [item, still] of leftOf()) {
+      const n = Math.min(still, this.inventory.count(item));
+      if (n <= 0) continue;
+      this.inventory.take(item, n);
+      obj.given = { ...obj.given, [item]: (obj.given?.[item] ?? 0) + n };
+      given.push([item, n]);
+      this.emit({ type: 'float', x, y, amount: -n, what: { item }, tone: 'info' });
+    }
+    const left = leftOf();
+    const site = obj.kind;
+    if (!given.length) {
+      this.message({ key: 'siteNeeds', obj: site, left }, 'info');
+      return false;
+    }
+    this.gainXp(given.reduce((sum, [, n]) => sum + n, 0), x, y);
+    if (left.length) {
+      this.message({ key: 'siteGive', obj: site, given, left }, 'good');
+      return true;
+    }
+    obj.kind = OBJECTS[site].site!;
+    delete obj.given;
+    this.emit({ type: 'sparkle', x, y });
+    this.message({ key: 'siteDone', obj: obj.kind }, 'good');
+    return true;
+  }
+
+  /** What a site of this kind takes in all: its own `siteCost`, or that of the recipe that builds it. */
+  private siteCostOf(kind: ObjectKind): Items | null {
+    const own = OBJECTS[kind].siteCost;
+    if (own) return this.withSkills(own);
+    const recipe = RECIPE_IDS.find((id) => {
+      const r = RECIPES[id];
+      return 'builds' in r && r.builds === kind && r.siteCost;
+    });
+    return recipe ? this.siteCost(recipe) : null;
+  }
+
+  /** What a building site still needs, or null if (x, y) is no site. */
+  siteLeft(x: number, y: number): Items | null {
+    const obj = this.objectAt(x, y);
+    if (!obj || !OBJECTS[obj.kind].site) return null;
+    const cost = this.siteCostOf(obj.kind);
+    if (!cost) return null;
+    const left: Items = {};
+    for (const [item, n] of Object.entries(cost) as [ItemId, number][]) {
+      const still = n - (obj.given?.[item] ?? 0);
+      if (still > 0) left[item] = still;
+    }
+    return left;
   }
 
   /** Cast the fishing rod into the sea at (x, y). Always takes a turn. */
@@ -1250,10 +1917,27 @@ export class Game {
    * nearest free neighbour. A bridge goes straight ahead across the river
    * instead, facing the way the explorer does. A way up a step (`onto`)
    * goes on such a step in front, else on the nearest one next to the explorer.
+   * Mending a broken gangway fills the whole gap between its two broken ends.
    */
-  private buildSpot(kind: ObjectKind, onto?: ObjectKind): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
+  private buildSpot(kind: ObjectKind, onto?: ObjectKind[]): { kind: ObjectKind; cells: { x: number; y: number }[] } | null {
     const p = this.player;
     const [fx, fy] = facingDelta(p.facing);
+    if (OBJECTS[kind].deck) {
+      const cell = this.deckSpot(fx, fy);
+      return cell ? { kind, cells: [cell] } : null;
+    }
+    if (OBJECTS[kind].holdUpgrade) {
+      const boat = this.boatCell();
+      return boat < 0 ? null : { kind, cells: [{ x: boat % this.map.width, y: Math.floor(boat / this.map.width) }] };
+    }
+    if (OBJECTS[kind].onSea) {
+      // On the sea in front of the explorer (else next to them), who stands on a deck.
+      const here = this.map.get(p.x, p.y);
+      if (here !== Tile.Deck && here !== Tile.Helipad) return null;
+      const sea = [[fx, fy], [0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => (dx === 0) !== (dy === 0) &&
+        this.map.get(p.x + dx, p.y + dy) === Tile.Water && !this.objectAt(p.x + dx, p.y + dy) && !this.animalAt(p.x + dx, p.y + dy));
+      return sea ? { kind, cells: [{ x: p.x + sea[0], y: p.y + sea[1] }] } : null;
+    }
     if (OBJECTS[kind].bridge) {
       const lava = !!OBJECTS[kind].onLava;
       const cells = this.riverAhead(p.x, p.y, fx, fy, lava ? Tile.Lava : Tile.River);
@@ -1263,8 +1947,16 @@ export class Game {
     }
     const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
     if (onto) {
-      const at = order.find(([dx, dy]) => this.objectAt(p.x + dx, p.y + dy)?.kind === onto && !this.animalAt(p.x + dx, p.y + dy));
-      return at ? { kind, cells: [{ x: p.x + at[0], y: p.y + at[1] }] } : null;
+      const at = order.find(([dx, dy]) => {
+        const obj = this.objectAt(p.x + dx, p.y + dy);
+        return !!obj && onto.includes(obj.kind) && !this.animalAt(p.x + dx, p.y + dy);
+      });
+      if (!at) return null;
+      const x = p.x + at[0];
+      const y = p.y + at[1];
+      const run = OBJECTS[this.objectAt(x, y)!.kind].broken;
+      if (run) return { kind: run === 'ns' ? 'gangway_ns' : 'gangway_ew', cells: this.brokenRun(x, y, run) };
+      return { kind, cells: [{ x, y }] };
     }
     for (const [dx, dy] of order) {
       const x = p.x + dx;
@@ -1279,6 +1971,76 @@ export class Game {
       if (ok) return { kind, cells: [{ x, y }] };
     }
     return null;
+  }
+
+  /**
+   * Where a new platform cell goes: the sea cell in front of the explorer
+   * (else next to them) that touches the deck of the crew platform, near the
+   * crew cabin, away from gangways and from other platforms. So new decks
+   * make room at the camp, but never a way past a broken gangway.
+   */
+  private deckSpot(fx: number, fy: number): { x: number; y: number } | null {
+    const cabin = [...this.objects].find(([, o]) => o.kind === 'crew_cabin')?.[0];
+    if (cabin === undefined) return null;
+    const w = this.map.width;
+    const cx = cabin % w;
+    const cy = (cabin - cx) / w;
+    const isDeck = (x: number, y: number) => {
+      const t = this.map.get(x, y);
+      return t === Tile.Deck || t === Tile.Helipad;
+    };
+    // The crew platform: every deck cell joined to the cabin's (not over gangways).
+    const own = new Set([cabin]);
+    const queue = [cabin];
+    for (let head = 0; head < queue.length; head++) {
+      const x = queue[head] % w;
+      const y = (queue[head] - x) / w;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const n = this.map.idx(x + dx, y + dy);
+        if (this.map.inBounds(x + dx, y + dy) && isDeck(x + dx, y + dy) && !own.has(n)) {
+          own.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    const ok = (x: number, y: number) => {
+      if (this.map.get(x, y) !== Tile.Water || this.objectAt(x, y) || this.animalAt(x, y) || this.dogAt(x, y)) return false;
+      if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) > PLATFORM_RANGE) return false;
+      if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => own.has(this.map.idx(x + dx, y + dy)))) return false;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const ox = x + dx;
+          const oy = y + dy;
+          if (!this.map.inBounds(ox, oy)) continue;
+          const obj = this.objectAt(ox, oy);
+          if (Math.max(Math.abs(dx), Math.abs(dy)) <= 1 && obj && (OBJECTS[obj.kind].overSea || OBJECTS[obj.kind].broken)) return false;
+          if (isDeck(ox, oy) && !own.has(this.map.idx(ox, oy))) return false;
+        }
+      }
+      return true;
+    };
+    const p = this.player;
+    const order: (readonly [number, number])[] = [[fx, fy], ...DIRS.filter(([dx, dy]) => dx !== fx || dy !== fy)];
+    const at = order.find(([dx, dy]) => ok(p.x + dx, p.y + dy));
+    return at ? { x: p.x + at[0], y: p.y + at[1] } : null;
+  }
+
+  /** The broken gangway ends in a row with (x, y), along the way the gangway runs. */
+  private brokenRun(x: number, y: number, run: 'ns' | 'ew'): { x: number; y: number }[] {
+    const [dx, dy] = run === 'ns' ? [0, 1] : [1, 0];
+    const broken = (cx: number, cy: number) => {
+      const obj = this.objectAt(cx, cy);
+      return !!obj && OBJECTS[obj.kind].broken === run;
+    };
+    let sx = x;
+    let sy = y;
+    while (broken(sx - dx, sy - dy)) {
+      sx -= dx;
+      sy -= dy;
+    }
+    const cells: { x: number; y: number }[] = [];
+    for (let cx = sx, cy = sy; broken(cx, cy); cx += dx, cy += dy) cells.push({ x: cx, y: cy });
+    return cells;
   }
 
   /** The open river (or lava, `flow`) cells straight ahead, if they end on free ground within a bridge's span. */
@@ -1341,6 +2103,7 @@ export class Game {
     for (const a of this.animals) this.animalAct(a, playerDist);
     this.animalsActing = false;
     if (this.turn % RESPAWN_EVERY === 0) this.topUpAnimals();
+    this.deliver();
 
     if (this.needs.health <= 0) this.faint();
     const goal = this.goalCell();
@@ -1869,14 +2632,8 @@ export class Game {
       rng: this.rng.state32,
       turn: this.turn,
       nextId: this.nextId,
-      width: this.map.width,
-      height: this.map.height,
-      tiles: String.fromCharCode(...this.map.tiles.map((t) => t + 48)),
-      explored: Array.from(this.map.explored, (e) => (e ? '1' : '0')).join(''),
-      objects: [...this.objects].map(([i, o]) => {
-        if (o.rooms?.length) return [i, o.kind, o.readyAt ?? 0, [...o.rooms]];
-        return o.readyAt ? [i, o.kind, o.readyAt] : [i, o.kind];
-      }),
+      ...saveMap(this.map),
+      objects: saveObjects(this.objects),
       animals: this.animals.map((a) => ({ ...a })),
       player: { ...this.player },
       home: { ...this.home },
@@ -1894,6 +2651,22 @@ export class Game {
       safeSince: this.safeSince,
       warned: [...this.warned],
       log: this.log.slice(-30),
+      islands: [...this.islands.values()].map((island) => ({
+        level: island.level,
+        ...saveMap(island.map),
+        objects: saveObjects(island.objects),
+        home: { ...island.home },
+        goalGiven: { ...island.goalGiven },
+        bearSpots: [...island.bearSpots],
+        fishHere: island.fishHere,
+        ...(island.dock !== undefined && { dock: island.dock }),
+      })),
+      left: [...this.left],
+      hold: { ...this.hold },
+      delivery: this.delivery && { ...this.delivery },
+      orderDay: this.orderDay,
+      holdUpgrades: this.holdUpgrades,
+      stocked: [...this.stocked],
     };
   }
 
@@ -1930,7 +2703,26 @@ export class Game {
     }
     if (data.v === 8) {
       // Version 8 huts had no rooms. Their objects need no change: a hut gets its bed for free.
-      data = { ...data, v: SAVE_VERSION };
+      data = { ...data, v: 9 };
+    }
+    if (data.v === 9) {
+      // Version 9 had no store crates and no building sites. A bag over the
+      // carry limit keeps everything; only gathering heavy things waits.
+      data = { ...data, v: 10 };
+    }
+    if (data.v === 10) {
+      // Version 10 kept only the island the explorer is on. The islands before
+      // it are new when the explorer sails back to them; their goals are used.
+      const left = ([1, 2, 3] as LevelId[]).filter((l) => l < data.level);
+      data = { ...data, v: 11, islands: [], left, hold: {} };
+    }
+    if (data.v === 11) {
+      // Version 11 had no radio orders.
+      data = { ...data, v: 12, delivery: null, orderDay: 0 };
+    }
+    if (data.v === 12) {
+      // Version 12 had no rig workshop. Each island gets its new resources when the explorer is there.
+      data = { ...data, v: SAVE_VERSION, holdUpgrades: 0, stocked: [] };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);
