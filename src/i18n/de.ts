@@ -387,7 +387,7 @@ export const de: Strings = {
     inHold: 'Im Laderaum',
     holdEmpty: 'Der Laderaum ist leer.',
     radio: 'Funkgerät',
-    radioNote: 'Bestell jeden Tag eine Kiste. Etwa 2 Stunden später wirft ein Hubschrauber sie auf dem Landeplatz ab.',
+    radioNote: 'Bestell jeden Tag eine Kiste. Dann geh zum Landeplatz: Ein Hubschrauber kommt und wirft sie dort ab.',
     order: 'Bestellen',
     orders: { food: 'Essenskiste', build: 'Baukiste', fuel: 'Treibstoffkiste' },
   },
@@ -554,7 +554,7 @@ export const de: Strings = {
       case 'holdUpgraded': return `Du machst den Laderaum größer. Er trägt jetzt ${msg.limit} schwere Dinge.`;
       case 'openRadio': return 'Das Funkgerät summt. Du kannst Vorräte bestellen.';
       case 'noRadio': return 'Stell dich neben das Funkgerät, nachdem du Hilfe gerufen hast.';
-      case 'onTheWay': return 'Deine Kiste ist unterwegs. Hör auf den Hubschrauber.';
+      case 'onTheWay': return 'Deine Kiste ist unterwegs. Geh zum Landeplatz und warte auf den Hubschrauber.';
       case 'orderedToday': return 'Du hast heute schon eine Kiste bestellt. Versuch es morgen wieder.';
       case 'ordered': return `„Eine ${de.ui.orders[msg.order]}, bitte!“ Das Funkgerät knistert: „Ist unterwegs!“`;
       case 'delivered': return `Ein Hubschrauber donnert über die Bohrinsel und wirft eine ${de.ui.orders[msg.order]} auf dem Landeplatz ab!`;

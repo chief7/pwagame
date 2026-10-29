@@ -1034,10 +1034,11 @@ does not have.
   crate (3 cooked fish, 4 coconuts, 3 apples), a building crate (10 logs,
   6 wood, 12 leaves, 6 stone) or a fuel crate (4 diesel, 4 rope). One order
   each day (`orderDay`, else `orderedToday`), and one at a time (`onTheWay`).
-- **Delivery.** 20 turns later (`DELIVERY_TURNS`), at the end of a turn on
-  the rig, the helicopter drops a `supply_crate` on a free cell of the
-  helipad (its middle if it can), with sparkles and `delivered`. While the
-  explorer is away from the rig, the crate waits for them.
+- **Delivery.** At the end of the first turn that the explorer stands on
+  the helipad, the helicopter drops a `supply_crate` on a free cell of the
+  helipad (its middle if it can), with sparkles and `delivered`. There is no
+  wait after the order. Until the explorer steps on the pad, the crate waits
+  for them.
 - **The helicopter.** A delivery also sends a `drop` event. The animator
   plays it for 3.2 s (`DROP_MS`; not with reduced motion): the helicopter
   (`helicopter`, 2 frames for the rotor) flies in from 14 cells to the left,
@@ -1876,7 +1877,7 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Mend gangway | `recipes.ts` → `gangway` | 6 scrap |
 | Fishing boat, derrick | `objects.ts` → `siteCost` of `fishing_boat_wreck`, `derrick`; `derrick_working` regrow | 10 scrap, 6 wood, 4 rope; 12 scrap, 2 rope; 2 diesel every 120 turns |
 | Voyages and hold | `game.ts` → `VOYAGE_TURNS`, `VOYAGE_DIESEL`, `HOLD_LOAD` | 60 turns, 2 diesel; 60 heavy things |
-| Radio orders | `game.ts` → `RADIO_ORDERS`, `DELIVERY_TURNS` | 3 crates, one each day; 20 turns |
+| Radio orders | `game.ts` → `RADIO_ORDERS` | 3 crates, one each day; dropped when the explorer is on the helipad |
 | New platforms | `recipes.ts` → `platform`, `rain_tank`; `game.ts` → `PLATFORM_RANGE` | 6 scrap, 2 wood; 6 scrap; 6 cells from the cabin |
 | Rig workshop | `recipes.ts` → tools and buildings; `game.ts` → `WORKSHOP_STOCK`, `CRATE_DISTANCE`, `HOLD_UPGRADE`, `HOLD_UPGRADES` | see 4.24 |
 | Climb cost | `game.ts` → `CLIMB_ENERGY` | 2 Energy |
