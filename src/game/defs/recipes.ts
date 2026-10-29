@@ -12,6 +12,8 @@ export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_fr
 export type Recipe = {
   id: RecipeId;
   cost: Partial<Record<ItemId, number>>;
+  /** Another cost that works too, used when the explorer has not got `cost` (logs for the store crate's wood). */
+  orCost?: Partial<Record<ItemId, number>>;
   /**
    * A big building that goes up in trips: the recipe places its site (for
    * `cost`, often nothing), and the site takes these materials one trip at a time.
@@ -38,8 +40,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   // The camp: only one on each island, and it is big work. More than a bag
   // can carry, so it is built on a site that takes the materials in trips.
   hut: { id: 'hut', builds: 'hut_site', cost: {}, siteCost: { log: 24, wood: 12, leaves: 30, stone: 20, rope: 8 } },
-  // Keeps what you do not carry: one on each island.
-  store_crate: { id: 'store_crate', builds: 'store_crate', cost: { wood: 6, rope: 2 } },
+  // Keeps what you do not carry: one on each island. Logs work in place of the wood,
+  // for a bag full of logs (saves from before the carry limit).
+  store_crate: { id: 'store_crate', builds: 'store_crate', cost: { wood: 6, rope: 2 }, orCost: { log: 6, rope: 2 } },
   // Carry more heavy things; needs the Pack frame skill.
   pack_frame: { id: 'pack_frame', makes: 'pack_frame', cost: { wood: 4, rope: 3 }, skill: 'pack_frame' },
   axe: { id: 'axe', makes: 'axe', cost: { wood: 2, stone: 2, leaves: 1 } },

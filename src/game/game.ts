@@ -956,9 +956,16 @@ export class Game {
     return null;
   }
 
-  /** What a recipe costs the explorer now (Handy builder saves a piece of wood). */
+  /**
+   * What a recipe costs the explorer now (Handy builder saves a piece of
+   * wood): its `orCost` when they have that and not the usual cost.
+   */
   recipeCost(id: RecipeId): Items {
-    return this.withSkills(RECIPES[id].cost);
+    const { cost, orCost } = RECIPES[id];
+    const usual = this.withSkills(cost);
+    if (!orCost || this.inventory.hasAll(usual)) return usual;
+    const other = this.withSkills(orCost);
+    return this.inventory.hasAll(other) ? other : usual;
   }
 
   /** What a building site of this recipe takes, in trips (Handy builder works here too). */
