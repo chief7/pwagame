@@ -168,6 +168,30 @@ export function container(): Sprite {
   return s.outline().shadow(8, 15, 7.5, 1.2);
 }
 
+/** The same container seen from its end: two cargo doors with lock bars, so it reads as a store. */
+export function containerDoors(): Sprite {
+  const s = new Sprite('rig_container_doors');
+  for (let y = 4; y <= 14; y++) {
+    for (let x = 1; x <= 14; x++) {
+      // The lid is lit; under it the two doors meet in the middle, darker to the right.
+      const c = y === 4 ? P.rustLight
+        : y <= 6 ? (hash2(x, y, 310) < 0.2 ? P.rustDark : P.rust)
+        : y === 7 || y === 14 ? P.rustDark
+        : x === 1 || x === 14 ? P.rustDark
+        : x === 7 || x === 8 ? (x === 7 ? P.rustDark : P.steelDeep)
+        : x === 4 || x === 11 ? (x === 4 ? P.steelLight : P.steel)
+        : x >= 9 ? P.rustDark
+        : x === 2 ? P.rustLight : P.rust;
+      s.set(x, y, c);
+    }
+  }
+  // Yellow handles on the lock bars.
+  for (const x of [5, 10]) s.set(x, 10, P.hazard);
+  s.set(10, 11, P.hazardDark);
+  s.set(5, 11, P.hazardDark);
+  return s.outline().shadow(8, 15, 7.5, 1.2);
+}
+
 /** Two old red fuel drums: the rig's diesel. Empty ones are faded, with their lids off. */
 function drums(name: string, empty: boolean): Sprite {
   const s = new Sprite(name);
@@ -641,7 +665,7 @@ export function helicopter(): Sprite[] {
 export function rigSprites(): Sprite[] {
   return [
     ...deck(), ...deckSide(), ...helipad(), ...gangway(), ...gangwayEnds(),
-    container(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
+    container(), containerDoors(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
     pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(), supplyCrate(), platformIcon(), ...helicopter(),
   ];
 }
