@@ -126,6 +126,13 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   fishing_boat: { name: 'fishing boat' },
   supply_crate: { name: 'supply crate' },
   platform_deck: { name: 'platform' },
+  storage_container_0: { name: 'storage container' },
+  storage_container_1: { name: 'storage container' },
+  storage_container_2: { name: 'storage container' },
+  storage_container_3: { name: 'storage container' },
+  storage_container_4: { name: 'storage container' },
+  storage_container_5: { name: 'storage container' },
+  storage_container_back: { name: 'storage container' },
   ore_vein: { name: 'ore vein', gather: 'You hack ore out of the rock' },
   clay_bank: { name: 'clay bank', gather: 'You dig up wet clay' },
   sealed_crate: { name: 'sealed crate', gather: 'You prise the crate open' },
@@ -276,6 +283,9 @@ export const en: Strings = {
     inStore: 'In the store crate',
     bagEmptyShort: 'Your bag is empty.',
     storeEmpty: 'The store crate is empty.',
+    container: 'Storage container',
+    inContainer: 'In the storage container',
+    containerEmpty: 'The storage container is empty.',
     heavy: 'Heavy',
     putOne: 'Put in 1',
     putAll: 'Put in all',
@@ -444,8 +454,8 @@ export const en: Strings = {
       case 'noRoom': return 'There is no room to build here.';
       case 'noBridgeSpot': return 'Stand at a river and face the water. A bridge can cross up to 3 steps.';
       case 'noLavaSpot': return 'Stand at the lava flow and face the lava. Stepping stones can cross up to 3 steps.';
-      case 'tooHeavy': return 'Your bag is too heavy for more wood, logs, stone, scrap or diesel. Put some in a store crate, or use them.';
-      case 'openStore': return 'You open your store crate.';
+      case 'tooHeavy': return `Your bag is too heavy for more wood, logs, stone, scrap or diesel. Put some in ${msg.container ? 'the storage container' : 'a store crate'}, or use them.`;
+      case 'openStore': return msg.container ? 'You open the storage container.' : 'You open your store crate.';
       case 'oneStore': return 'You already have a store crate on this island.';
       case 'siteNeeds': return `The ${obj(msg.obj)} still needs ${itemList(msg.left)}.`;
       case 'siteGive': return `You give the ${obj(msg.obj)} ${itemList(msg.given)}. It still needs ${itemList(msg.left)}.`;

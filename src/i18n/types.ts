@@ -120,6 +120,10 @@ export interface Strings {
     inStore: string;
     bagEmptyShort: string;
     storeEmpty: string;
+    /** The Store panel at the rig's storage container: its title, the stock row and the empty text. */
+    container: string;
+    inContainer: string;
+    containerEmpty: string;
     heavy: string;
     putOne: string;
     putAll: string;

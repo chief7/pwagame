@@ -406,7 +406,7 @@ function row(image: string, title: string, note: Node | string, action?: HTMLEle
 function renderSheet(): void {
   const words = t();
   ui.sheetTitle.textContent = {
-    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: game.hutHere()?.kind === 'crew_cabin' ? words.ui.yourCabin : words.ui.yourHut, store: words.ui.store, chart: words.ui.chart, radio: words.ui.radio, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
+    bag: words.ui.yourBag, build: words.ui.build, skills: words.ui.skills, map: words.ui.yourMap, hut: game.hutHere()?.kind === 'crew_cabin' ? words.ui.yourCabin : words.ui.yourHut, store: game.storeNear()?.kind === 'storage_container_0' ? words.ui.container : words.ui.store, chart: words.ui.chart, radio: words.ui.radio, sail: words.levels[game.level].sailTitle, end: words.ui.endTitle,
     cheats: 'Cheats',
   }[sheetKind];
   const rows = el('div', { className: 'rows' });
@@ -579,7 +579,7 @@ function renderStock(rows: HTMLElement, title: string, empty: string, stock: Par
   }
 }
 
-/** The Store panel: the store crate and the bag. */
+/** The Store panel: the store crate (or the rig's storage container) and the bag. */
 function renderStore(rows: HTMLElement): void {
   const words = t();
   const store = game.storeNear();
@@ -588,7 +588,8 @@ function renderStore(rows: HTMLElement): void {
     return;
   }
   rows.append(loadRow());
-  renderStock(rows, words.ui.inStore, words.ui.storeEmpty, store.store ?? {}, (id, n) => game.storeItem(id, n), (id, n) => game.takeItem(id, n));
+  const container = store.kind === 'storage_container_0';
+  renderStock(rows, container ? words.ui.inContainer : words.ui.inStore, container ? words.ui.containerEmpty : words.ui.storeEmpty, store.store ?? {}, (id, n) => game.storeItem(id, n), (id, n) => game.takeItem(id, n));
 }
 
 /** The Radio panel: order one supply crate each day; the helicopter drops it on the helipad. */

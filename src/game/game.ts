@@ -140,6 +140,12 @@ export const WORKSHOP_STOCK: Partial<Record<LevelId, [ObjectKind, number][]>> = 
 };
 /** Sealed crates are at least this far from home. */
 const CRATE_DISTANCE = 12;
+/** The rig's storage container is this many cells wide (and 2 deep). */
+export const STORAGE_WIDTH = 6;
+/** What may stand where the storage container goes: it takes their place (they only decorate the rig). */
+const STORAGE_REPLACES: ObjectKind[] = ['rig_container', 'life_ring'];
+/** Loose things the storage container may move to another cell when there is no other room. */
+const STORAGE_MOVES: ObjectKind[] = ['scrap_pile', 'pallet', 'old_net', 'chest_closed', 'chest_open', 'diesel_drums', 'diesel_drums_empty'];
 export const SAVE_VERSION = 13;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
@@ -449,7 +455,10 @@ export class Game {
       this.populate();
       this.message({ key: 'arrive' }, 'info');
     }
-    if (save) this.stockIsland();
+    if (save) {
+      this.stockIsland();
+      this.placeStorage();
+    }
     this.updateFov();
   }
 
@@ -621,13 +630,129 @@ export class Game {
     return false;
   }
 
-  /** The cell of the store (a store crate or a dropped supply crate) next to the explorer, or -1. */
+  /** The cell of the store (a store crate, a dropped supply crate or the storage container) next to the explorer, or -1. */
   private storeCell(): number {
     for (const [dx, dy] of DIRS) {
-      const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
-      if (obj && OBJECTS[obj.kind].store) return this.map.idx(this.player.x + dx, this.player.y + dy);
+      const main = this.mainPiece(this.player.x + dx, this.player.y + dy);
+      if (main && OBJECTS[main.obj.kind].store) return this.map.idx(main.x, main.y);
     }
     return -1;
+  }
+
+  /** The object at a cell, or the main piece of the big object it is part of (see `partOf`). */
+  private mainPiece(x: number, y: number): { x: number; y: number; obj: WorldObject } | null {
+    for (let k = 0; k < 3; k++) {
+      const obj = this.objectAt(x, y);
+      if (!obj) return null;
+      const part = OBJECTS[obj.kind].partOf;
+      if (!part) return { x, y, obj };
+      x += part[0];
+      y += part[1];
+    }
+    return null;
+  }
+
+  /** The bag is full: say so, and on the rig point to the storage container. */
+  private tooHeavy(): void {
+    this.message(this.storageCell() >= 0 ? { key: 'tooHeavy', container: true } : { key: 'tooHeavy' }, 'info');
+  }
+
+  /** The explorer, the dog or an animal stands here. */
+  private someoneAt(x: number, y: number): boolean {
+    return (x === this.player.x && y === this.player.y) || this.dogAt(x, y) || !!this.animalAt(x, y);
+  }
+
+  /** The cell of the storage container's main piece on this island, or -1. */
+  private storageCell(): number {
+    for (const [i, obj] of this.objects) if (obj.kind === 'storage_container_0') return i;
+    return -1;
+  }
+
+  /**
+   * Put the big storage container on the rig, if it is not there yet (new
+   * rigs, and rigs from saves before it). It wants 6 × 2 deck cells, no
+   * gangway or boat round them and a free deck cell in front, as near the
+   * crew cabin as it can, and must leave the whole rig reachable. Rusty
+   * containers and life rings only decorate the rig: it takes their place
+   * if there is no other room. Last of all it moves loose things (scrap,
+   * pallets, nets, chests, drums) to the nearest free deck cell.
+   */
+  private placeStorage(): void {
+    if (levelDef(this.level).biome !== 'rig' || this.storageCell() >= 0) return;
+    const { map } = this;
+    const w = map.width;
+    let cabin = { x: this.home.x, y: this.home.y };
+    for (const [i, obj] of this.objects) if (obj.kind === 'crew_cabin') cabin = { x: i % w, y: (i - (i % w)) / w };
+    // What it costs to put the container here: 1 for each decoration it replaces, 10 for each thing in front, 100 for each thing it moves.
+    const spots: { x: number; y: number; cost: number; far: number }[] = [];
+    for (let y = 1; y < map.height - 2; y++) {
+      for (let x = 1; x < w - STORAGE_WIDTH; x++) {
+        let cost = 0;
+        let front = false;
+        let ok = true;
+        for (let cy = y - 1; ok && cy <= y + 2; cy++) {
+          for (let cx = x - 1; ok && cx <= x + STORAGE_WIDTH; cx++) {
+            const inside = cy >= y && cy <= y + 1 && cx >= x && cx < x + STORAGE_WIDTH;
+            const obj = this.objectAt(cx, cy);
+            if (inside) {
+              if (map.get(cx, cy) !== Tile.Deck || this.someoneAt(cx, cy)) ok = false;
+              else if (obj) {
+                if (STORAGE_REPLACES.includes(obj.kind)) cost += 1;
+                else if (STORAGE_MOVES.includes(obj.kind)) cost += 100;
+                else ok = false;
+              }
+            } else if (obj && (OBJECTS[obj.kind].overSea || OBJECTS[obj.kind].broken || obj.kind.startsWith('fishing_boat'))) {
+              ok = false;
+            } else if (cy === y + 2 && cx >= x && cx < x + STORAGE_WIDTH) {
+              // A free deck cell in front to walk in from; things in front would hide its side.
+              if (map.get(cx, cy) === Tile.Deck && !obj) front = true;
+              if (obj) cost += 10;
+            }
+          }
+        }
+        if (ok && front) spots.push({ x, y, cost, far: Math.abs(x + STORAGE_WIDTH / 2 - cabin.x) + Math.abs(y - cabin.y) });
+      }
+    }
+    spots.sort((a, b) => a.cost - b.cost || a.far - b.far);
+    const inside = (cx: number, cy: number, x: number, y: number) => cx >= x && cx < x + STORAGE_WIDTH && cy >= y && cy <= y + 1;
+    for (const { x, y } of spots) {
+      const before = new Map<number, WorldObject>();
+      const moved: number[] = [];
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < STORAGE_WIDTH; dx++) {
+          const i = map.idx(x + dx, y + dy);
+          const obj = this.objects.get(i);
+          if (obj) before.set(i, obj);
+          const kind: ObjectKind = dy === 0 ? 'storage_container_back' : `storage_container_${dx}` as ObjectKind;
+          this.objects.set(i, { kind });
+        }
+      }
+      // Loose things go to the nearest free deck cell.
+      for (const [i, obj] of before) {
+        if (!STORAGE_MOVES.includes(obj.kind)) continue;
+        const ox = i % w;
+        const oy = (i - ox) / w;
+        let best = -1;
+        let bestFar = Infinity;
+        for (let k = 0; k < map.tiles.length; k++) {
+          const kx = k % w;
+          const ky = (k - kx) / w;
+          const far = Math.abs(kx - ox) + Math.abs(ky - oy);
+          if (far >= bestFar || map.tiles[k] !== Tile.Deck || this.objects.has(k) || inside(kx, ky, x, y)) continue;
+          if (this.someoneAt(kx, ky) || (ky === y + 2 && kx >= x && kx < x + STORAGE_WIDTH)) continue;
+          best = k;
+          bestFar = far;
+        }
+        if (best >= 0) {
+          this.objects.set(best, obj);
+          moved.push(best);
+        }
+      }
+      if (this.allReachableFrom(this.home.x, this.home.y)) return;
+      for (const k of moved) this.objects.delete(k);
+      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < STORAGE_WIDTH; dx++) this.objects.delete(map.idx(x + dx, y + dy));
+      for (const [i, obj] of before) this.objects.set(i, obj);
+    }
   }
 
   /** The store next to the explorer, or null. */
@@ -1238,7 +1363,7 @@ export class Game {
     if (!store || have <= 0) return false;
     const room = ITEMS[id].heavy ? this.loadLimit - this.load : Infinity;
     if (room <= 0) {
-      this.message({ key: 'tooHeavy' }, 'info');
+      this.tooHeavy();
       return false;
     }
     const count = Math.min(n, have, room);
@@ -1459,7 +1584,7 @@ export class Game {
     if (!this.boatNear() || have <= 0) return false;
     const room = ITEMS[id].heavy ? this.loadLimit - this.load : Infinity;
     if (room <= 0) {
-      this.message({ key: 'tooHeavy' }, 'info');
+      this.tooHeavy();
       return false;
     }
     const count = Math.min(n, have, room);
@@ -1540,6 +1665,7 @@ export class Game {
     // By boat, the explorer lands where the boat moors (where it was left, if they were here before).
     if (dock !== undefined) this.moor(this.home.x, this.home.y, kept?.dock);
     this.stockIsland();
+    this.placeStorage();
     this.sailAsked = false;
     if (dock === undefined) this.turn = Math.ceil((this.turn + 1) / TURNS_PER_DAY) * TURNS_PER_DAY;
     this.animals = [];
@@ -1631,12 +1757,17 @@ export class Game {
   // ---- Interactions ------------------------------------------------------------------
 
   private interact(x: number, y: number, obj: WorldObject): boolean {
-    const def = OBJECTS[obj.kind];
     this.emit({ type: 'lunge', id: this.player.id, x: this.player.x, y: this.player.y, targetX: x, targetY: y });
+    // A piece of a big object (the storage container) works like its main piece.
+    if (OBJECTS[obj.kind].partOf) {
+      const main = this.mainPiece(x, y);
+      if (main) ({ x, y, obj } = main);
+    }
+    const def = OBJECTS[obj.kind];
 
     if (def.store) {
       this.storeAsked = true;
-      this.message({ key: 'openStore' }, 'info');
+      this.message(obj.kind === 'storage_container_0' ? { key: 'openStore', container: true } : { key: 'openStore' }, 'info');
       return false;
     }
     if (def.site) return this.workOnSite(x, y, obj);
@@ -1686,7 +1817,7 @@ export class Game {
     // A full bag takes no more heavy things (one gather can still go a little over).
     const heavy = gather.yields.some((y) => ITEMS[y.item].heavy && (!y.tool || this.inventory.count(y.tool) > 0));
     if (heavy && this.load >= this.loadLimit) {
-      this.message({ key: 'tooHeavy' }, 'info');
+      this.tooHeavy();
       return false;
     }
 
