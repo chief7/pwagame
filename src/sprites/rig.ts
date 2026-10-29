@@ -585,7 +585,7 @@ function boatHull(y: number): [number, number] {
   return [2 + keel * 2 + (y < 18 ? 1 : 0), (y < 16 ? 46 - (16 - y) : 45) - keel * 2];
 }
 
-function fishingBoatSprite(name: string, repaired: boolean): Sprite {
+function fishingBoatSprite(name: string, repaired: boolean, motor = false): Sprite {
   const s = new Sprite(name, 48, 28);
   // The hull: a white band, a red line, the blue side and a dark keel.
   for (let y = 13; y <= 24; y++) {
@@ -618,6 +618,11 @@ function fishingBoatSprite(name: string, repaired: boolean): Sprite {
   for (let y = 0; y <= 12; y++) s.set(20, y, P.steelDark);
   for (let i = 0; i <= 8; i++) s.set(20 - i, 3 + Math.round(i * 0.6), P.steelDark);
   if (repaired) for (const [x, y] of [[21, 0], [22, 0], [23, 0], [21, 1], [22, 1]]) s.set(x, y, P.hazard);
+  if (motor) {
+    // An outboard motor on the stern: a grey hood with a yellow cap, and its shaft down into the sea.
+    for (let y = 8; y <= 13; y++) for (let x = 0; x <= 3; x++) s.set(x, y, y === 8 ? P.hazard : x === 0 ? P.steelLight : x === 3 ? P.steelDeep : P.steel);
+    for (let y = 14; y <= 24; y++) s.set(1, y, P.steelDark);
+  }
   s.outline();
   // Foam where the hull meets the sea.
   for (let x = 4; x <= 43; x++) if (hash2(x, 25, 314) < 0.6) s.set(x, 25, P.foam);
@@ -626,7 +631,7 @@ function fishingBoatSprite(name: string, repaired: boolean): Sprite {
 
 /** The old fishing boat at the rig's dock, with a hole in its side; and repaired, ready to sail. */
 export function fishingBoat(): Sprite[] {
-  return [fishingBoatSprite('fishing_boat_wreck', false), fishingBoatSprite('fishing_boat', true)];
+  return [fishingBoatSprite('fishing_boat_wreck', false), fishingBoatSprite('fishing_boat', true), fishingBoatSprite('fishing_boat_motor', true, true)];
 }
 
 /** A supply crate from the helicopter: a wooden crate with its orange parachute folded on top. */

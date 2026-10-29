@@ -15,6 +15,7 @@ import { palmLeaning, palmLeaningBare, palmTall, palmTallBare, palmYoung } from 
 import type { Sprite } from './pixel';
 import { rigSprites } from './rig';
 import { workshopSprites } from './workshop';
+import { habitatSprites } from './habitat';
 import {
   ash, ashPumice, bankSets, basaltFace, basaltTop, caveFloor, grassAshSet, lava, lavaBankSets, lavaMouthSet, sandAshSet, caveFloorPebbles, grass, grassEdgeSet, grassFlowers, grassScreeSet, river, riverBankSet, riverMouthSet, rockFace, rockTop,
   sand, sandRipples, sandShell, scree, screeStones, shoreSet, snow, snowEdgeSet, snowTracks, water, waterVariants,
@@ -60,6 +61,7 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Interface', sprites: [globe(), ...skillIcons(), starEmpty(), ...grillButton(), loadIcon(), appIcon()] },
     { title: 'Oil rig', sprites: rigSprites() },
     { title: 'Rig workshop', sprites: workshopSprites() },
+    { title: 'Rig habitat', sprites: habitatSprites() },
     { title: 'Map', sprites: [mapIcon(), ...mapMarkers()] },
   ];
 }
