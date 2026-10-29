@@ -246,11 +246,17 @@ stars.
   scrap, 2 rope): its pump gives 2 diesel every half day. Repair the old
   fishing boat at the dock (10 scrap, 6 wood, 4 rope), then walk into it to
   open the sea chart. Sail to islands 1, 2 or 3 and back: a trip takes 6
-  hours and 2 diesel. The boat's hold carries 60 heavy things. Every island
+  hours and 2 diesel (3 hours and 1 diesel with the boat motor). The boat's hold carries 60 heavy things. Every island
   stays as you left it.
 - **Supply drops:** after the call for help, walk into the radio to order
-  one crate each day: food, building materials or fuel. Then walk onto the
-  helipad, and a helicopter comes and drops it there.
+  one free crate each day: food, building materials or fuel. Special parts
+  (solar panel, electric cooker, motor) cost materials from your bag. Then
+  walk onto the helipad, and a helicopter comes and drops your order there.
+- **The rig habitat:** build a solar station (2 solar panels, 4 steel
+  plates, 6 scrap), a galley (1 cooker, 4 steel plates, 6 wood) and a
+  machine shop (1 motor, 6 steel plates, 4 scrap) on steel frames, in trips.
+  The solar station opens lamp posts and the cooker and motor orders; the
+  galley opens fish stew; the machine shop opens a motor for the boat.
 - **New platforms:** build "Platform" (6 scrap, 2 wood) at the edge of the
   crew platform to add a piece of deck, and "Rain tank" (6 scrap) for
   water. New deck stays near the cabin and away from gangways.

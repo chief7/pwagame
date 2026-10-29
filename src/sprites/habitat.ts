@@ -90,9 +90,9 @@ export function habitatItemIcons(): Sprite[] {
   ];
 }
 
-/** The steel frame a habitat building goes up on: girders, a half-done floor and a stack of plates. */
-export function habitatSite(): Sprite {
-  const s = new Sprite('habitat_site', 24, 28);
+/** The steel frame a habitat building goes up on: girders, a stack of plates and a safety board. */
+function habitatSite(name: string): Sprite {
+  const s = new Sprite(name, 24, 28);
   // Four corner posts and two cross girders.
   for (const x of [3, 4, 19, 20]) for (let y = 8; y <= 26; y++) s.set(x, y, x % 2 ? P.steelLight : P.steelDark);
   for (const y of [8, 9, 17]) for (let x = 3; x <= 20; x++) s.set(x, y, y === 9 ? P.steelDark : P.steelLight);
@@ -195,6 +195,20 @@ export function lampPost(): Sprite {
   return s;
 }
 
+/** The same frame for each habitat building. */
+export function habitatSites(): Sprite[] {
+  return ['solar_station_site', 'galley_site', 'machine_shop_site'].map(habitatSite);
+}
+
+/** The icon of the boat motor recipe: the motor with a yellow plus. */
+export function boatMotorIcon(): Sprite {
+  const motor = habitatItemIcons().find((s) => s.name === 'item_motor')!;
+  const s = new Sprite('boat_motor');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) s.set(x - 1, y + 1, motor.get(x, y));
+  for (const [x, y] of [[13, 0], [13, 1], [13, 2], [13, 3], [13, 4], [11, 2], [12, 2], [14, 2], [15, 2]]) s.set(x, y, P.hazard);
+  return s;
+}
+
 export function habitatSprites(): Sprite[] {
-  return [...habitatItemIcons(), habitatSite(), solarStation(), ...galley(), machineShop(), lampPost()];
+  return [...habitatItemIcons(), ...habitatSites(), solarStation(), ...galley(), machineShop(), lampPost(), boatMotorIcon()];
 }

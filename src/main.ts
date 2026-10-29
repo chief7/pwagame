@@ -6,7 +6,8 @@ import { OBJECTS } from './game/defs/objects';
 import { RECIPE_IDS, RECIPES } from './game/defs/recipes';
 import { ROOM_IDS, type RoomId } from './game/defs/rooms';
 import { PATH_IDS, PATHS, SKILLS, xpForPoints, pointsForXp } from './game/defs/skills';
-import { Game, ORDER_IDS, RADIO_ORDERS, VOYAGE_DIESEL, type SaveData } from './game/game';
+import { Game, type SaveData } from './game/game';
+import { HABITAT, ORDER_IDS, ORDERS } from './game/defs/orders';
 import { Tile } from './game/map';
 import { LOW, NEED_IDS, type NeedId } from './game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang, type Strings } from './i18n';
@@ -464,7 +465,10 @@ function renderSheet(): void {
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), actions.childElementCount ? actions : undefined));
     }
   } else {
-    rows.append(goalCard(), starsCard());
+    rows.append(goalCard());
+    // After the call for help, the rig habitat is the long goal.
+    if (game.goalUsed && levelDef(game.level).biome === 'rig') rows.append(habitatCard());
+    rows.append(starsCard());
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
       const problem = game.buildProblem(id);
@@ -483,7 +487,7 @@ function renderSheet(): void {
       const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
-      const told = ['needSkill', 'needFire', 'needFurnace', 'oneHut', 'oneStore', 'rigOnly', 'holdMax'];
+      const told = ['needSkill', 'needFire', 'needNear', 'oneHut', 'oneStore', 'rigOnly', 'holdMax', 'needBuilding', 'oneBuilding', 'haveMotor'];
       if (problem && !site && told.includes(problem.key)) {
         note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
       }
@@ -592,7 +596,10 @@ function renderStore(rows: HTMLElement): void {
   renderStock(rows, container ? words.ui.inContainer : words.ui.inStore, container ? words.ui.containerEmpty : words.ui.storeEmpty, store.store ?? {}, (id, n) => game.storeItem(id, n), (id, n) => game.takeItem(id, n));
 }
 
-/** The Radio panel: order one supply crate each day; the helicopter drops it on the helipad. */
+/**
+ * The Radio panel: free supply crates (one each day) and special parts paid
+ * with materials from the bag; the helicopter drops the order on the helipad.
+ */
 function renderRadio(rows: HTMLElement): void {
   const words = t();
   if (!game.atRadio) {
@@ -600,19 +607,33 @@ function renderRadio(rows: HTMLElement): void {
     return;
   }
   rows.append(el('p', { className: 'empty', textContent: words.ui.radioNote }));
-  const problem = game.orderProblem();
-  if (problem) rows.append(el('p', { className: 'empty locked', textContent: words.message(problem) }));
-  for (const id of ORDER_IDS) {
-    const button = el('button', { type: 'button', textContent: words.ui.order, disabled: !!problem, className: problem ? '' : 'primary' });
-    button.addEventListener('click', () => {
-      if (game.order(id)) saveSoon();
-      updateHud();
-    });
-    const contents = el('div', { className: 'costs' });
-    for (const [item, n] of Object.entries(RADIO_ORDERS[id]) as [ItemId, number][]) {
-      contents.append(el('span', { className: 'cost', title: words.itemCount(item, n) }, [el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, n) }), `${n}`]));
+  const general = game.orderProblem();
+  if (general) rows.append(el('p', { className: 'empty locked', textContent: words.message(general) }));
+  for (const special of [false, true]) {
+    rows.append(el('h3', { className: 'path', textContent: special ? words.ui.specialParts : words.ui.supplyCrates }));
+    for (const id of ORDER_IDS.filter((o) => !!ORDERS[o].price === special)) {
+      const { contents, price } = ORDERS[id];
+      const problem = game.orderProblem(id);
+      const button = el('button', { type: 'button', textContent: words.ui.order, disabled: !!problem, className: problem ? '' : 'primary' });
+      button.addEventListener('click', () => {
+        if (game.order(id)) saveSoon();
+        updateHud();
+      });
+      const note = el('div', {});
+      if (price) {
+        note.append(el('span', { className: 'row-note', textContent: words.ui.price }), costList(price));
+      } else {
+        const list = el('div', { className: 'costs' });
+        for (const [item, n] of Object.entries(contents) as [ItemId, number][]) {
+          list.append(el('span', { className: 'cost', title: words.itemCount(item, n) }, [el('img', { src: icon(`item_${item}`), alt: words.itemCount(item, n) }), `${n}`]));
+        }
+        note.append(list, el('span', { className: 'row-note', textContent: words.ui.freeDaily }));
+      }
+      // Say why a part is locked, or why a free crate must wait for tomorrow.
+      if (problem && !general && problem.key !== 'needPrice') note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
+      const picture = price ? `item_${Object.keys(contents)[0]}` : 'supply_crate';
+      rows.append(row(icon(picture), words.ui.orders[id], note, button));
     }
-    rows.append(row(icon('supply_crate'), words.ui.orders[id], contents, button));
   }
 }
 
@@ -623,7 +644,7 @@ function renderChart(rows: HTMLElement): void {
     rows.append(el('p', { className: 'empty', textContent: words.message({ key: 'noBoat' }) }));
     return;
   }
-  rows.append(el('p', { className: 'empty', textContent: words.ui.chartNote(VOYAGE_DIESEL, game.dieselAboard) }));
+  rows.append(el('p', { className: 'empty', textContent: words.ui.chartNote(game.voyageDiesel, game.dieselAboard, game.voyageTurns / 10) }));
   for (const level of LEVELS.map((l) => l.level)) {
     if (level === game.level) continue;
     const problem = game.voyageProblem(level);
@@ -739,6 +760,28 @@ function goalCard(): HTMLElement {
     note.append(keep);
   }
   const card = row(icon(sprite), level.goalTitle, note);
+  card.classList.add('goal');
+  return card;
+}
+
+/** The rig habitat: how many of its buildings stand, and what each one opens. */
+function habitatCard(): HTMLElement {
+  const words = t();
+  const built = game.habitatBuilt();
+  const note = el('div', {}, [el('span', { className: 'row-note goal-step', textContent: words.ui.habitatProgress(built.length, HABITAT.length) })]);
+  const list = el('ul', { className: 'stars' });
+  for (const kind of HABITAT) {
+    const done = built.includes(kind);
+    list.append(
+      el('li', { className: done ? 'done' : '' }, [
+        // A building that does not stand yet shows its empty frame.
+        el('img', { src: icon(done ? kind : `${kind}_site`), alt: '' }),
+        el('span', {}, [el('b', { textContent: words.objectName(kind) }), ` ${words.ui.habitatOpens[kind as keyof typeof words.ui.habitatOpens]}`]),
+      ]),
+    );
+  }
+  note.append(list, el('span', { className: 'row-note goal-hint', textContent: built.length === HABITAT.length ? words.ui.habitatDone : words.ui.habitatHint }));
+  const card = row(icon(built.at(-1) ?? 'solar_station_site'), words.ui.habitatTitle, note);
   card.classList.add('goal');
   return card;
 }

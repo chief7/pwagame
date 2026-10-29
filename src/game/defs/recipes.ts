@@ -7,7 +7,8 @@ import type { SkillId } from './skills';
 // the bag (`makes`). Names and descriptions live in src/i18n/.
 
 export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway' | 'platform' | 'rain_tank'
-  | 'pickaxe' | 'shovel' | 'crowbar' | 'furnace' | 'smelt' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade';
+  | 'pickaxe' | 'shovel' | 'crowbar' | 'furnace' | 'smelt' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade'
+  | 'solar_station' | 'galley' | 'machine_shop' | 'lamp_post' | 'fish_stew' | 'boat_motor';
 
 export type Recipe = {
   id: RecipeId;
@@ -23,8 +24,10 @@ export type Recipe = {
   skill?: SkillId;
   /** Only possible next to a campfire (cooking). */
   atFire?: true;
-  /** Only possible next to the furnace (smelting). */
-  atFurnace?: true;
+  /** Only possible next to an object of this kind (the furnace for smelting, the galley for stew). */
+  near?: ObjectKind;
+  /** Only once this building stands on the island (the rig habitat). */
+  needsBuilt?: ObjectKind;
   /** Only on the oil rig. */
   rigOnly?: true;
   /**
@@ -68,12 +71,27 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   shovel: { id: 'shovel', makes: 'shovel', cost: { scrap: 3, wood: 2 } },
   crowbar: { id: 'crowbar', makes: 'crowbar', cost: { scrap: 3 } },
   furnace: { id: 'furnace', builds: 'furnace', cost: { clay: 12, stone: 6 }, rigOnly: true },
-  smelt: { id: 'smelt', makes: 'steel_plate', cost: { iron_ore: 2, coal: 1 }, atFurnace: true },
+  smelt: { id: 'smelt', makes: 'steel_plate', cost: { iron_ore: 2, coal: 1 }, near: 'furnace' },
   greenhouse: { id: 'greenhouse', builds: 'greenhouse', cost: { steel_plate: 4, clay: 10, wood: 4 }, rigOnly: true },
   water_maker: { id: 'water_maker', builds: 'water_maker', cost: { steel_plate: 4, spare_part: 2 }, rigOnly: true },
   fish_trap: { id: 'fish_trap', builds: 'fish_trap', cost: { steel_plate: 2, rope: 2 }, rigOnly: true },
   // Next to the fishing boat: 30 more heavy things in its hold, two times.
   hold_upgrade: { id: 'hold_upgrade', builds: 'hold_upgrade', cost: { steel_plate: 4, spare_part: 2 } },
+  // The rig habitat: each building needs a special part from the helicopter,
+  // goes up on a steel frame in trips, and opens more to build and order.
+  solar_station: {
+    id: 'solar_station', builds: 'solar_station_site', cost: {}, siteCost: { solar_panel: 2, steel_plate: 4, scrap: 6 }, rigOnly: true,
+  },
+  galley: {
+    id: 'galley', builds: 'galley_site', cost: {}, siteCost: { cooker: 1, steel_plate: 4, wood: 6 }, rigOnly: true, needsBuilt: 'solar_station',
+  },
+  machine_shop: {
+    id: 'machine_shop', builds: 'machine_shop_site', cost: {}, siteCost: { motor: 1, steel_plate: 6, scrap: 4 }, rigOnly: true, needsBuilt: 'solar_station',
+  },
+  // What the habitat buildings open: lamps on the decks, stew in the galley, a motor for the boat.
+  lamp_post: { id: 'lamp_post', builds: 'lamp_post', cost: { scrap: 3 }, rigOnly: true, needsBuilt: 'solar_station' },
+  fish_stew: { id: 'fish_stew', makes: 'fish_stew', cost: { fish: 1, vegetables: 2, mussels: 2 }, rigOnly: true, near: 'galley' },
+  boat_motor: { id: 'boat_motor', builds: 'boat_motor', cost: { motor: 1, steel_plate: 2 }, rigOnly: true, needsBuilt: 'machine_shop' },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];

@@ -6,6 +6,7 @@ import { ITEMS, type ItemId } from './defs/items';
 import { goalProgress, levelDef, nextLevel, type GoalStage, type LevelId, type StarId } from './defs/levels';
 import { canBeOpened, OBJECTS, type ObjectKind, type WorldObject } from './defs/objects';
 import { RECIPE_IDS, RECIPES, type RecipeId } from './defs/recipes';
+import { HABITAT, ORDERS, type OrderId } from './defs/orders';
 import { hutSprite, ROOMS, type RoomId } from './defs/rooms';
 import { pointsForXp, SKILLS, skillBefore, type SkillId } from './defs/skills';
 import { computeFov } from './fov';
@@ -112,14 +113,9 @@ export const HOLD_LOAD = 60;
 /** A boat trip between the rig and an island: how long it takes (6 hours), and the diesel it burns. */
 export const VOYAGE_TURNS = 60;
 export const VOYAGE_DIESEL = 2;
-/** What the radio can order: a crate the helicopter drops on the helipad, one each day. */
-export type OrderId = 'food' | 'build' | 'fuel';
-export const RADIO_ORDERS: Record<OrderId, Partial<Record<ItemId, number>>> = {
-  food: { cooked_fish: 3, coconut: 4, apple: 3 },
-  build: { log: 10, wood: 6, leaves: 12, stone: 6 },
-  fuel: { diesel: 4, rope: 4 },
-};
-export const ORDER_IDS = Object.keys(RADIO_ORDERS) as OrderId[];
+/** With the boat motor: half the time (3 hours), and half the diesel. */
+export const MOTOR_VOYAGE_TURNS = 30;
+export const MOTOR_VOYAGE_DIESEL = 1;
 /** A new platform cell must be this close to the crew cabin. */
 export const PLATFORM_RANGE = 6;
 /** The bigger hold: 30 more heavy things each time, at most two times. */
@@ -144,7 +140,7 @@ export const STORAGE_WIDTH = 6;
 const STORAGE_REPLACES: ObjectKind[] = ['rig_container', 'life_ring'];
 /** Loose things the storage container may move to another cell when there is no other room. */
 const STORAGE_MOVES: ObjectKind[] = ['scrap_pile', 'pallet', 'old_net', 'chest_closed', 'chest_open', 'diesel_drums', 'diesel_drums_empty'];
-export const SAVE_VERSION = 13;
+export const SAVE_VERSION = 14;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
 
@@ -329,6 +325,8 @@ export interface SaveData {
   orderDay: number;
   /** How often the boat's hold was made bigger. */
   holdUpgrades: number;
+  /** The fishing boat has its outboard motor. */
+  boatMotor: boolean;
   /** Islands that got their ore veins, clay banks and sealed crates. */
   stocked: LevelId[];
 }
@@ -364,6 +362,8 @@ export class Game {
   orderDay = 0;
   /** How often the boat's hold was made bigger (see HOLD_UPGRADE). */
   holdUpgrades = 0;
+  /** The fishing boat has its outboard motor (see MOTOR_VOYAGE_TURNS). */
+  boatMotor = false;
   /** Islands that got their ore veins, clay banks and sealed crates. */
   private stocked = new Set<LevelId>();
   /** The adopted dog, or null before you find one. */
@@ -422,6 +422,7 @@ export class Game {
       this.delivery = save.delivery && { order: save.delivery.order };
       this.orderDay = save.orderDay;
       this.holdUpgrades = save.holdUpgrades;
+      this.boatMotor = save.boatMotor;
       this.stocked = new Set(save.stocked);
       this.animals = save.animals;
       this.player = save.player;
@@ -557,6 +558,7 @@ export class Game {
   objectSprite(obj: WorldObject, frame = 0): string {
     const def = OBJECTS[obj.kind];
     if (obj.kind === 'hut') return hutSprite(obj.rooms, frame);
+    if (obj.kind === 'fishing_boat' && this.boatMotor) return 'fishing_boat_motor';
     if (def.tidal && !this.lowTide) return `${obj.kind}_wet`;
     if (obj.readyAt !== undefined && obj.readyAt > this.turn && def.depletedSprite) return def.depletedSprite;
     return obj.kind;
@@ -836,12 +838,22 @@ export class Game {
     return [...this.lavaCache.cells];
   }
 
-  /** A furnace stands next to the explorer (for smelting). */
-  nearFurnace(): boolean {
-    return DIRS.some(([dx, dy]) => {
-      const obj = this.objectAt(this.player.x + dx, this.player.y + dy);
-      return !!obj && !!OBJECTS[obj.kind].furnace;
-    });
+  /** An object of this kind stands next to the explorer (the furnace for smelting, the galley for stew). */
+  nextTo(kind: ObjectKind): boolean {
+    return DIRS.some(([dx, dy]) => this.objectAt(this.player.x + dx, this.player.y + dy)?.kind === kind);
+  }
+
+  /** This building stands on this island; with `orSite`, its frame counts too. */
+  hasBuilt(kind: ObjectKind, orSite = false): boolean {
+    for (const obj of this.objects.values()) {
+      if (obj.kind === kind || (orSite && OBJECTS[obj.kind].site === kind)) return true;
+    }
+    return false;
+  }
+
+  /** The habitat buildings that stand on the rig (none away from it). */
+  habitatBuilt(): ObjectKind[] {
+    return levelDef(this.level).biome === 'rig' ? HABITAT.filter((kind) => this.hasBuilt(kind)) : [];
   }
 
   /**
@@ -1010,14 +1022,21 @@ export class Game {
       return { key: 'haveTool', item: recipe.makes };
     }
     if (recipe.rigOnly && levelDef(this.level).biome !== 'rig') return { key: 'rigOnly' };
+    if (recipe.needsBuilt && !this.hasBuilt(recipe.needsBuilt)) return { key: 'needBuilding', obj: recipe.needsBuilt };
+    if ('builds' in recipe) {
+      // Each habitat building stands only once on the rig (its frame counts too).
+      const building = OBJECTS[recipe.builds].site ?? recipe.builds;
+      if (HABITAT.includes(building) && this.hasBuilt(building, true)) return { key: 'oneBuilding', obj: building };
+    }
     if ('builds' in recipe && OBJECTS[recipe.builds].holdUpgrade && this.holdUpgrades >= HOLD_UPGRADES) return { key: 'holdMax' };
+    if ('builds' in recipe && OBJECTS[recipe.builds].boatMotor && this.boatMotor) return { key: 'haveMotor' };
     if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
-    if (recipe.atFurnace && !this.nearFurnace()) return { key: 'needFurnace' };
+    if (recipe.near && !this.nextTo(recipe.near)) return { key: 'needNear', obj: recipe.near };
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
       if (recipe.onto) return { key: 'noStep', obj: recipe.onto[0] };
       const built = OBJECTS[recipe.builds];
-      if (built.holdUpgrade) return { key: 'noBoat' };
+      if (built.holdUpgrade || built.boatMotor) return { key: 'noBoat' };
       if (built.onSea) return { key: 'noSeaSpot' };
       return built.deck ? { key: 'noDeckSpot' } : built.onLava ? { key: 'noLavaSpot' } : built.bridge ? { key: 'noBridgeSpot' } : { key: 'noRoom' };
     }
@@ -1291,6 +1310,15 @@ export class Game {
       this.endTurn();
       return true;
     }
+    if (OBJECTS[spot.kind].boatMotor) {
+      this.boatMotor = true;
+      const [boat] = spot.cells;
+      this.emit({ type: 'sparkle', x: boat.x, y: boat.y });
+      this.message({ key: 'motorFitted' }, 'good');
+      this.gainXp(xp, boat.x, boat.y);
+      this.endTurn();
+      return true;
+    }
     if (OBJECTS[spot.kind].deck) {
       // A new cell of deck: the tile changes, nothing stands on it.
       const [cell] = spot.cells;
@@ -1399,23 +1427,43 @@ export class Game {
     return DIRS.some(([dx, dy]) => this.objectAt(this.player.x + dx, this.player.y + dy)?.kind === 'radio_ready');
   }
 
-  /** Why a crate cannot be ordered now, or null if it can. */
-  orderProblem(): Msg | null {
+  /**
+   * Why nothing can be ordered now (not at the radio, a crate on its way),
+   * or with an order, why that one cannot: its building is missing, a free
+   * crate was ordered today, or the bag lacks its price.
+   */
+  orderProblem(id?: OrderId): Msg | null {
     if (!this.atRadio) return { key: 'noRadio' };
     if (this.delivery) return { key: 'onTheWay' };
-    if (this.orderDay === dayNumber(this.turn)) return { key: 'orderedToday' };
+    if (!id) return null;
+    const { opensAfter, price } = ORDERS[id];
+    if (opensAfter && !this.hasBuilt(opensAfter)) return { key: 'orderLocked', obj: opensAfter };
+    if (!price && this.orderDay === dayNumber(this.turn)) return { key: 'orderedToday' };
+    if (price && !this.inventory.hasAll(price)) return { key: 'needPrice' };
     return null;
   }
 
-  /** Order a crate on the radio: the helicopter drops it when the explorer steps on the helipad. Takes no time. */
+  /**
+   * Order a crate on the radio: the helicopter drops it when the explorer
+   * steps on the helipad. A special part is paid from the bag now; a free
+   * crate counts as the order of the day. Takes no time.
+   */
   order(id: OrderId): boolean {
-    const problem = this.orderProblem();
+    const problem = this.orderProblem(id);
     if (problem) {
       this.message(problem, 'info');
       return false;
     }
+    const { price } = ORDERS[id];
+    if (price) {
+      this.inventory.takeAll(price);
+      for (const [item, n] of Object.entries(price) as [ItemId, number][]) {
+        this.emit({ type: 'float', x: this.player.x, y: this.player.y, amount: -n, what: { item }, tone: 'info' });
+      }
+    } else {
+      this.orderDay = dayNumber(this.turn);
+    }
     this.delivery = { order: id };
-    this.orderDay = dayNumber(this.turn);
     this.message({ key: 'ordered', order: id }, 'good');
     return true;
   }
@@ -1433,7 +1481,7 @@ export class Game {
     const middle = (i: number) => [1, -1, this.map.width, -this.map.width].every((d) => this.map.tiles[i + d] === Tile.Helipad);
     const at = pad.find(middle) ?? pad[0];
     if (at === undefined) return;
-    this.objects.set(at, { kind: 'supply_crate', store: { ...RADIO_ORDERS[this.delivery.order] } });
+    this.objects.set(at, { kind: 'supply_crate', store: { ...ORDERS[this.delivery.order].contents } });
     const x = at % this.map.width;
     this.emit({ type: 'drop', x, y: (at - x) / this.map.width });
     this.emit({ type: 'sparkle', x, y: (at - x) / this.map.width });
@@ -1516,11 +1564,20 @@ export class Game {
     return this.inventory.count('diesel') + (this.hold.diesel ?? 0);
   }
 
+  /** How long a boat trip takes, and the diesel it burns: less with the motor. */
+  get voyageTurns(): number {
+    return this.boatMotor ? MOTOR_VOYAGE_TURNS : VOYAGE_TURNS;
+  }
+
+  get voyageDiesel(): number {
+    return this.boatMotor ? MOTOR_VOYAGE_DIESEL : VOYAGE_DIESEL;
+  }
+
   /** Why the boat cannot sail to this island now, or null if it can. */
   voyageProblem(to: LevelId): Msg | null {
     if (!this.boatNear()) return { key: 'noBoat' };
     if (to === this.level) return { key: 'hereAlready' };
-    if (this.dieselAboard < VOYAGE_DIESEL) return { key: 'needDiesel', n: VOYAGE_DIESEL };
+    if (this.dieselAboard < this.voyageDiesel) return { key: 'needDiesel', n: this.voyageDiesel };
     return null;
   }
 
@@ -1535,12 +1592,14 @@ export class Game {
       this.message(problem, 'info');
       return false;
     }
-    const fromHold = Math.min(VOYAGE_DIESEL, this.hold.diesel ?? 0);
+    const diesel = this.voyageDiesel;
+    const turns = this.voyageTurns;
+    const fromHold = Math.min(diesel, this.hold.diesel ?? 0);
     this.takeFromHold('diesel', fromHold);
-    this.inventory.take('diesel', VOYAGE_DIESEL - fromHold);
+    this.inventory.take('diesel', diesel - fromHold);
     const dock = this.boatCell();
     this.objects.delete(dock);
-    for (let i = 0; i < VOYAGE_TURNS; i++) {
+    for (let i = 0; i < turns; i++) {
       this.turn++;
       tickNeeds(this.needs, {
         sleeping: false,
@@ -1557,7 +1616,7 @@ export class Game {
     }
     this.emit({ type: 'fade' });
     this.landOn(to, dock);
-    this.message({ key: 'voyage', level: to }, 'good');
+    this.message({ key: 'voyage', level: to, ...(this.boatMotor && { motor: true as const }) }, 'good');
     if (this.needs.health <= 0) this.faint();
     return true;
   }
@@ -1933,7 +1992,11 @@ export class Game {
     obj.kind = OBJECTS[site].site!;
     delete obj.given;
     this.emit({ type: 'sparkle', x, y });
-    this.message({ key: 'siteDone', obj: obj.kind }, 'good');
+    if (HABITAT.includes(obj.kind)) {
+      this.message({ key: 'habitatBuilt', obj: obj.kind, built: this.habitatBuilt().length, of: HABITAT.length }, 'good');
+    } else {
+      this.message({ key: 'siteDone', obj: obj.kind }, 'good');
+    }
     return true;
   }
 
@@ -2063,7 +2126,7 @@ export class Game {
       const cell = this.deckSpot(fx, fy);
       return cell ? { kind, cells: [cell] } : null;
     }
-    if (OBJECTS[kind].holdUpgrade) {
+    if (OBJECTS[kind].holdUpgrade || OBJECTS[kind].boatMotor) {
       const boat = this.boatCell();
       return boat < 0 ? null : { kind, cells: [{ x: boat % this.map.width, y: Math.floor(boat / this.map.width) }] };
     }
@@ -2803,6 +2866,7 @@ export class Game {
       delivery: this.delivery && { ...this.delivery },
       orderDay: this.orderDay,
       holdUpgrades: this.holdUpgrades,
+      boatMotor: this.boatMotor,
       stocked: [...this.stocked],
     };
   }
@@ -2859,7 +2923,11 @@ export class Game {
     }
     if (data.v === 12) {
       // Version 12 had no rig workshop. Each island gets its new resources when the explorer is there.
-      data = { ...data, v: SAVE_VERSION, holdUpgrades: 0, stocked: [] };
+      data = { ...data, v: 13, holdUpgrades: 0, stocked: [] };
+    }
+    if (data.v === 13) {
+      // Version 13 had no rig habitat: the boat has no motor yet.
+      data = { ...data, v: SAVE_VERSION, boatMotor: false };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

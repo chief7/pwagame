@@ -29,7 +29,8 @@ export type ObjectKind =
   | 'supply_crate' | 'platform_deck'
   | 'storage_container_0' | 'storage_container_1' | 'storage_container_2' | 'storage_container_3' | 'storage_container_4'
   | 'storage_container_5' | 'storage_container_back'
-  | 'ore_vein' | 'clay_bank' | 'sealed_crate' | 'furnace' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade';
+  | 'ore_vein' | 'clay_bank' | 'sealed_crate' | 'furnace' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade'
+  | 'solar_station_site' | 'galley_site' | 'machine_shop_site' | 'solar_station' | 'galley' | 'machine_shop' | 'lamp_post' | 'boat_motor';
 
 export interface Yield {
   item: ItemId;
@@ -92,10 +93,10 @@ export interface ObjectDef {
   dropped?: true;
   /** Built on a sea cell next to a rig deck, in front of the explorer (the fish trap). */
   onSea?: true;
-  /** Smelting needs one of these next to the explorer. */
-  furnace?: true;
   /** Not an object: building it makes the boat's hold bigger. */
   holdUpgrade?: true;
+  /** Not an object: building it puts the outboard motor on the fishing boat. */
+  boatMotor?: true;
   /** Not an object: building it lays a new deck cell on the sea (a platform on the rig). */
   deck?: true;
   /** A store: walking into it opens the Store panel (see Game.storeItem). */
@@ -360,7 +361,7 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     },
   }),
   // The rig's buildings.
-  furnace: def({ kind: 'furnace', furnace: true, lightRadius: 2, frames: ['furnace', 'furnace_2'] }),
+  furnace: def({ kind: 'furnace', lightRadius: 2, frames: ['furnace', 'furnace_2'] }),
   greenhouse: def({
     kind: 'greenhouse', blocksSight: true, depletedSprite: 'greenhouse_picked',
     gather: { yields: [{ item: 'vegetables', min: 2, max: 3 }], after: { regrow: 120 } },
@@ -371,6 +372,15 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     gather: { yields: [{ item: 'fish', min: 1, max: 2 }], after: { regrow: 100 } },
   }),
   hold_upgrade: def({ kind: 'hold_upgrade', holdUpgrade: true }),
+  // The rig habitat: steel frames that take what their recipe's siteCost needs, then the buildings.
+  solar_station_site: def({ kind: 'solar_station_site', site: 'solar_station' }),
+  galley_site: def({ kind: 'galley_site', site: 'galley' }),
+  machine_shop_site: def({ kind: 'machine_shop_site', site: 'machine_shop' }),
+  solar_station: def({ kind: 'solar_station' }),
+  galley: def({ kind: 'galley', blocksSight: true, lightRadius: 1, frames: ['galley', 'galley_2'] }),
+  machine_shop: def({ kind: 'machine_shop', blocksSight: true }),
+  lamp_post: def({ kind: 'lamp_post', lightRadius: 3 }),
+  boat_motor: def({ kind: 'boat_motor', boatMotor: true }),
   crane: def({ kind: 'crane', blocksSight: true }),
   // The camp on the rig: a bed for a full rest, and a little stove to cook on.
   crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),

@@ -7,10 +7,11 @@ import { ANIMALS } from './defs/animals';
 import { canBeOpened, OBJECTS, type ObjectKind } from './defs/objects';
 import { LEVELS } from './defs/levels';
 import { RECIPES } from './defs/recipes';
+import { ORDERS } from './defs/orders';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import {
-  BAG_LOAD, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
+  BAG_LOAD, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, MOTOR_VOYAGE_DIESEL, MOTOR_VOYAGE_TURNS, VOYAGE_DIESEL, VOYAGE_TURNS,
 } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -2945,12 +2946,12 @@ describe('Game: radio supply drops and new platforms', () => {
     [game.player.x, game.player.y] = [rx, ry];
     const crate = [...game.objects].find(([, o]) => o.kind === 'supply_crate')!;
     expect(game.map.tiles[crate[0]]).toBe(Tile.Helipad);
-    expect(crate[1].store).toEqual(RADIO_ORDERS.build);
+    expect(crate[1].store).toEqual(ORDERS.build.contents);
     expect(game.log.some((e) => e.msg.key === 'delivered')).toBe(true);
     // Only one each day.
-    expect(game.orderProblem()).toEqual({ key: 'orderedToday' });
+    expect(game.orderProblem('food')).toEqual({ key: 'orderedToday' });
     game.turn += TURNS_PER_DAY;
-    expect(game.orderProblem()).toBe(null);
+    expect(game.orderProblem('food')).toBe(null);
   });
 
   it('takes things out of the supply crate, and the empty crate is gone', () => {
@@ -3137,7 +3138,7 @@ describe('Game: the rig workshop', () => {
   it('smelts steel plates next to the furnace only', () => {
     const game = rigGame(164);
     give(game, { iron_ore: 4, coal: 2 });
-    expect(game.buildProblem('smelt')).toEqual({ key: 'needFurnace' });
+    expect(game.buildProblem('smelt')).toEqual({ key: 'needNear', obj: 'furnace' });
     place(game, 1, 0, 'furnace');
     expect(game.build('smelt')).toBe(true);
     expect(game.inventory.count('steel_plate')).toBe(1);
@@ -3193,6 +3194,146 @@ describe('Game: the rig workshop', () => {
     const other = rigGame(168);
     give(other, { steel_plate: 4, spare_part: 2 });
     expect(other.buildProblem('hold_upgrade')).toEqual({ key: 'noBoat' });
+  });
+});
+
+describe('Game: the rig habitat', () => {
+  /** On the rig after the call for help, on a clear 5 × 5 deck. */
+  function rigGame(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    game.sailed = true;
+    const { map, player: p } = game;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      map.set(p.x + dx, p.y + dy, Tile.Deck);
+      game.objects.delete(map.idx(p.x + dx, p.y + dy));
+    }
+    game.takeEvents();
+    return game;
+  }
+
+  /** The working radio just east of the explorer. */
+  function atRadio(seed: number): Game {
+    const game = rigGame(seed);
+    place(game, 1, 0, 'radio_ready');
+    return game;
+  }
+
+  /** Build a habitat building's frame in front of the explorer and give it everything. */
+  function putUp(game: Game, id: 'solar_station' | 'galley' | 'machine_shop'): void {
+    game.player.facing = 'right';
+    game.objects.delete(game.map.idx(game.player.x + 1, game.player.y));
+    expect(game.build(id)).toBe(true);
+    give(game, RECIPES[id].siteCost!);
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe(id);
+  }
+
+  it('sells special parts for materials, with no daily limit, and only after their building', () => {
+    const game = atRadio(180);
+    expect(game.orderProblem('solar_panel')).toEqual({ key: 'needPrice' });
+    expect(game.orderProblem('cooker')).toEqual({ key: 'orderLocked', obj: 'solar_station' });
+    expect(game.orderProblem('motor')).toEqual({ key: 'orderLocked', obj: 'solar_station' });
+    give(game, { steel_plate: 4, crystal: 4 });
+    // A free crate today does not stop a special part.
+    expect(game.order('food')).toBe(true);
+    game.delivery = null;
+    expect(game.order('solar_panel')).toBe(true);
+    expect(game.inventory.count('steel_plate')).toBe(2);
+    expect(game.inventory.count('crystal')).toBe(2);
+    expect(game.orderProblem('solar_panel')).toEqual({ key: 'onTheWay' });
+    onHelipad(game);
+    game.wait();
+    const crate = [...game.objects.values()].find((o) => o.kind === 'supply_crate');
+    expect(crate?.store).toEqual({ solar_panel: 1 });
+    expect(game.log.map((e) => e.msg)).toContainEqual({ key: 'delivered', order: 'solar_panel' });
+  });
+
+  it('builds the solar station on a frame in trips, once, and it opens the next things', () => {
+    const game = rigGame(181);
+    expect(game.buildProblem('galley')).toEqual({ key: 'needBuilding', obj: 'solar_station' });
+    expect(game.buildProblem('lamp_post')).toEqual({ key: 'needBuilding', obj: 'solar_station' });
+    game.player.facing = 'right';
+    expect(game.build('solar_station')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('solar_station_site');
+    expect(game.buildProblem('solar_station')).toEqual({ key: 'oneBuilding', obj: 'solar_station' });
+    give(game, { solar_panel: 1, steel_plate: 4, scrap: 6 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.siteLeft(game.player.x + 1, game.player.y)).toEqual({ solar_panel: 1 });
+    give(game, { solar_panel: 1 });
+    expect(game.move(1, 0)).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('solar_station');
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'habitatBuilt', obj: 'solar_station', built: 1, of: 3 });
+    expect(game.habitatBuilt()).toEqual(['solar_station']);
+    expect(game.buildProblem('solar_station')).toEqual({ key: 'oneBuilding', obj: 'solar_station' });
+    // The galley's frame costs nothing: what it needs goes in later.
+    expect(game.buildProblem('galley')).toBe(null);
+    expect(game.buildProblem('lamp_post')).toEqual({ key: 'needMaterials' });
+    place(game, 0, 1, 'radio_ready');
+    expect(game.orderProblem('cooker')).toEqual({ key: 'needPrice' });
+  });
+
+  it('lights the deck at night with a lamp post', () => {
+    const game = rigGame(182);
+    putUp(game, 'solar_station');
+    game.player.facing = 'left';
+    give(game, { scrap: 3 });
+    expect(game.build('lamp_post')).toBe(true);
+    expect(game.objectAt(game.player.x - 1, game.player.y)?.kind).toBe('lamp_post');
+    expect(game.lights()).toContainEqual([game.player.x - 1, game.player.y, OBJECTS.lamp_post.lightRadius]);
+  });
+
+  it('cooks fish stew next to the galley only', () => {
+    const game = rigGame(183);
+    putUp(game, 'solar_station');
+    game.player.y -= 1;
+    putUp(game, 'galley');
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'habitatBuilt', obj: 'galley', built: 2, of: 3 });
+    give(game, { fish: 2, vegetables: 4, mussels: 4 });
+    expect(game.build('fish_stew')).toBe(true);
+    expect(game.inventory.count('fish_stew')).toBe(1);
+    game.player.y += 2;
+    expect(game.buildProblem('fish_stew')).toEqual({ key: 'needNear', obj: 'galley' });
+    game.needs.food = 20;
+    expect(game.eat('fish_stew')).toBe(true);
+    expect(game.needs.food).toBeCloseTo(80, 0);
+  });
+
+  it('fits a motor to the boat after the machine shop: shorter, cheaper trips', () => {
+    const game = rigGame(184);
+    putUp(game, 'solar_station');
+    game.player.y -= 1;
+    putUp(game, 'machine_shop');
+    const { map, player: p } = game;
+    map.set(p.x, p.y + 3, Tile.Water);
+    game.objects.set(map.idx(p.x, p.y + 3), { kind: 'fishing_boat' });
+    give(game, { motor: 1, steel_plate: 2 });
+    expect(game.buildProblem('boat_motor')).toEqual({ key: 'noBoat' });
+    p.y += 2;
+    expect(game.build('boat_motor')).toBe(true);
+    expect(game.boatMotor).toBe(true);
+    expect(game.log.map((e) => e.msg)).toContainEqual({ key: 'motorFitted' });
+    expect(game.objectSprite(game.objectAt(p.x, p.y + 1)!)).toBe('fishing_boat_motor');
+    give(game, { motor: 1, steel_plate: 2 });
+    expect(game.buildProblem('boat_motor')).toEqual({ key: 'haveMotor' });
+    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: MOTOR_VOYAGE_DIESEL });
+    game.inventory.add('diesel', 1);
+    const turn = game.turn;
+    expect(game.voyage(1)).toBe(true);
+    expect(game.turn).toBe(turn + MOTOR_VOYAGE_TURNS);
+    expect(game.inventory.count('diesel')).toBe(0);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'voyage', level: 1, motor: true });
+    expect(Game.fromSave(JSON.parse(JSON.stringify(game.toSave()))).boatMotor).toBe(true);
+  });
+
+  it('loads a save from before the habitat with no boat motor', () => {
+    const save = { ...new Game(185).toSave(), v: 13 } as Partial<ReturnType<Game['toSave']>>;
+    delete save.boatMotor;
+    const loaded = Game.fromSave(save as ReturnType<Game['toSave']>);
+    expect(loaded.boatMotor).toBe(false);
+    expect(loaded.voyageTurns).toBe(VOYAGE_TURNS);
   });
 });
 

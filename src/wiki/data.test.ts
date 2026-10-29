@@ -26,7 +26,7 @@ describe('compendium data', () => {
   it('knows where every item comes from', () => {
     for (const id of ITEM_IDS) {
       const src = itemSources(id);
-      expect(src.objects.length + src.recipes.length + Number(src.fishing), id).toBeGreaterThan(0);
+      expect(src.objects.length + src.recipes.length + Number(src.fishing) + Number(src.radio), id).toBeGreaterThan(0);
     }
   });
 

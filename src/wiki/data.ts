@@ -1,3 +1,4 @@
+import { ORDER_IDS, ORDERS } from '../game/defs/orders';
 import { ANIMALS, ANIMAL_KINDS, type AnimalKind } from '../game/defs/animals';
 import { ITEMS, ITEM_IDS, type ItemId } from '../game/defs/items';
 import { LEVELS, type StageId } from '../game/defs/levels';
@@ -57,6 +58,8 @@ export interface ItemSource {
   recipes: RecipeId[];
   /** Fishing in the sea. */
   fishing: boolean;
+  /** Ordered on the rig's radio (the special parts). */
+  radio: boolean;
 }
 
 export function itemSources(id: ItemId): ItemSource {
@@ -65,7 +68,8 @@ export function itemSources(id: ItemId): ItemSource {
     return !!g && g.yields.some((y) => y.item === id);
   });
   const recipes = RECIPE_IDS.filter((r) => 'makes' in RECIPES[r] && (RECIPES[r] as { makes: ItemId }).makes === id);
-  return { objects, recipes, fishing: id === 'fish' };
+  const radio = ORDER_IDS.some((o) => ORDERS[o].price && ORDERS[o].contents[id]);
+  return { objects, recipes, fishing: id === 'fish', radio };
 }
 
 /** Items grouped as the Bag panel thinks of them. */

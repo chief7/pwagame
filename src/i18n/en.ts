@@ -36,6 +36,10 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   spare_part: { one: 'spare part', many: 'spare parts', short: ['part', 'parts'] },
   steel_plate: { one: 'steel plate', many: 'steel plates', short: ['plate', 'plates'] },
   vegetables: { one: 'basket of vegetables', many: 'baskets of vegetables', short: ['vegetables', 'vegetables'] },
+  solar_panel: { one: 'solar panel', many: 'solar panels', short: ['panel', 'panels'] },
+  cooker: { one: 'electric cooker', many: 'electric cookers', short: ['cooker', 'cookers'] },
+  motor: { one: 'motor', many: 'motors', short: ['motor', 'motors'] },
+  fish_stew: { one: 'bowl of fish stew', many: 'bowls of fish stew', short: ['stew', 'stews'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -141,6 +145,14 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   water_maker: { name: 'water maker' },
   fish_trap: { name: 'fish trap', gather: 'You pull up the fish trap' },
   hold_upgrade: { name: 'bigger hold' },
+  solar_station_site: { name: 'solar station frame' },
+  galley_site: { name: 'galley frame' },
+  machine_shop_site: { name: 'machine shop frame' },
+  solar_station: { name: 'solar station' },
+  galley: { name: 'galley' },
+  machine_shop: { name: 'machine shop' },
+  lamp_post: { name: 'lamp post' },
+  boat_motor: { name: 'boat motor' },
 };
 
 const ANIMAL: AnimalWords<{ name: string; shoo: string; hurt?: string; alert?: string }> = {
@@ -294,7 +306,7 @@ export const en: Strings = {
     siteNote: 'First you build the frame. Then walk into it to give it these materials, in as many trips as you like.',
     siteLeft: 'The frame still needs:',
     chart: 'Sea chart',
-    chartNote: (diesel, aboard) => `A trip takes 6 hours and ${diesel} diesel. You have ${aboard} diesel in your bag and the hold.`,
+    chartNote: (diesel, aboard, hours) => `A trip takes ${hours} hours and ${diesel} diesel. You have ${aboard} diesel in your bag and the hold.`,
     islandName: (level) => ({ 1: 'Island 1: the tropical island', 2: 'Island 2: Pine Ridge', 3: 'Island 3: Ember Isle', 4: 'The oil rig' })[level],
     sailTo: 'Sail',
     beenThere: 'You were here before. Everything is as you left it.',
@@ -304,9 +316,22 @@ export const en: Strings = {
     inHold: 'In the hold',
     holdEmpty: 'The hold is empty.',
     radio: 'Radio',
-    radioNote: 'Order one crate each day. Then go to the helipad: a helicopter comes and drops it there.',
+    radioNote: 'Order a crate, then go to the helipad: a helicopter comes and drops it there. One crate comes at a time.',
     order: 'Order',
-    orders: { food: 'Food crate', build: 'Building crate', fuel: 'Fuel crate' },
+    orders: { food: 'Food crate', build: 'Building crate', fuel: 'Fuel crate', solar_panel: 'Solar panel', cooker: 'Electric cooker', motor: 'Motor' },
+    supplyCrates: 'Supply crates',
+    specialParts: 'Special parts',
+    price: 'Price:',
+    freeDaily: 'Free, one each day.',
+    habitatTitle: 'Rig habitat',
+    habitatProgress: (built, of) => `${built} of ${of} buildings`,
+    habitatHint: 'Order special parts on the radio and pay with materials. Then build the habitat buildings here, on the rig.',
+    habitatDone: 'Your habitat is complete. The rig is a real home now!',
+    habitatOpens: {
+      solar_station: 'Opens: lamp posts, and the cooker and motor on the radio.',
+      galley: 'Opens: fish stew.',
+      machine_shop: 'Opens: a motor for the fishing boat.',
+    },
   },
   rooms: {
     workshop: { name: 'Workshop', description: 'A workbench. Rope you make in your hut gives 1 more.' },
@@ -401,6 +426,12 @@ export const en: Strings = {
     platform: { name: 'Platform', description: 'Lays a new piece of deck at the edge of the crew platform. Stand at the edge and face the sea.' },
     rain_tank: { name: 'Rain tank', description: 'A steel tank that catches rain water. Drink from it.' },
     gangway: { name: 'Mend gangway', description: 'Fixes a broken gangway on the rig with scrap metal. Stand next to a broken end to build it.' },
+    solar_station: { name: 'Solar station', description: 'The first building of your rig habitat. It makes power for the rig. Solar panels come from the radio.' },
+    galley: { name: 'Galley', description: 'A kitchen on the rig. Cook fish stew next to it. The cooker comes from the radio.' },
+    machine_shop: { name: 'Machine shop', description: 'A workshop for machines. Here you learn to fit a motor to the boat. The motor comes from the radio.' },
+    lamp_post: { name: 'Lamp post', description: 'An electric lamp for the decks. It lights 3 steps around it at night.' },
+    fish_stew: { name: 'Fish stew', description: 'Stand next to the galley. A big hot meal: lots of Food, some Water and Energy.' },
+    boat_motor: { name: 'Boat motor', description: 'Stand next to the fishing boat. With a motor, a trip takes 3 hours and 1 diesel.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
   objectName: (kind) => cap(OBJECT[kind].name),
@@ -474,6 +505,14 @@ export const en: Strings = {
       case 'onTheWay': return 'Your crate is on its way. Go to the helipad to meet the helicopter.';
       case 'orderedToday': return 'You already ordered a crate today. Try again tomorrow.';
       case 'ordered': return `“One ${en.ui.orders[msg.order].toLowerCase()}, please!” The radio crackles: “On its way!”`;
+      case 'orderLocked': return `Build the ${obj(msg.obj)} on the rig first.`;
+      case 'needPrice': return 'You do not have what this part costs. Bring it in your bag.';
+      case 'needBuilding': return `Build the ${obj(msg.obj)} on the rig first.`;
+      case 'oneBuilding': return `There is already ${a(obj(msg.obj))} on the rig.`;
+      case 'needNear': return msg.obj === 'furnace' ? 'Stand next to the furnace to smelt.' : `Stand next to the ${obj(msg.obj)}.`;
+      case 'habitatBuilt': return `The ${obj(msg.obj)} is finished! Your rig habitat has ${msg.built} of ${msg.of} buildings.`;
+      case 'haveMotor': return 'The fishing boat already has a motor.';
+      case 'motorFitted': return 'You bolt the motor to the fishing boat. Trips are faster now, and use less diesel!';
       case 'delivered': return `A helicopter roars over the rig and drops a ${en.ui.orders[msg.order].toLowerCase()} on the helipad!`;
       case 'platformBuilt': return 'You bolt a new piece of deck to the platform.';
       case 'noDeckSpot': return 'Stand at the edge of the crew platform and face the sea. New deck must stay near the cabin, and away from gangways and other platforms.';
@@ -483,8 +522,8 @@ export const en: Strings = {
       case 'needDiesel': return `The boat needs ${msg.n} diesel for the trip. Carry it in your bag or the hold.`;
       case 'holdFull': return 'The hold is full of heavy things.';
       case 'voyage': return msg.level === 4
-        ? 'After six hours at sea, you tie up the boat at the oil rig again.'
-        : `After six hours at sea, you land on ${en.ui.islandName(msg.level).replace(/^Island \d: /, '')}.`;
+        ? `After ${msg.motor ? 'three' : 'six'} hours at sea, you tie up the boat at the oil rig again.`
+        : `After ${msg.motor ? 'three' : 'six'} hours at sea, you land on ${en.ui.islandName(msg.level).replace(/^Island \d: /, '')}.`;
       case 'gangwayBroken': return 'This gangway is broken in the middle. Mend it with scrap metal: build “Mend gangway” next to it.';
       case 'gangwayMended': return 'You bolt scrap metal over the gap. The gangway is whole again!';
       case 'lavaHot': return "Too hot! You can't walk on lava. Lay stepping stones across the lava flow.";

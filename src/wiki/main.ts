@@ -159,6 +159,7 @@ function sourceText(id: ItemId): string {
   const src = itemSources(id);
   const parts = [names(src.objects), ...src.recipes.map((r) => t().recipes[r].name)];
   if (src.fishing) parts.push(W.itemsSection.fishing);
+  if (src.radio) parts.push(W.itemsSection.radio);
   return parts.filter(Boolean).join(', ');
 }
 
