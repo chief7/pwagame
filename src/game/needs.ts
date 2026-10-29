@@ -35,7 +35,7 @@ export interface Conditions {
 const RATES = {
   food: 0.45,
   water: 0.45,
-  energyAwake: 0.25,
+  energyAwake: 0.15,
   energySleep: 1.4,
   warmthUp: 1.5,
   warmthDown: 0.6,
