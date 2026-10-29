@@ -395,7 +395,7 @@ export const de: Strings = {
     siteNote: 'Zuerst baust du das Gerüst. Dann lauf dagegen, um ihm diese Dinge zu geben, so oft du willst.',
     siteLeft: 'Das Gerüst braucht noch:',
     chart: 'Seekarte',
-    chartNote: (diesel, aboard, hours) => `Eine Fahrt dauert ${hours} Stunden und braucht ${diesel} Diesel. Du hast ${aboard} Diesel in Tasche und Laderaum.`,
+    chartNote: (diesel, aboard, hours) => `Eine Fahrt dauert ${hours} Stunden und braucht ${diesel} Diesel. Für eine Fahrt zu einer Insel nimm auch den Diesel für die Rückfahrt zur Bohrinsel mit. Du hast ${aboard} Diesel in Tasche und Laderaum.`,
     islandName: (level) => ({ 1: 'Insel 1: die Tropeninsel', 2: 'Insel 2: Kiefernkamm', 3: 'Insel 3: Glutinsel', 4: 'Die Bohrinsel' })[level],
     sailTo: 'Losfahren',
     beenThere: 'Hier warst du schon. Alles ist so, wie du es verlassen hast.',
@@ -608,7 +608,9 @@ export const de: Strings = {
       case 'openChart': return 'Du steigst an Bord und rollst die Seekarte aus.';
       case 'noBoat': return 'Stell dich neben das Fischerboot.';
       case 'hereAlready': return 'Hier bist du schon.';
-      case 'needDiesel': return `Das Boot braucht ${msg.n} Diesel für die Fahrt. Trag ihn in der Tasche oder im Laderaum.`;
+      case 'needDiesel': return msg.back
+        ? `Das Boot braucht ${msg.n} Diesel: für die Hinfahrt und die Rückfahrt zur Bohrinsel. Diesel gibt es nur auf der Bohrinsel. Trag ihn in der Tasche oder im Laderaum.`
+        : `Das Boot braucht ${msg.n} Diesel für die Fahrt. Trag ihn in der Tasche oder im Laderaum.`;
       case 'holdFull': return 'Der Laderaum ist voll mit schweren Dingen.';
       case 'voyage': return msg.level === 4
         ? `Nach ${msg.motor ? 'drei' : 'sechs'} Stunden auf See machst du das Boot wieder an der Bohrinsel fest.`

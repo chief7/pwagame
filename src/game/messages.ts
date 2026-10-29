@@ -79,10 +79,10 @@ export type Msg =
   | { key: 'holdUpgraded'; limit: number }
   /** Walked into the fishing boat: the sea chart and the hold open. */
   | { key: 'openChart' }
-  /** The boat cannot sail: no boat here, already on that island, not enough diesel. */
+  /** The boat cannot sail: no boat here, already on that island, not enough diesel (back: for the trip there and back to the rig). */
   | { key: 'noBoat' }
   | { key: 'hereAlready' }
-  | { key: 'needDiesel'; n: number }
+  | { key: 'needDiesel'; n: number; back?: true }
   /** The boat's hold is full of heavy things. */
   | { key: 'holdFull' }
   /** Arrived by boat on this island (or the rig). */

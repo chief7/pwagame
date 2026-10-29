@@ -2809,20 +2809,38 @@ describe('Game: the fishing boat, voyages and kept islands', () => {
 
   it('needs diesel to sail, takes it from the hold first, and the trip takes hours', () => {
     const { game } = atBoat(142);
-    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: VOYAGE_DIESEL });
+    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: 2 * VOYAGE_DIESEL, back: true });
     expect(game.voyageProblem(4)).toEqual({ key: 'hereAlready' });
-    game.inventory.add('diesel', 1);
-    game.hold = { diesel: 1, stone: 10 };
+    game.inventory.add('diesel', VOYAGE_DIESEL);
+    game.hold = { diesel: VOYAGE_DIESEL, stone: 10 };
     const turn = game.turn;
     expect(game.voyage(1)).toBe(true);
     expect(game.level).toBe(1);
     expect(game.turn).toBe(turn + VOYAGE_TURNS);
-    expect(game.inventory.count('diesel')).toBe(0);
+    expect(game.inventory.count('diesel')).toBe(VOYAGE_DIESEL);
     expect(game.hold).toEqual({ stone: 10 });
     expect(game.log.at(-1)?.msg).toEqual({ key: 'voyage', level: 1 });
     // The boat lies next to the explorer, in the sea.
     expect(game.boatNear()).toBe(true);
     expect(game.visited(4)).toBe(true);
+  });
+
+  it('keeps the diesel for the way back to the rig: an island never strands the explorer', () => {
+    const { game } = atBoat(146);
+    // One trip of diesel is not enough to leave the rig for an island.
+    game.inventory.add('diesel', 2 * VOYAGE_DIESEL - 1);
+    expect(game.voyageProblem(2)).toEqual({ key: 'needDiesel', n: 2 * VOYAGE_DIESEL, back: true });
+    expect(game.voyage(2)).toBe(false);
+    expect(game.level).toBe(4);
+    game.inventory.add('diesel', 1);
+    expect(game.voyage(2)).toBe(true);
+    expect(game.dieselAboard).toBe(VOYAGE_DIESEL);
+    // On the island, the diesel left is for the rig, not for the next island.
+    expect(game.voyageProblem(3)).toEqual({ key: 'needDiesel', n: 2 * VOYAGE_DIESEL, back: true });
+    expect(game.voyageProblem(4)).toBeNull();
+    expect(game.voyage(4)).toBe(true);
+    expect(game.level).toBe(4);
+    expect(game.dieselAboard).toBe(0);
   });
 
   it('keeps the islands as they were left, and moors at the same dock again', () => {
@@ -2879,8 +2897,8 @@ describe('Game: the fishing boat, voyages and kept islands', () => {
     const { game } = atBoat(147);
     game.sailed = true;
     expect(game.goalUsed).toBe(true);
-    game.inventory.add('diesel', 2);
-    game.voyage(2);
+    game.inventory.add('diesel', 2 * VOYAGE_DIESEL);
+    expect(game.voyage(2)).toBe(true);
     expect(game.goalUsed).toBe(false);
     expect(game.goal().state).not.toBe('sailed');
   });
@@ -3318,12 +3336,12 @@ describe('Game: the rig habitat', () => {
     expect(game.objectSprite(game.objectAt(p.x, p.y + 1)!)).toBe('fishing_boat_motor');
     give(game, { motor: 1, steel_plate: 2 });
     expect(game.buildProblem('boat_motor')).toEqual({ key: 'haveMotor' });
-    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: MOTOR_VOYAGE_DIESEL });
-    game.inventory.add('diesel', 1);
+    expect(game.voyageProblem(1)).toEqual({ key: 'needDiesel', n: 2 * MOTOR_VOYAGE_DIESEL, back: true });
+    game.inventory.add('diesel', 2 * MOTOR_VOYAGE_DIESEL);
     const turn = game.turn;
     expect(game.voyage(1)).toBe(true);
     expect(game.turn).toBe(turn + MOTOR_VOYAGE_TURNS);
-    expect(game.inventory.count('diesel')).toBe(0);
+    expect(game.inventory.count('diesel')).toBe(MOTOR_VOYAGE_DIESEL);
     expect(game.log.at(-1)?.msg).toEqual({ key: 'voyage', level: 1, motor: true });
     expect(Game.fromSave(JSON.parse(JSON.stringify(game.toSave()))).boatMotor).toBe(true);
   });
