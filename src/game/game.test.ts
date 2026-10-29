@@ -2641,6 +2641,33 @@ describe('Game: the carry limit, the store crate and the hut frame', () => {
     expect(game.inventory.count('leaves')).toBe(1);
   });
 
+  it('builds the store crate with logs when there is not enough wood', () => {
+    const game = sandbox(134);
+    game.player.facing = 'right';
+    game.inventory.add('log', 200);
+    give(game, { rope: 2 });
+    // The Build panel shows the logs, and building takes them.
+    expect(game.recipeCost('store_crate')).toEqual({ log: 6, rope: 2 });
+    expect(game.buildProblem('store_crate')).toBe(null);
+    expect(game.build('store_crate')).toBe(true);
+    expect(game.objectAt(game.player.x + 1, game.player.y)?.kind).toBe('store_crate');
+    expect(game.inventory.count('log')).toBe(194);
+    expect(game.inventory.count('rope')).toBe(0);
+  });
+
+  it('builds the store crate with wood first, and shows the wood when neither is there', () => {
+    const game = sandbox(135);
+    game.inventory.add('log', 6);
+    expect(game.recipeCost('store_crate')).toEqual({ wood: 6, rope: 2 });
+    expect(game.buildProblem('store_crate')).toEqual({ key: 'needMaterials' });
+    give(game, { wood: 6, rope: 2 });
+    expect(game.recipeCost('store_crate')).toEqual({ wood: 6, rope: 2 });
+    game.player.facing = 'right';
+    expect(game.build('store_crate')).toBe(true);
+    expect(game.inventory.count('log')).toBe(6);
+    expect(game.inventory.count('wood')).toBe(0);
+  });
+
   it('lets one gather go a little over the limit', () => {
     const game = sandbox(132);
     game.inventory.add('stone', BAG_LOAD - 1);

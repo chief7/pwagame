@@ -461,7 +461,7 @@ export const de: Strings = {
     campfire: { name: 'Lagerfeuer', description: 'Hält dich warm und macht die Nacht hell.' },
     lean_to: { name: 'Unterstand', description: 'Ein einfacher Unterschlupf für unterwegs. Wärmere Nächte, aber nur das Bett in einer Hütte gibt volle Erholung.' },
     hut: { name: 'Hütte', description: 'Dein Lager. Ein Bett für volle Erholung, und drinnen baust du neue Räume an. Eine pro Insel.' },
-    store_crate: { name: 'Vorratskiste', description: 'Bewahrt auf, was du nicht trägst. Lauf dagegen, um Dinge hineinzulegen oder herauszunehmen. Eine pro Insel.' },
+    store_crate: { name: 'Vorratskiste', description: 'Bewahrt auf, was du nicht trägst. Lauf dagegen, um Dinge hineinzulegen oder herauszunehmen. Eine pro Insel. 6 Holzstämme gehen auch statt Holz.' },
     pack_frame: { name: 'Kraxe', description: 'Ein Holzgestell für den Rücken. Du trägst 15 schwere Dinge mehr.' },
     rope: { name: 'Seil', description: 'Aus großen Blättern gedreht. Für das Inselziel brauchst du Seile.' },
     axe: { name: 'Steinaxt', description: 'Schlägt Holzstämme von Bäumen und einen Weg durch Dornengestrüpp.' },

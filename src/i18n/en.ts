@@ -378,7 +378,7 @@ export const en: Strings = {
     campfire: { name: 'Campfire', description: 'Keeps you warm and lights up the night.' },
     lean_to: { name: 'Lean-to', description: 'A simple shelter for trips. Warmer nights, but only the bed in a hut gives a full rest.' },
     hut: { name: 'Hut', description: 'Your camp. A bed for a full rest, and you can add rooms from inside. One on each island.' },
-    store_crate: { name: 'Store crate', description: 'Keeps what you do not carry. Walk into it to put things in or take them out. One on each island.' },
+    store_crate: { name: 'Store crate', description: 'Keeps what you do not carry. Walk into it to put things in or take them out. One on each island. 6 logs work in place of the wood.' },
     pack_frame: { name: 'Pack frame', description: 'A wooden frame on your back. You can carry 15 more heavy things.' },
     axe: { name: 'Stone axe', description: 'Chops logs from trees and clears brambles.' },
     rope: { name: 'Rope', description: 'Twisted from big leaves. You need rope for the island goal.' },
