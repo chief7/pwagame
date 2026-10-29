@@ -268,6 +268,10 @@ export const PALETTE = {
   paintRedDark: '#8e2c1f',
   paintBlue: '#3f6f9a',
   paintBlueDark: '#2c4f70',
+  // The storage container: fresh green paint, so it stands out from the rust.
+  paintGreenLight: '#7fbf6a',
+  paintGreen: '#4f9446',
+  paintGreenDark: '#336a32',
   glass: '#2a4a5c',
   clay: '#c2683f',
   clayLight: '#de8c5e',

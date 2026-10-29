@@ -168,28 +168,71 @@ export function container(): Sprite {
   return s.outline().shadow(8, 15, 7.5, 1.2);
 }
 
-/** The same container seen from its end: two cargo doors with lock bars, so it reads as a store. */
-export function containerDoors(): Sprite {
-  const s = new Sprite('rig_container_doors');
-  for (let y = 4; y <= 14; y++) {
-    for (let x = 1; x <= 14; x++) {
-      // The lid is lit; under it the two doors meet in the middle, darker to the right.
-      const c = y === 4 ? P.rustLight
-        : y <= 6 ? (hash2(x, y, 310) < 0.2 ? P.rustDark : P.rust)
-        : y === 7 || y === 14 ? P.rustDark
-        : x === 1 || x === 14 ? P.rustDark
-        : x === 7 || x === 8 ? (x === 7 ? P.rustDark : P.steelDeep)
-        : x === 4 || x === 11 ? (x === 4 ? P.steelLight : P.steel)
-        : x >= 9 ? P.rustDark
-        : x === 2 ? P.rustLight : P.rust;
+/** The rig's big storage container, 6 × 2 cells: freshly painted green, with a log sign and cargo doors. */
+function storageContainerWhole(): Sprite {
+  const s = new Sprite('storage_container', 96, 32);
+  // The roof, seen from above: lit, with seams between its panels.
+  for (let y = 3; y <= 12; y++) {
+    for (let x = 2; x <= 93; x++) {
+      const c = y === 3 || x === 2 ? P.paintGreenLight
+        : x % 16 === 1 ? P.paintGreenDark
+        : hash2(x, y, 320) < 0.012 ? P.rust : P.paintGreen;
       s.set(x, y, c);
     }
   }
-  // Yellow handles on the lock bars.
-  for (const x of [5, 10]) s.set(x, 10, P.hazard);
-  s.set(10, 11, P.hazardDark);
-  s.set(5, 11, P.hazardDark);
-  return s.outline().shadow(8, 15, 7.5, 1.2);
+  // The long side: upright ribs, a dark rim at the top and a steel rail at the foot.
+  for (let y = 13; y <= 29; y++) {
+    for (let x = 2; x <= 93; x++) {
+      const c = y === 13 ? P.paintGreenDark
+        : y === 29 ? P.steelDeep
+        : x % 3 === 0 ? P.paintGreenDark
+        : hash2(x, y, 321) < 0.012 ? P.rust : P.paintGreen;
+      s.set(x, y, c);
+    }
+  }
+  // Steel corner posts.
+  for (let y = 3; y <= 29; y++) {
+    for (const x of [2, 3, 92, 93]) s.set(x, y, x === 2 ? P.steelLight : x === 93 ? P.steelDark : P.steel);
+  }
+  // A white sign with a stack of logs: things are kept here.
+  for (let y = 15; y <= 26; y++) for (let x = 12; x <= 31; x++) s.set(x, y, y === 26 || x === 31 ? P.steelLight : P.paintWhite);
+  const logEnd = [' ### ', '#ooo#', '#o.o#', '#ooo#', ' ### '];
+  for (const [x0, y0] of [[14, 20], [19, 20], [24, 20], [16.5, 16], [21.5, 16]]) {
+    logEnd.forEach((row, dy) => [...row].forEach((ch, dx) => {
+      if (ch !== ' ') s.set(Math.round(x0 + dx), y0 + dy, ch === '#' ? P.woodDark : ch === 'o' ? P.woodLight : P.wood);
+    }));
+  }
+  // The cargo doors at the right end: two leaves, four lock bars, yellow handles.
+  for (let y = 14; y <= 28; y++) {
+    s.set(64, y, P.steelDeep);
+    s.set(78, y, P.steelDeep);
+    for (const x of [68, 73, 83, 88]) {
+      s.set(x, y, P.steelLight);
+      s.set(x + 1, y, P.steel);
+    }
+  }
+  for (const x of [70, 75, 85, 90]) {
+    s.set(x, 21, P.hazard);
+    s.set(x, 22, P.hazardDark);
+  }
+  // A yellow and black safety band along the foot.
+  for (let x = 4; x <= 91; x++) s.set(x, 28, Math.floor(x / 3) % 2 ? P.hazard : P.outline);
+  return s.outline().shadow(48, 30.5, 48, 2);
+}
+
+/**
+ * The storage container cut into 6 pieces, one for each cell of its front row
+ * (`storage_container_0` … `_5`, left to right). Each piece is 16 × 32 and
+ * reaches up over the back row, so the container draws whole.
+ */
+export function storageContainer(): Sprite[] {
+  const whole = storageContainerWhole();
+  const pieces = [0, 1, 2, 3, 4, 5].map((i) => {
+    const piece = new Sprite(`storage_container_${i}`, 16, 32);
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 16; x++) piece.set(x, y, whole.get(i * 16 + x, y));
+    return piece;
+  });
+  return [whole, ...pieces];
 }
 
 /** Two old red fuel drums: the rig's diesel. Empty ones are faded, with their lids off. */
@@ -665,7 +708,7 @@ export function helicopter(): Sprite[] {
 export function rigSprites(): Sprite[] {
   return [
     ...deck(), ...deckSide(), ...helipad(), ...gangway(), ...gangwayEnds(),
-    container(), containerDoors(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
+    container(), ...storageContainer(), ...dieselDrums(), scrapPile(), lifeRing(), ...derrick(), crane(), ...radioHut(), crewCabin(), ...fishingBoat(),
     pallet(), oldNet(), waterTank(), ...musselBed(), ...rigItemIcons(), supplyCrate(), platformIcon(), ...helicopter(),
   ];
 }
