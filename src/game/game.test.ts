@@ -10,7 +10,7 @@ import { RECIPES } from './defs/recipes';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import {
-  BAG_LOAD, DELIVERY_TURNS, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
+  BAG_LOAD, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
 } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -2935,8 +2935,14 @@ describe('Game: radio supply drops and new platforms', () => {
     expect(game.orderProblem()).toBe(null);
     expect(game.order('build')).toBe(true);
     expect(game.orderProblem()).toEqual({ key: 'onTheWay' });
-    for (let k = 0; k < DELIVERY_TURNS; k++) game.wait();
+    // No crate while the explorer is away from the helipad, however long they wait.
+    for (let k = 0; k < 40; k++) game.wait();
+    expect(game.delivery).not.toBe(null);
+    const [rx, ry] = [game.player.x, game.player.y];
+    onHelipad(game);
+    game.wait();
     expect(game.delivery).toBe(null);
+    [game.player.x, game.player.y] = [rx, ry];
     const crate = [...game.objects].find(([, o]) => o.kind === 'supply_crate')!;
     expect(game.map.tiles[crate[0]]).toBe(Tile.Helipad);
     expect(crate[1].store).toEqual(RADIO_ORDERS.build);
@@ -2965,9 +2971,12 @@ describe('Game: radio supply drops and new platforms', () => {
     const game = atRadio(153);
     game.order('fuel');
     game.jumpToIsland(1);
-    for (let k = 0; k < DELIVERY_TURNS + 2; k++) game.wait();
+    for (let k = 0; k < 40; k++) game.wait();
     expect(game.delivery).not.toBe(null);
     game.jumpToIsland(4);
+    game.wait();
+    expect(game.delivery).not.toBe(null);
+    onHelipad(game);
     game.wait();
     expect(game.delivery).toBe(null);
     expect([...game.objects.values()].some((o) => o.kind === 'supply_crate')).toBe(true);
@@ -3234,14 +3243,24 @@ describe('Game: the crew cabin is the camp on the rig', () => {
     const radio = [...game.objects].find(([, o]) => o.kind === 'radio_hut')![0];
     game.objects.get(radio)!.kind = 'radio_ready';
     game.sailed = true;
-    game.delivery = { order: 'food', at: game.turn + 1 };
+    game.delivery = { order: 'food' };
     game.takeEvents();
+    game.wait();
+    expect(game.takeEvents().some((e) => e.type === 'drop')).toBe(false);
+    onHelipad(game);
     game.wait();
     const drop = game.takeEvents().find((e) => e.type === 'drop');
     expect(drop).toBeDefined();
     expect(game.objectAt((drop as { x: number }).x, (drop as { y: number }).y)?.kind).toBe('supply_crate');
   });
 });
+
+/** Put the explorer on the middle of the helipad. */
+function onHelipad(game: Game): void {
+  const i = game.map.tiles.findIndex((t, i) => t === Tile.Helipad && game.map.tiles[i + 1] === Tile.Helipad && game.map.tiles[i - 1] === Tile.Helipad);
+  game.player.x = i % game.map.width;
+  game.player.y = (i - game.player.x) / game.map.width;
+}
 
 function give(game: Game, cost: Partial<Record<Parameters<Game['inventory']['add']>[0], number>>): void {
   for (const [item, n] of Object.entries(cost)) game.inventory.add(item as Parameters<Game['inventory']['add']>[0], n);
