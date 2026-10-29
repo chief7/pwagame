@@ -304,7 +304,7 @@ export const en: Strings = {
     inHold: 'In the hold',
     holdEmpty: 'The hold is empty.',
     radio: 'Radio',
-    radioNote: 'Order one crate each day. About 2 hours later, a helicopter drops it on the helipad.',
+    radioNote: 'Order one crate each day. Then go to the helipad: a helicopter comes and drops it there.',
     order: 'Order',
     orders: { food: 'Food crate', build: 'Building crate', fuel: 'Fuel crate' },
   },
@@ -471,7 +471,7 @@ export const en: Strings = {
       case 'holdUpgraded': return `You make the hold bigger. It now carries ${msg.limit} heavy things.`;
       case 'openRadio': return 'The radio hums. You can order supplies.';
       case 'noRadio': return 'Stand next to the working radio, after you called for help.';
-      case 'onTheWay': return 'Your crate is on its way. Listen for the helicopter.';
+      case 'onTheWay': return 'Your crate is on its way. Go to the helipad to meet the helicopter.';
       case 'orderedToday': return 'You already ordered a crate today. Try again tomorrow.';
       case 'ordered': return `“One ${en.ui.orders[msg.order].toLowerCase()}, please!” The radio crackles: “On its way!”`;
       case 'delivered': return `A helicopter roars over the rig and drops a ${en.ui.orders[msg.order].toLowerCase()} on the helipad!`;

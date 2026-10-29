@@ -120,8 +120,6 @@ export const RADIO_ORDERS: Record<OrderId, Partial<Record<ItemId, number>>> = {
   fuel: { diesel: 4, rope: 4 },
 };
 export const ORDER_IDS = Object.keys(RADIO_ORDERS) as OrderId[];
-/** How long after an order the helicopter comes (2 hours). */
-export const DELIVERY_TURNS = 20;
 /** A new platform cell must be this close to the crew cabin. */
 export const PLATFORM_RANGE = 6;
 /** The bigger hold: 30 more heavy things each time, at most two times. */
@@ -327,7 +325,7 @@ export interface SaveData {
   /** What the fishing boat's hold carries. */
   hold: Items;
   /** The crate ordered on the radio and the turn it comes, and the day of the last order. */
-  delivery: { order: OrderId; at: number } | null;
+  delivery: { order: OrderId } | null;
   orderDay: number;
   /** How often the boat's hold was made bigger. */
   holdUpgrades: number;
@@ -360,8 +358,8 @@ export class Game {
   hold: Items = {};
   /** The other islands the explorer has been to, as they left them. */
   private islands = new Map<LevelId, Island>();
-  /** The crate ordered on the radio, and the turn the helicopter brings it. */
-  delivery: { order: OrderId; at: number } | null = null;
+  /** The crate ordered on the radio: the helicopter brings it when the explorer steps on the helipad. */
+  delivery: { order: OrderId } | null = null;
   /** The day of the last order (0: none yet). */
   orderDay = 0;
   /** How often the boat's hold was made bigger (see HOLD_UPGRADE). */
@@ -420,7 +418,8 @@ export class Game {
       }
       this.left = new Set(save.left);
       this.hold = save.hold;
-      this.delivery = save.delivery;
+      // Older saves also keep the turn of the drop: it is not used now.
+      this.delivery = save.delivery && { order: save.delivery.order };
       this.orderDay = save.orderDay;
       this.holdUpgrades = save.holdUpgrades;
       this.stocked = new Set(save.stocked);
@@ -1408,22 +1407,22 @@ export class Game {
     return null;
   }
 
-  /** Order a crate on the radio: the helicopter drops it on the helipad a little later. Takes no time. */
+  /** Order a crate on the radio: the helicopter drops it when the explorer steps on the helipad. Takes no time. */
   order(id: OrderId): boolean {
     const problem = this.orderProblem();
     if (problem) {
       this.message(problem, 'info');
       return false;
     }
-    this.delivery = { order: id, at: this.turn + DELIVERY_TURNS };
+    this.delivery = { order: id };
     this.orderDay = dayNumber(this.turn);
     this.message({ key: 'ordered', order: id }, 'good');
     return true;
   }
 
-  /** The helicopter drops the ordered crate on a free cell of the helipad (the middle if it can). */
+  /** Once the explorer is on the helipad, the helicopter drops the ordered crate on a free cell of it (the middle if it can). */
   private deliver(): void {
-    if (!this.delivery || this.turn < this.delivery.at || this.level !== 4) return;
+    if (!this.delivery || this.level !== 4 || this.map.tiles[this.map.idx(this.player.x, this.player.y)] !== Tile.Helipad) return;
     const pad: number[] = [];
     for (let i = 0; i < this.map.tiles.length; i++) {
       if (this.map.tiles[i] !== Tile.Helipad || this.objects.has(i)) continue;
