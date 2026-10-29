@@ -41,10 +41,10 @@ export type Msg =
   | { key: 'noBridgeSpot' }
   /** Tried to lay stepping stones without lava ahead. */
   | { key: 'noLavaSpot' }
-  /** The bag is too heavy for more heavy things (wood, logs, stone, scrap, diesel). */
-  | { key: 'tooHeavy' }
-  /** Walked into a store crate: the Store panel opens. */
-  | { key: 'openStore' }
+  /** The bag is too heavy for more heavy things (wood, logs, stone, scrap, diesel); `container` on the rig with its storage container. */
+  | { key: 'tooHeavy'; container?: true }
+  /** Walked into a store crate (or the rig's storage container, `container`): the Store panel opens. */
+  | { key: 'openStore'; container?: true }
   /** Tried to build a second store crate on this island. */
   | { key: 'oneStore' }
   /** A building site: what it still needs, what was given, and that it is finished (`obj` is then the building). */

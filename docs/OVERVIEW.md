@@ -955,6 +955,32 @@ leaves, rope, tools, tar, resin, sulphur, crystals) has no load.
 - **The pack frame** (`pack_frame`, a tool) is a recipe (4 wood, 3 rope)
   that needs the Pack frame skill (Building path, after Cartographer).
 - The Bag panel shows a load row (`ui_load`) and marks heavy items.
+- **The storage container** (island 4 only) is the rig's store: a green
+  shipping container, 6 × 2 cells (`STORAGE_WIDTH`), with a log sign and
+  cargo doors. Nobody builds it: `Game.placeStorage()` puts it on the rig
+  when the explorer lands there, and when a save loads (also rigs from
+  before it; it does nothing when the rig has one). So players with a full
+  bag (for example 200 logs from saves before the carry limit) can put
+  things down on the rig without gathering anything first.
+  - **Pieces.** It is 12 objects: the front row is `storage_container_0`
+    to `_5` (left to right), the back row is `storage_container_back`
+    (`noSprite`). Each piece's `partOf` points towards the main piece
+    (`storage_container_0`, `store: true`), which keeps the stock.
+    `Game.mainPiece()` follows them: walking into any piece opens the Store
+    panel of the main piece (`openStore` with `container`), and
+    `storeNear()` gives the main piece. The panel says "Storage container".
+  - **Where.** 6 × 2 deck cells (not the helipad), with no gangway, broken
+    end or boat round them and at least one free deck cell in front, as
+    near the crew cabin as it can, and the whole rig must stay reachable.
+    It prefers, in this order: free cells; cells with rusty containers or
+    life rings, which it replaces (they only decorate); nothing standing in
+    front (tall things there would hide it); and last, cells with loose
+    things (`STORAGE_MOVES`: scrap, pallets, nets, chests, drums), which it
+    moves to the nearest free deck cell. Nothing useful is lost.
+  - It counts as the rig's store: the store crate recipe says `oneStore`
+    there. A store crate built on the rig before stays and works.
+  - On the rig, a full bag says "Put some in the storage container"
+    (`tooHeavy` with `container`).
 
 ### 4.22 The fishing boat and the kept islands
 
@@ -1537,7 +1563,7 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 | Type | Entries |
 |---|---|
 | Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin, sulphur, diesel (rare goal materials); scrap metal (rig material); mussels (food: 12 food, 2 water); stone axe, fishing rod, crystal lantern, pack frame (tools). Heavy: wood, logs, stone, scrap, diesel |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, hut frame, store crate, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (islands 1 to 3): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals). Island 4, the oil rig: gangway (2 directions), broken gangway end (4 directions), scrap pile (2–3 scrap), rusty container, fuel drums (2 diesel, then empty), wooden pallet (2–3 wood), old fishing net (1–2 rope), rain water tank (drink 35), mussel bed (2–3 mussels, regrows in 200 turns), life ring, derrick, deck crane, crew cabin (bed and stove), crashed balloon, radio room (site, aerial, power, ready), derrick (broken, then working: 2 diesel, refills in 120 turns), fishing boat (wreck, then repaired: sea chart and hold), supply crate (from the radio, on the helipad) |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, hut frame, store crate, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (islands 1 to 3): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals). Island 4, the oil rig: gangway (2 directions), broken gangway end (4 directions), scrap pile (2–3 scrap), rusty container, fuel drums (2 diesel, then empty), wooden pallet (2–3 wood), old fishing net (1–2 rope), rain water tank (drink 35), mussel bed (2–3 mussels, regrows in 200 turns), life ring, derrick, deck crane, crew cabin (bed and stove), crashed balloon, radio room (site, aerial, power, ready), derrick (broken, then working: 2 diesel, refills in 120 turns), fishing boat (wreck, then repaired: sea chart and hold), supply crate (from the radio, on the helipad), storage container (6 × 2 cells, the rig's store; see 4.21) |
 | Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope, given in trips to its frame; one on each island), store crate (6 wood, 2 rope; one on each island), pack frame (4 wood, 3 rope; needs the skill), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope), stepping stones (8 stone; over lava), mend gangway (6 scrap; on a broken gangway end), platform (6 scrap, 2 wood; a new deck cell at the crew platform), rain tank (6 scrap), pickaxe, shovel, crowbar, furnace, smelt steel, greenhouse, water maker, fish trap, bigger hold (see 4.24) |
 | Hut rooms | workshop (12 wood, 6 stone, 2 rope), hearth (12 stone, 4 wood), rain barrel (8 wood, 3 rope) (see 4.19) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer, pack frame. Explorer: small sips, small appetite, thick skin, night eyes, sure foot, strong back. Improving: green thumb, patient angler, animal friend, wild sense |
@@ -1566,6 +1592,11 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
   (`src/sprites/interiors.ts`) are 32 × 24 each and are only drawn in the Hut
   panel. All are drawn bottom-centre on their
   cell, so tall sprites overlap the cell above.
+- **Objects bigger than one cell.** The rig's storage container
+  (`storage_container`, 96 × 32, in the gallery) is cut into six 16 × 32
+  pieces, `storage_container_0` to `_5`, one for each cell of its front
+  row. Each reaches up over the back row, whose pieces draw nothing
+  (`noSprite`), so the renderer draws it whole with no special code.
 - **Transition tiles** are 12 tiles per set: 4 edges, 4 outer corners and 4
   inner corners. `transitionTileName()` picks one from the neighbour cells.
   The sets:
@@ -1696,7 +1727,10 @@ Auto-walk (travel and hold) stops when:
   to every island before the current one: those islands are new when the
   explorer sails there. The save is about 30 KB for each island. Version 10 added what
   a store crate holds and what a building site got: an object is then
-  `[cell, kind, readyAt or 0, rooms, { store, given }]`. Version 9 saves load
+  `[cell, kind, readyAt or 0, rooms, { store, given }]`. The rig's storage container
+  needed no new version: its pieces are objects like others, the main
+  piece keeps its stock this way, and `placeStorage()` adds it to a rig
+  from an older save when it loads. Version 9 saves load
   as they are. Version 9 added the
   rooms of a hut: an object is `[cell, kind, readyAt or 0, rooms]` when it
   has rooms. Version 8 saves load as they are; their huts have a bed and no
@@ -1783,7 +1817,7 @@ Run `npm test`. The tests are in:
 
 | File | What it checks |
 |---|---|
-| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable; island 3: ash, basalt and lava, reach with stepping stones, the balloon on the crater rim, vents and hot springs, volcano edges drawable; the oil rig: its platforms, the radio behind a broken gangway, enough scrap), the island goal (stages, many trips, sailing to island 2, the beacon, on to island 3, old saves that lit the beacon), snow cold, island 3 (lava blocks, stepping stones, hot ash, hot springs, steam vents and sulphur, the balloon and the flight to the rig, lava light, saves), the oil rig (gangways, mending a broken gangway, tanks, mussels, pallets, nets, diesel, the crew cabin, the radio stages and the end, old saves that ended on island 3, saves), steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the carry limit (load, skills, pack frame, full bag, the store crate, the hut frame in trips, saves), the fishing boat (the dock, repairing the derrick and the boat, diesel, voyages, the hold, kept islands, used goals, saves), the rig workshop (resources on the islands once, old saves, tools, rig-only buildings, smelting, greenhouse, water maker, fish trap, the bigger hold), the radio and platforms (orders, delivery on the helipad, one each day, waiting while away, the supply crate, new deck cells and their limits, the rain tank, saves), the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
+| `src/game/game.test.ts` | Island generation (all floor reachable, all edges drawable, biomes present, the boat on a far-side beach; island 2: scree and snow, the beacon on the peak, the rings of steps round it, mountain edges drawable; island 3: ash, basalt and lava, reach with stepping stones, the balloon on the crater rim, vents and hot springs, volcano edges drawable; the oil rig: its platforms, the radio behind a broken gangway, enough scrap), the island goal (stages, many trips, sailing to island 2, the beacon, on to island 3, old saves that lit the beacon), snow cold, island 3 (lava blocks, stepping stones, hot ash, hot springs, steam vents and sulphur, the balloon and the flight to the rig, lava light, saves), the oil rig (gangways, mending a broken gangway, tanks, mussels, pallets, nets, diesel, the crew cabin, the radio stages and the end, old saves that ended on island 3, saves), steep steps (blocked, ladder, climbing rope, Energy, goat), the tide islet (generation, sandbar at low and high tide, wading back, tide messages), sleeping and prowling cave bears, deep caves (generation, the cave finder, darkness and the lantern, the map sign, glowcaps, crystals), rare materials (tar barrels, resin, old islands), island stars, a new island that keeps progress, the dog (adopt, follow, swap, bark, feed, drink, tired, faint, sailing, saves), clock, needs, gathering and regrowing, eating, drinking, building, sleeping, fainting, the carry limit (load, skills, pack frame, full bag, the store crate, the hut frame in trips, saves), the storage container (on every rig, one store from every cell, the rig's store, the full-bag message, old saves and kept rigs, moving loose things on a full rig), the fishing boat (the dock, repairing the derrick and the boat, diesel, voyages, the hold, kept islands, used goals, saves), the rig workshop (resources on the islands once, old saves, tools, rig-only buildings, smelting, greenhouse, water maker, fish trap, the bigger hold), the radio and platforms (orders, delivery on the helipad, one each day, waiting while away, the supply crate, new deck cells and their limits, the rain tank, saves), the camp (hut cost and one per island, going inside, rest limits, healing in the bed, rooms, workbench rope, hearth cooking, rain barrel, saves), animals, XP and skills, fishing and cooking, saving, events |
 | `src/sprites/sprites.test.ts` | Each sprite is valid. Each item, object and animal has its sprites. Each set of hut rooms has its hut sprites (both smoke frames), and each room its inside sprite. Each possible neighbour pattern has a transition tile. |
 | `src/ui/animator.test.ts` | Movement tweens, late events, reduced motion, walk frames |
 | `src/ui/mapview.test.ts` | The Cartographer's map: blank where unexplored, washes and coast ink, signs only for seen places, bear hatching, cave signs |
@@ -1819,6 +1853,7 @@ Also run `npm run build` (typecheck and build) before you commit.
 | Healing asleep in a hut | `game.ts` → `BED_HEAL`, `HEARTH_HEAL` | ×2, ×3 |
 | Hut cost, room costs | `recipes.ts` → `hut` (`siteCost`); `rooms.ts` → `ROOMS` | see 4.19 |
 | Carry limit | `game.ts` → `BAG_LOAD`, `STRONG_BACK_LOAD`, `PACK_FRAME_LOAD`; `items.ts` → `heavy` | 30; +10; +15 |
+| Storage container | `game.ts` → `STORAGE_WIDTH`, `STORAGE_REPLACES`, `STORAGE_MOVES` | 6 × 2 cells; replaces rusty containers and life rings; moves scrap, pallets, nets, chests, drums |
 | Store crate, pack frame | `recipes.ts` → `store_crate`, `pack_frame` | 6 wood, 2 rope; 4 wood, 3 rope |
 | Workbench rope, barrel drink, hearth light | `game.ts` → `WORKSHOP_ROPE`, `BARREL_DRINK`, `HEARTH_LIGHT` | +1 rope, 35, 2 cells |
 | Island size | `worldgen.ts` → `WORLD_WIDTH`, `WORLD_HEIGHT` | 104 × 80 |

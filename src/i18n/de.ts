@@ -188,6 +188,13 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   fishing_boat: { g: 'n', word: 'Fischerboot' },
   supply_crate: { g: 'f', word: 'Versorgungskiste' },
   platform_deck: { g: 'f', word: 'Plattform' },
+  storage_container_0: { g: 'm', word: 'Lagercontainer' },
+  storage_container_1: { g: 'm', word: 'Lagercontainer' },
+  storage_container_2: { g: 'm', word: 'Lagercontainer' },
+  storage_container_3: { g: 'm', word: 'Lagercontainer' },
+  storage_container_4: { g: 'm', word: 'Lagercontainer' },
+  storage_container_5: { g: 'm', word: 'Lagercontainer' },
+  storage_container_back: { g: 'm', word: 'Lagercontainer' },
   ore_vein: { g: 'f', word: 'Erzader', gather: 'Du hackst Erz aus dem Fels' },
   clay_bank: { g: 'f', word: 'Lehmbank', gather: 'Du gräbst nassen Lehm aus' },
   sealed_crate: { g: 'f', word: 'Kiste', adj: 'versiegelt', gather: 'Du brichst die Kiste auf' },
@@ -359,6 +366,9 @@ export const de: Strings = {
     inStore: 'In der Vorratskiste',
     bagEmptyShort: 'Deine Tasche ist leer.',
     storeEmpty: 'Die Vorratskiste ist leer.',
+    container: 'Lagercontainer',
+    inContainer: 'Im Lagercontainer',
+    containerEmpty: 'Der Lagercontainer ist leer.',
     heavy: 'Schwer',
     putOne: '1 hineinlegen',
     putAll: 'Alle hineinlegen',
@@ -527,8 +537,8 @@ export const de: Strings = {
       case 'noRoom': return 'Hier ist kein Platz zum Bauen.';
       case 'noBridgeSpot': return 'Stell dich an einen Fluss und schau zum Wasser. Eine Brücke reicht bis zu 3 Schritte weit.';
       case 'noLavaSpot': return 'Stell dich an den Lavastrom und schau zur Lava. Trittsteine reichen bis zu 3 Schritte weit.';
-      case 'tooHeavy': return 'Deine Tasche ist zu schwer für mehr Holz, Holzstämme, Steine, Schrott oder Diesel. Leg etwas in eine Vorratskiste, oder verbrauche es.';
-      case 'openStore': return 'Du öffnest deine Vorratskiste.';
+      case 'tooHeavy': return `Deine Tasche ist zu schwer für mehr Holz, Holzstämme, Steine, Schrott oder Diesel. Leg etwas in ${msg.container ? 'den Lagercontainer' : 'eine Vorratskiste'}, oder verbrauche es.`;
+      case 'openStore': return msg.container ? 'Du öffnest den Lagercontainer.' : 'Du öffnest deine Vorratskiste.';
       case 'oneStore': return 'Du hast schon eine Vorratskiste auf dieser Insel.';
       case 'siteNeeds': return `${cap(obj(msg.obj, 'nom', 'the'))} braucht noch ${itemList(msg.left)}.`;
       case 'siteGive': return `Du gibst ${obj(msg.obj, 'dat', 'the')} ${itemList(msg.given)}. Es braucht noch ${itemList(msg.left)}.`;

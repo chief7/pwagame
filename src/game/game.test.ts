@@ -10,7 +10,7 @@ import { RECIPES } from './defs/recipes';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import {
-  BAG_LOAD, DELIVERY_TURNS, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
+  BAG_LOAD, DELIVERY_TURNS, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, RADIO_ORDERS, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, VOYAGE_DIESEL, VOYAGE_TURNS,
 } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -2925,6 +2925,8 @@ describe('Game: radio supply drops and new platforms', () => {
     const { map, player: p } = game;
     map.set(p.x + 1, p.y, Tile.Helipad);
     game.objects.set(map.idx(p.x + 1, p.y), { kind: 'supply_crate', store: { coconut: 2, rope: 1 } });
+    // The supply crate is not the island's store (the storage container is).
+    for (const [i, o] of game.objects) if (o.kind.startsWith('storage_container')) game.objects.delete(i);
     expect(game.hasStore()).toBe(false);
     expect(game.takeItem('coconut', 2)).toBe(true);
     expect(game.objectAt(p.x + 1, p.y)?.kind).toBe('supply_crate');
@@ -3254,6 +3256,156 @@ function river(game: Game, width = 2): void {
     game.objects.delete(game.map.idx(game.player.x + width + 1, game.player.y + dy));
   }
 }
+
+describe('Game: the storage container on the rig', () => {
+  function rigGame(seed: number): Game {
+    const game = new Game(seed);
+    (game as unknown as { landOn(level: number): void }).landOn(4);
+    game.animals = [];
+    game.dog = null;
+    game.takeEvents();
+    return game;
+  }
+
+  /** The cells of the container's pieces, by kind. */
+  function pieces(game: Game): Map<string, { x: number; y: number }[]> {
+    const out = new Map<string, { x: number; y: number }[]>();
+    for (const [i, o] of game.objects) {
+      if (!o.kind.startsWith('storage_container')) continue;
+      const x = i % game.map.width;
+      out.set(o.kind, [...(out.get(o.kind) ?? []), { x, y: (i - x) / game.map.width }]);
+    }
+    return out;
+  }
+
+  /** Put the explorer on a free deck cell next to (x, y), and return the step into it. */
+  function standNextTo(game: Game, x: number, y: number): [number, number] {
+    for (const [dx, dy] of [[0, 1], [0, -1], [-1, 0], [1, 0]]) {
+      if (game.map.get(x + dx, y + dy) === Tile.Deck && !game.objectAt(x + dx, y + dy)) {
+        game.player.x = x + dx;
+        game.player.y = y + dy;
+        return [-dx, -dy];
+      }
+    }
+    throw new Error('no free deck next to the container');
+  }
+
+  it('stands on every rig: 6 × 2 cells of deck, and the whole rig stays reachable', () => {
+    for (let seed = 400; seed < 416; seed++) {
+      const game = rigGame(seed);
+      const found = pieces(game);
+      const main = found.get('storage_container_0');
+      expect(main, `seed ${seed}`).toHaveLength(1);
+      const { x, y } = main![0];
+      for (let dx = 0; dx < STORAGE_WIDTH; dx++) {
+        expect(game.objectAt(x + dx, y)?.kind).toBe(`storage_container_${dx}`);
+        expect(game.objectAt(x + dx, y - 1)?.kind).toBe('storage_container_back');
+        expect(game.map.get(x + dx, y)).toBe(Tile.Deck);
+        expect(game.map.get(x + dx, y - 1)).toBe(Tile.Deck);
+      }
+      expect(found.get('storage_container_back')).toHaveLength(STORAGE_WIDTH);
+      expect((game as unknown as { allReachableFrom(x: number, y: number): boolean }).allReachableFrom(game.home.x, game.home.y)).toBe(true);
+    }
+  });
+
+  it('moves loose things out of the way on a full rig, and keeps every one of them', () => {
+    const game = rigGame(446);
+    for (const [i, o] of game.objects) if (o.kind.startsWith('storage_container')) game.objects.delete(i);
+    // Single scrap piles on every third cell of every other row (where they block no way): no clean 6 × 2 room is left.
+    const { map } = game;
+    const reachable = () => (game as unknown as { allReachableFrom(x: number, y: number): boolean }).allReachableFrom(game.home.x, game.home.y);
+    for (let i = 0; i < map.tiles.length; i++) {
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      if (map.tiles[i] !== Tile.Deck || game.objects.has(i) || (x === game.player.x && y === game.player.y)) continue;
+      if (x % 3 !== 0 || y % 2 !== 0) continue;
+      game.objects.set(i, { kind: 'scrap_pile' });
+      if (!reachable()) game.objects.delete(i);
+    }
+    const loose = ['scrap_pile', 'pallet', 'old_net', 'chest_closed', 'chest_open', 'diesel_drums', 'diesel_drums_empty'];
+    const looseCells = () => [...game.objects].filter(([, o]) => loose.includes(o.kind)).map(([i, o]) => `${o.kind}@${i}`).sort();
+    const before = looseCells();
+    (game as unknown as { placeStorage(): void }).placeStorage();
+    expect(pieces(game).get('storage_container_0')).toHaveLength(1);
+    const after = looseCells();
+    expect(after.map((c) => c.split('@')[0])).toEqual(before.map((c) => c.split('@')[0]));
+    expect(after).not.toEqual(before);
+    expect(reachable()).toBe(true);
+  });
+
+  it('is not on islands 1 to 3', () => {
+    const game = new Game(441);
+    expect(pieces(game).size).toBe(0);
+  });
+
+  it('opens from any of its cells, and all of them share one store', () => {
+    const game = rigGame(442);
+    const { x, y } = pieces(game).get('storage_container_0')![0];
+    // Walk into the right end of the front row: the Store panel opens, no time passes.
+    const [dx, dy] = standNextTo(game, x + STORAGE_WIDTH - 1, y);
+    const turn = game.turn;
+    expect(game.move(dx, dy)).toBe(false);
+    expect(game.turn).toBe(turn);
+    expect(game.takeStoreRequest()).toBe(true);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'openStore', container: true });
+    game.inventory.add('log', 200);
+    expect(game.storeItem('log', 200)).toBe(true);
+    expect(game.inventory.count('log')).toBe(0);
+    // From another side (the back row or the left end), the same logs are there.
+    const other = [...Array(STORAGE_WIDTH).keys()].map((dx) => ({ x: x + dx, y: y - 1 })).concat([{ x, y }])
+      .find((c) => [[0, -1], [-1, 0], [1, 0]].some(([ox, oy]) => game.map.get(c.x + ox, c.y + oy) === Tile.Deck && !game.objectAt(c.x + ox, c.y + oy)))!;
+    const [bx, by] = standNextTo(game, other.x, other.y);
+    expect(game.move(bx, by)).toBe(false);
+    expect(game.takeStoreRequest()).toBe(true);
+    expect(game.storeNear()?.kind).toBe('storage_container_0');
+    expect(game.takeItem('log', 5)).toBe(true);
+    expect(game.objectAt(x, y)?.store).toEqual({ log: 195 });
+  });
+
+  it('counts as the store of the rig, and the full bag points to it', () => {
+    const game = rigGame(443);
+    give(game, RECIPES.store_crate.cost);
+    expect(game.buildProblem('store_crate')).toEqual({ key: 'oneStore' });
+    const { x, y } = pieces(game).get('storage_container_0')![0];
+    standNextTo(game, x, y);
+    game.inventory.add('log', BAG_LOAD + 10);
+    expect(game.storeItem('log', 10)).toBe(true);
+    expect(game.takeItem('log', 1)).toBe(false);
+    expect(game.log.at(-1)?.msg).toEqual({ key: 'tooHeavy', container: true });
+  });
+
+  it('comes to rigs in running games, and keeps its things in the save and while the explorer is away', () => {
+    const game = rigGame(444);
+    // A rig from before the container: take it away again.
+    for (const [i, o] of game.objects) if (o.kind.startsWith('storage_container')) game.objects.delete(i);
+    const old = JSON.parse(JSON.stringify(game.toSave()));
+    const loaded = Game.fromSave(old);
+    expect(pieces(loaded).get('storage_container_0')).toHaveLength(1);
+    expect(loaded.toSave().v).toBe(SAVE_VERSION);
+    // Fill it, save, load: still one container, with its things.
+    const { x, y } = pieces(loaded).get('storage_container_0')![0];
+    standNextTo(loaded, x, y);
+    loaded.inventory.add('stone', 12);
+    expect(loaded.storeItem('stone', 12)).toBe(true);
+    const again = Game.fromSave(JSON.parse(JSON.stringify(loaded.toSave())));
+    expect(pieces(again).get('storage_container_0')).toHaveLength(1);
+    expect(again.objectAt(x, y)?.store).toEqual({ stone: 12 });
+    // Away on island 1 and back: the rig is kept as it was.
+    again.jumpToIsland(1);
+    expect(pieces(again).size).toBe(0);
+    again.jumpToIsland(4);
+    expect(again.objectAt(x, y)?.store).toEqual({ stone: 12 });
+    expect(pieces(again).get('storage_container_0')).toHaveLength(1);
+  });
+
+  it('comes to a kept rig from before when the explorer lands there again', () => {
+    const game = rigGame(445);
+    for (const [i, o] of game.objects) if (o.kind.startsWith('storage_container')) game.objects.delete(i);
+    game.jumpToIsland(1);
+    game.jumpToIsland(4);
+    expect(pieces(game).get('storage_container_0')).toHaveLength(1);
+  });
+});
 
 function nightTurn(): number {
   return Array.from({ length: TURNS_PER_DAY }, (_, t) => t).find((t) => isNight(t) && !isNight(t - 10))!;

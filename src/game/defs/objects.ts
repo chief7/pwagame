@@ -27,6 +27,8 @@ export type ObjectKind =
   | 'radio_hut' | 'radio_aerial' | 'radio_power' | 'radio_ready'
   | 'derrick_working' | 'fishing_boat_wreck' | 'fishing_boat'
   | 'supply_crate' | 'platform_deck'
+  | 'storage_container_0' | 'storage_container_1' | 'storage_container_2' | 'storage_container_3' | 'storage_container_4'
+  | 'storage_container_5' | 'storage_container_back'
   | 'ore_vein' | 'clay_bank' | 'sealed_crate' | 'furnace' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade';
 
 export interface Yield {
@@ -98,6 +100,14 @@ export interface ObjectDef {
   deck?: true;
   /** A store: walking into it opens the Store panel (see Game.storeItem). */
   store?: true;
+  /**
+   * One cell of a big object that covers many cells (the rig's storage
+   * container): the way, in cells, towards its main piece. Walking into any
+   * piece works like walking into the main piece.
+   */
+  partOf?: [number, number];
+  /** Draws nothing: another piece of the same big object draws over this cell. */
+  noSprite?: true;
   /** Walkable over the sea: a gangway between the platforms of the oil rig. */
   overSea?: true;
   /**
@@ -321,6 +331,15 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   fishing_boat: def({ kind: 'fishing_boat', boat: true }),
   // A supply crate from the radio, on the helipad: take out what you need.
   supply_crate: def({ kind: 'supply_crate', store: true, dropped: true }),
+  // The rig's big storage container, 6 × 2 cells: one store, whichever cell you walk into.
+  // The main piece is the front row's left end; the back row has no sprite (the front pieces reach over it).
+  storage_container_0: def({ kind: 'storage_container_0', blocksSight: true, store: true }),
+  storage_container_1: def({ kind: 'storage_container_1', blocksSight: true, partOf: [-1, 0] }),
+  storage_container_2: def({ kind: 'storage_container_2', blocksSight: true, partOf: [-2, 0] }),
+  storage_container_3: def({ kind: 'storage_container_3', blocksSight: true, partOf: [-3, 0] }),
+  storage_container_4: def({ kind: 'storage_container_4', blocksSight: true, partOf: [-4, 0] }),
+  storage_container_5: def({ kind: 'storage_container_5', blocksSight: true, partOf: [-5, 0] }),
+  storage_container_back: def({ kind: 'storage_container_back', blocksSight: true, partOf: [0, 1], noSprite: true }),
   // Only for the recipe: the platform recipe lays a deck cell, not an object.
   platform_deck: def({ kind: 'platform_deck', deck: true }),
   // Island 2: rocks with iron and coal (the pickaxe); island 1: clay at the river (the shovel);

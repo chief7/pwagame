@@ -51,7 +51,7 @@ describe('sprites', () => {
     }
     for (const id of ITEM_IDS) expect(sprites.has(`item_${id}`)).toBe(true);
     for (const def of Object.values(OBJECTS)) {
-      for (const name of [def.kind, def.depletedSprite, ...(def.frames ?? []), ...(def.done?.frames ?? [])]) {
+      for (const name of [def.noSprite ? undefined : def.kind, def.depletedSprite, ...(def.frames ?? []), ...(def.done?.frames ?? [])]) {
         if (name) expect(sprites.has(name), name).toBe(true);
       }
     }
