@@ -657,6 +657,7 @@ function renderChart(rows: HTMLElement): void {
     const note = el('div', {}, [el('span', { className: 'row-note', textContent: game.visited(level) ? words.ui.beenThere : words.ui.newPlace })]);
     // Say how much diesel this trip needs when the boat has too little.
     if (problem?.key === 'needDiesel') note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
+    if (game.rescueTo(level)) note.append(el('span', { className: 'row-note locked', textContent: words.ui.rescueNote }));
     rows.append(row(icon(levelDef(level).site), words.ui.islandName(level), note, go));
   }
   rows.append(row(icon('ui_load'), words.ui.hold, el('div', {}, [

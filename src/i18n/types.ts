@@ -135,6 +135,7 @@ export interface Strings {
     /** The sea chart of the fishing boat, and its hold. */
     chart: string;
     chartNote(diesel: number, aboard: number, hours: number): string;
+    rescueNote: string;
     islandName(level: LevelId): string;
     sailTo: string;
     beenThere: string;

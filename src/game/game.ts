@@ -116,6 +116,11 @@ export const VOYAGE_DIESEL = 2;
 /** With the boat motor: half the time (3 hours), and half the diesel. */
 export const MOTOR_VOYAGE_TURNS = 30;
 export const MOTOR_VOYAGE_DIESEL = 1;
+/**
+ * Stranded on an island without the diesel to get home (old saves): the boat
+ * still gets back to the rig on what diesel is left, rowing and drifting for 12 hours.
+ */
+export const RESCUE_VOYAGE_TURNS = 120;
 /** A new platform cell must be this close to the crew cabin. */
 export const PLATFORM_RANGE = 6;
 /** The bigger hold: 30 more heavy things each time, at most two times. */
@@ -1582,10 +1587,16 @@ export class Game {
     return levelDef(to).biome === 'rig' ? this.voyageDiesel : 2 * this.voyageDiesel;
   }
 
+  /** On an island without the diesel to sail back to the rig: the trip there is a slow rescue trip. */
+  rescueTo(to: LevelId): boolean {
+    return levelDef(to).biome === 'rig' && levelDef(this.level).biome !== 'rig' && this.dieselAboard < this.voyageDiesel;
+  }
+
   /** Why the boat cannot sail to this island now, or null if it can. */
   voyageProblem(to: LevelId): Msg | null {
     if (!this.boatNear()) return { key: 'noBoat' };
     if (to === this.level) return { key: 'hereAlready' };
+    if (this.rescueTo(to)) return null;
     const need = this.dieselFor(to);
     if (this.dieselAboard < need) return { key: 'needDiesel', n: need, ...(levelDef(to).biome !== 'rig' && { back: true as const }) };
     return null;
@@ -1595,7 +1606,9 @@ export class Game {
    * Sail the fishing boat to another island (or back to the rig). The trip
    * burns diesel (from the hold first) and takes hours; the diesel for the way
    * back to the rig must be aboard too (see dieselFor), and needs go down on
-   * the way. The boat moors next to the explorer on arrival; its hold comes along.
+   * the way. Stranded without that diesel, the boat still gets back to the rig
+   * on what is left, but slowly (see rescueTo). The boat moors next to the
+   * explorer on arrival; its hold comes along.
    */
   voyage(to: LevelId): boolean {
     const problem = this.voyageProblem(to);
@@ -1603,8 +1616,9 @@ export class Game {
       this.message(problem, 'info');
       return false;
     }
-    const diesel = this.voyageDiesel;
-    const turns = this.voyageTurns;
+    const rescue = this.rescueTo(to);
+    const diesel = rescue ? this.dieselAboard : this.voyageDiesel;
+    const turns = rescue ? RESCUE_VOYAGE_TURNS : this.voyageTurns;
     const fromHold = Math.min(diesel, this.hold.diesel ?? 0);
     this.takeFromHold('diesel', fromHold);
     this.inventory.take('diesel', diesel - fromHold);
@@ -1627,7 +1641,8 @@ export class Game {
     }
     this.emit({ type: 'fade' });
     this.landOn(to, dock);
-    this.message({ key: 'voyage', level: to, ...(this.boatMotor && { motor: true as const }) }, 'good');
+    if (rescue) this.message({ key: 'rescueVoyage' }, 'good');
+    else this.message({ key: 'voyage', level: to, ...(this.boatMotor && { motor: true as const }) }, 'good');
     if (this.needs.health <= 0) this.faint();
     return true;
   }

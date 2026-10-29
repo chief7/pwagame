@@ -11,7 +11,7 @@ import { ORDERS } from './defs/orders';
 import { ROOMS } from './defs/rooms';
 import { pointsForXp, SKILLS, xpForPoints } from './defs/skills';
 import {
-  BAG_LOAD, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, MOTOR_VOYAGE_DIESEL, MOTOR_VOYAGE_TURNS, VOYAGE_DIESEL, VOYAGE_TURNS,
+  BAG_LOAD, Game, HOLD_LOAD, HOLD_UPGRADE, PACK_FRAME_LOAD, PLATFORM_RANGE, SAVE_VERSION, STORAGE_WIDTH, STRONG_BACK_LOAD, MOTOR_VOYAGE_DIESEL, MOTOR_VOYAGE_TURNS, RESCUE_VOYAGE_TURNS, VOYAGE_DIESEL, VOYAGE_TURNS,
 } from './game';
 import { GameMap, Tile } from './map';
 import { freshNeeds, tickNeeds, warmthTarget } from './needs';
@@ -2841,6 +2841,27 @@ describe('Game: the fishing boat, voyages and kept islands', () => {
     expect(game.voyage(4)).toBe(true);
     expect(game.level).toBe(4);
     expect(game.dieselAboard).toBe(0);
+  });
+
+  it('takes a stranded explorer back to the rig on a slow rescue trip', () => {
+    const { game } = atBoat(148);
+    game.inventory.add('diesel', 2 * VOYAGE_DIESEL);
+    expect(game.voyage(2)).toBe(true);
+    // An old save: the diesel for the way back was used up on the island.
+    game.inventory.take('diesel', VOYAGE_DIESEL - 1);
+    expect(game.rescueTo(4)).toBe(true);
+    expect(game.rescueTo(3)).toBe(false);
+    expect(game.voyageProblem(3)).toEqual({ key: 'needDiesel', n: 2 * VOYAGE_DIESEL, back: true });
+    expect(game.voyageProblem(4)).toBeNull();
+    const turn = game.turn;
+    expect(game.voyage(4)).toBe(true);
+    expect(game.level).toBe(4);
+    expect(game.turn).toBe(turn + RESCUE_VOYAGE_TURNS);
+    expect(game.dieselAboard).toBe(0);
+    expect(game.log.map((e) => e.msg)).toContainEqual({ key: 'rescueVoyage' });
+    // On the rig, there is no rescue trip: an island needs the diesel there and back.
+    expect(game.rescueTo(2)).toBe(false);
+    expect(game.voyageProblem(2)).toEqual({ key: 'needDiesel', n: 2 * VOYAGE_DIESEL, back: true });
   });
 
   it('keeps the islands as they were left, and moors at the same dock again', () => {
