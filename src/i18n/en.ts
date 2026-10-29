@@ -309,6 +309,7 @@ export const en: Strings = {
     chartNote: (diesel, aboard, hours) => `A trip takes ${hours} hours and ${diesel} diesel. To sail to an island, take the diesel for the trip back to the rig too. You have ${aboard} diesel in your bag and the hold.`,
     islandName: (level) => ({ 1: 'Island 1: the tropical island', 2: 'Island 2: Pine Ridge', 3: 'Island 3: Ember Isle', 4: 'The oil rig' })[level],
     sailTo: 'Sail',
+    rescueNote: 'Not enough diesel for the trip. You can still get back: you row and drift for 12 hours.',
     beenThere: 'You were here before. Everything is as you left it.',
     newPlace: 'You have not been here with the boat. A new island waits.',
     hold: 'Cargo hold',
@@ -526,6 +527,7 @@ export const en: Strings = {
       case 'voyage': return msg.level === 4
         ? `After ${msg.motor ? 'three' : 'six'} hours at sea, you tie up the boat at the oil rig again.`
         : `After ${msg.motor ? 'three' : 'six'} hours at sea, you land on ${en.ui.islandName(msg.level).replace(/^Island \d: /, '')}.`;
+      case 'rescueVoyage': return 'The diesel runs out on the way. You row and drift for twelve hours, and at last you tie up the boat at the oil rig.';
       case 'gangwayBroken': return 'This gangway is broken in the middle. Mend it with scrap metal: build “Mend gangway” next to it.';
       case 'gangwayMended': return 'You bolt scrap metal over the gap. The gangway is whole again!';
       case 'lavaHot': return "Too hot! You can't walk on lava. Lay stepping stones across the lava flow.";

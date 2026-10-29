@@ -87,6 +87,8 @@ export type Msg =
   | { key: 'holdFull' }
   /** Arrived by boat on this island (or the rig). */
   | { key: 'voyage'; level: LevelId; motor?: true }
+  /** Back at the rig on a slow rescue trip, without the diesel for a normal one. */
+  | { key: 'rescueVoyage' }
   /** Walked into a broken gangway end on the oil rig: mend it with scrap. */
   | { key: 'gangwayBroken' }
   | { key: 'gangwayMended' }
