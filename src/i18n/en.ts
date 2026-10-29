@@ -306,7 +306,7 @@ export const en: Strings = {
     siteNote: 'First you build the frame. Then walk into it to give it these materials, in as many trips as you like.',
     siteLeft: 'The frame still needs:',
     chart: 'Sea chart',
-    chartNote: (diesel, aboard, hours) => `A trip takes ${hours} hours and ${diesel} diesel. You have ${aboard} diesel in your bag and the hold.`,
+    chartNote: (diesel, aboard, hours) => `A trip takes ${hours} hours and ${diesel} diesel. To sail to an island, take the diesel for the trip back to the rig too. You have ${aboard} diesel in your bag and the hold.`,
     islandName: (level) => ({ 1: 'Island 1: the tropical island', 2: 'Island 2: Pine Ridge', 3: 'Island 3: Ember Isle', 4: 'The oil rig' })[level],
     sailTo: 'Sail',
     beenThere: 'You were here before. Everything is as you left it.',
@@ -519,7 +519,9 @@ export const en: Strings = {
       case 'openChart': return 'You climb on board and unroll the sea chart.';
       case 'noBoat': return 'Stand next to the fishing boat.';
       case 'hereAlready': return 'You are here already.';
-      case 'needDiesel': return `The boat needs ${msg.n} diesel for the trip. Carry it in your bag or the hold.`;
+      case 'needDiesel': return msg.back
+        ? `The boat needs ${msg.n} diesel: for the trip there and back to the rig. Only the rig has diesel. Carry it in your bag or the hold.`
+        : `The boat needs ${msg.n} diesel for the trip. Carry it in your bag or the hold.`;
       case 'holdFull': return 'The hold is full of heavy things.';
       case 'voyage': return msg.level === 4
         ? `After ${msg.motor ? 'three' : 'six'} hours at sea, you tie up the boat at the oil rig again.`

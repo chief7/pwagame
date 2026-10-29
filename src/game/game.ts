@@ -1573,17 +1573,28 @@ export class Game {
     return this.boatMotor ? MOTOR_VOYAGE_DIESEL : VOYAGE_DIESEL;
   }
 
+  /**
+   * The diesel the boat must carry to set off for this place. Diesel is found
+   * only on the rig, so a trip to an island also keeps the diesel for the trip
+   * back to the rig: the explorer can never be stranded.
+   */
+  dieselFor(to: LevelId): number {
+    return levelDef(to).biome === 'rig' ? this.voyageDiesel : 2 * this.voyageDiesel;
+  }
+
   /** Why the boat cannot sail to this island now, or null if it can. */
   voyageProblem(to: LevelId): Msg | null {
     if (!this.boatNear()) return { key: 'noBoat' };
     if (to === this.level) return { key: 'hereAlready' };
-    if (this.dieselAboard < this.voyageDiesel) return { key: 'needDiesel', n: this.voyageDiesel };
+    const need = this.dieselFor(to);
+    if (this.dieselAboard < need) return { key: 'needDiesel', n: need, ...(levelDef(to).biome !== 'rig' && { back: true as const }) };
     return null;
   }
 
   /**
    * Sail the fishing boat to another island (or back to the rig). The trip
-   * burns diesel (from the hold first) and takes hours, and needs go down on
+   * burns diesel (from the hold first) and takes hours; the diesel for the way
+   * back to the rig must be aboard too (see dieselFor), and needs go down on
    * the way. The boat moors next to the explorer on arrival; its hold comes along.
    */
   voyage(to: LevelId): boolean {
