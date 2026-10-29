@@ -5,7 +5,7 @@ import type { ObjectKind } from '../game/defs/objects';
 import type { RecipeId } from '../game/defs/recipes';
 import type { RoomId } from '../game/defs/rooms';
 import type { PathId, SkillId } from '../game/defs/skills';
-import type { OrderId } from '../game/game';
+import type { OrderId } from '../game/defs/orders';
 import type { FloatWhat, Msg } from '../game/messages';
 import type { NeedId } from '../game/needs';
 
@@ -134,7 +134,7 @@ export interface Strings {
     siteLeft: string;
     /** The sea chart of the fishing boat, and its hold. */
     chart: string;
-    chartNote(diesel: number, aboard: number): string;
+    chartNote(diesel: number, aboard: number, hours: number): string;
     islandName(level: LevelId): string;
     sailTo: string;
     beenThere: string;
@@ -148,6 +148,17 @@ export interface Strings {
     radioNote: string;
     order: string;
     orders: Record<OrderId, string>;
+    /** The two kinds of order, a price, why a special part is still locked, and the free crate's limit. */
+    supplyCrates: string;
+    specialParts: string;
+    price: string;
+    freeDaily: string;
+    /** The rig habitat card in the Build panel: progress, what to do, and what each building opens. */
+    habitatTitle: string;
+    habitatProgress(built: number, of: number): string;
+    habitatHint: string;
+    habitatDone: string;
+    habitatOpens: Record<'solar_station' | 'galley' | 'machine_shop', string>;
   };
   /** Rooms the explorer can add to the hut. */
   rooms: Record<RoomId, { name: string; description: string }>;

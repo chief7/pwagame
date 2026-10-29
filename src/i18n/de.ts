@@ -1,6 +1,7 @@
 import { dayNumber, minuteOfDay } from '../game/clock';
 import { stageLevel, type StageId } from '../game/defs/levels';
 import type { ObjectKind } from '../game/defs/objects';
+import { ORDERS, type OrderId } from '../game/defs/orders';
 import type { RoomId } from '../game/defs/rooms';
 import type { AnimalWords, ItemWords, ObjectWords, Strings } from './types';
 
@@ -98,6 +99,10 @@ const ITEM: ItemWords<CountNoun> = {
   spare_part: { g: 'n', word: 'Ersatzteil', plural: 'Ersatzteile', short: ['Teil', 'Teile'] },
   steel_plate: { g: 'f', word: 'Stahlplatte', plural: 'Stahlplatten', short: ['Platte', 'Platten'] },
   vegetables: { g: 'm', word: 'Korb Gemüse', plural: 'Körbe Gemüse', short: ['Gemüse', 'Gemüse'] },
+  solar_panel: { g: 'n', word: 'Solarmodul', plural: 'Solarmodule', short: ['Modul', 'Module'] },
+  cooker: { g: 'm', word: 'Elektroherd', plural: 'Elektroherde', short: ['Herd', 'Herde'] },
+  motor: { g: 'm', word: 'Motor', plural: 'Motoren', short: ['Motor', 'Motoren'] },
+  fish_stew: { g: 'f', word: 'Schüssel Fischeintopf', plural: 'Schüsseln Fischeintopf', short: ['Eintopf', 'Eintöpfe'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -203,6 +208,14 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   water_maker: { g: 'f', word: 'Wasseranlage' },
   fish_trap: { g: 'f', word: 'Fischreuse', gather: 'Du ziehst die Fischreuse hoch' },
   hold_upgrade: { g: 'm', word: 'Laderaum', adj: 'größer' },
+  solar_station_site: { g: 'n', word: 'Gerüst der Solarstation' },
+  galley_site: { g: 'n', word: 'Gerüst der Kombüse' },
+  machine_shop_site: { g: 'n', word: 'Gerüst der Maschinenwerkstatt' },
+  solar_station: { g: 'f', word: 'Solarstation' },
+  galley: { g: 'f', word: 'Kombüse' },
+  machine_shop: { g: 'f', word: 'Maschinenwerkstatt' },
+  lamp_post: { g: 'm', word: 'Laternenmast' },
+  boat_motor: { g: 'm', word: 'Außenbordmotor' },
 };
 
 const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }> = {
@@ -241,6 +254,11 @@ const ANIMAL: AnimalWords<Noun & { shoo: string; hurt?: string; alert?: string }
 const NEEDS = { health: 'Leben', food: 'Essen', water: 'Wasser', energy: 'Energie', warmth: 'Wärme' };
 
 const obj = (kind: ObjectKind, c: Case, det: Det) => phrase(OBJECT[kind], c, det);
+/** What an order is called: a crate (all feminine), or the special part in it. */
+const orderNoun = (id: OrderId): Noun => {
+  const part = ORDERS[id].price && (Object.keys(ORDERS[id].contents)[0] as keyof typeof ITEM);
+  return part ? ITEM[part] : { g: 'f', word: de.ui.orders[id] };
+};
 
 /** The rooms of the crew cabin on the oil rig. */
 const CABIN_ROOM: Record<RoomId, Noun> = {
@@ -377,7 +395,7 @@ export const de: Strings = {
     siteNote: 'Zuerst baust du das Gerüst. Dann lauf dagegen, um ihm diese Dinge zu geben, so oft du willst.',
     siteLeft: 'Das Gerüst braucht noch:',
     chart: 'Seekarte',
-    chartNote: (diesel, aboard) => `Eine Fahrt dauert 6 Stunden und braucht ${diesel} Diesel. Du hast ${aboard} Diesel in Tasche und Laderaum.`,
+    chartNote: (diesel, aboard, hours) => `Eine Fahrt dauert ${hours} Stunden und braucht ${diesel} Diesel. Du hast ${aboard} Diesel in Tasche und Laderaum.`,
     islandName: (level) => ({ 1: 'Insel 1: die Tropeninsel', 2: 'Insel 2: Kiefernkamm', 3: 'Insel 3: Glutinsel', 4: 'Die Bohrinsel' })[level],
     sailTo: 'Losfahren',
     beenThere: 'Hier warst du schon. Alles ist so, wie du es verlassen hast.',
@@ -387,9 +405,22 @@ export const de: Strings = {
     inHold: 'Im Laderaum',
     holdEmpty: 'Der Laderaum ist leer.',
     radio: 'Funkgerät',
-    radioNote: 'Bestell jeden Tag eine Kiste. Dann geh zum Landeplatz: Ein Hubschrauber kommt und wirft sie dort ab.',
+    radioNote: 'Bestell etwas, dann geh zum Landeplatz: Ein Hubschrauber kommt und wirft es dort ab. Es kommt immer nur eine Lieferung.',
     order: 'Bestellen',
-    orders: { food: 'Essenskiste', build: 'Baukiste', fuel: 'Treibstoffkiste' },
+    orders: { food: 'Essenskiste', build: 'Baukiste', fuel: 'Treibstoffkiste', solar_panel: 'Solarmodul', cooker: 'Elektroherd', motor: 'Motor' },
+    supplyCrates: 'Vorratskisten',
+    specialParts: 'Spezialteile',
+    price: 'Preis:',
+    freeDaily: 'Gratis, eine pro Tag.',
+    habitatTitle: 'Wohnstation',
+    habitatProgress: (built, of) => `${built} von ${of} Gebäuden`,
+    habitatHint: 'Bestell Spezialteile am Funkgerät und bezahl mit Material. Dann bau hier auf der Bohrinsel die Gebäude der Wohnstation.',
+    habitatDone: 'Deine Wohnstation ist fertig. Die Bohrinsel ist jetzt ein echtes Zuhause!',
+    habitatOpens: {
+      solar_station: 'Neu: Laternenmasten, und Elektroherd und Motor am Funkgerät.',
+      galley: 'Neu: Fischeintopf.',
+      machine_shop: 'Neu: ein Motor für das Fischerboot.',
+    },
   },
   rooms: {
     workshop: { name: 'Werkstatt', description: 'Eine Werkbank. Seile, die du in der Hütte drehst, geben 1 mehr.' },
@@ -484,6 +515,12 @@ export const de: Strings = {
     platform: { name: 'Plattform', description: 'Legt ein neues Stück Deck an den Rand der Mannschaftsplattform. Stell dich an den Rand und schau aufs Meer.' },
     rain_tank: { name: 'Regentank', description: 'Ein Stahltank, der Regenwasser auffängt. Trink daraus.' },
     gangway: { name: 'Steg reparieren', description: 'Repariert einen kaputten Steg der Bohrinsel mit Schrott. Stell dich neben ein kaputtes Ende, um ihn zu bauen.' },
+    solar_station: { name: 'Solarstation', description: 'Das erste Gebäude deiner Wohnstation. Sie macht Strom für die Bohrinsel. Solarmodule kommen per Funk.' },
+    galley: { name: 'Kombüse', description: 'Eine Küche auf der Bohrinsel. Daneben kochst du Fischeintopf. Der Elektroherd kommt per Funk.' },
+    machine_shop: { name: 'Maschinenwerkstatt', description: 'Eine Werkstatt für Maschinen. Hier lernst du, einen Motor an das Boot zu bauen. Der Motor kommt per Funk.' },
+    lamp_post: { name: 'Laternenmast', description: 'Eine elektrische Lampe für die Decks. Sie leuchtet nachts 3 Schritte weit.' },
+    fish_stew: { name: 'Fischeintopf', description: 'Stell dich neben die Kombüse. Ein großes warmes Essen: viel Hunger weg, etwas Wasser und Energie.' },
+    boat_motor: { name: 'Außenbordmotor', description: 'Stell dich neben das Fischerboot. Mit Motor dauert eine Fahrt 3 Stunden und braucht 1 Diesel.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
   objectName: (kind) => name(OBJECT[kind]),
@@ -556,8 +593,16 @@ export const de: Strings = {
       case 'noRadio': return 'Stell dich neben das Funkgerät, nachdem du Hilfe gerufen hast.';
       case 'onTheWay': return 'Deine Kiste ist unterwegs. Geh zum Landeplatz und warte auf den Hubschrauber.';
       case 'orderedToday': return 'Du hast heute schon eine Kiste bestellt. Versuch es morgen wieder.';
-      case 'ordered': return `„Eine ${de.ui.orders[msg.order]}, bitte!“ Das Funkgerät knistert: „Ist unterwegs!“`;
-      case 'delivered': return `Ein Hubschrauber donnert über die Bohrinsel und wirft eine ${de.ui.orders[msg.order]} auf dem Landeplatz ab!`;
+      case 'ordered': return `„${cap(phrase(orderNoun(msg.order), 'acc', 'a'))}, bitte!“ Das Funkgerät knistert: „Ist unterwegs!“`;
+      case 'delivered': return `Ein Hubschrauber donnert über die Bohrinsel und wirft ${phrase(orderNoun(msg.order), 'acc', 'a')} auf dem Landeplatz ab!`;
+      case 'orderLocked': return `Bau zuerst ${obj(msg.obj, 'acc', 'the')} auf der Bohrinsel.`;
+      case 'needPrice': return 'Du hast nicht, was dieses Teil kostet. Bring es in deiner Tasche mit.';
+      case 'needBuilding': return `Bau zuerst ${obj(msg.obj, 'acc', 'the')} auf der Bohrinsel.`;
+      case 'oneBuilding': return `Auf der Bohrinsel steht schon ${obj(msg.obj, 'nom', 'a')}.`;
+      case 'needNear': return msg.obj === 'furnace' ? 'Stell dich neben den Schmelzofen, um zu schmelzen.' : `Stell dich neben ${obj(msg.obj, 'acc', 'the')}.`;
+      case 'habitatBuilt': return `${cap(obj(msg.obj, 'nom', 'the'))} ist fertig! Deine Wohnstation hat ${msg.built} von ${msg.of} Gebäuden.`;
+      case 'haveMotor': return 'Das Fischerboot hat schon einen Motor.';
+      case 'motorFitted': return 'Du schraubst den Motor an das Fischerboot. Jetzt sind die Fahrten schneller und brauchen weniger Diesel!';
       case 'platformBuilt': return 'Du schraubst ein neues Stück Deck an die Plattform.';
       case 'noDeckSpot': return 'Stell dich an den Rand der Mannschaftsplattform und schau aufs Meer. Neues Deck muss nahe an der Kabine bleiben, weg von Stegen und anderen Plattformen.';
       case 'openChart': return 'Du steigst an Bord und rollst die Seekarte aus.';
@@ -566,8 +611,8 @@ export const de: Strings = {
       case 'needDiesel': return `Das Boot braucht ${msg.n} Diesel für die Fahrt. Trag ihn in der Tasche oder im Laderaum.`;
       case 'holdFull': return 'Der Laderaum ist voll mit schweren Dingen.';
       case 'voyage': return msg.level === 4
-        ? 'Nach sechs Stunden auf See machst du das Boot wieder an der Bohrinsel fest.'
-        : `Nach sechs Stunden auf See landest du auf ${{ 1: 'der Tropeninsel', 2: 'dem Kiefernkamm', 3: 'der Glutinsel' }[msg.level]}.`;
+        ? `Nach ${msg.motor ? 'drei' : 'sechs'} Stunden auf See machst du das Boot wieder an der Bohrinsel fest.`
+        : `Nach ${msg.motor ? 'drei' : 'sechs'} Stunden auf See landest du auf ${{ 1: 'der Tropeninsel', 2: 'dem Kiefernkamm', 3: 'der Glutinsel' }[msg.level]}.`;
       case 'gangwayBroken': return 'Dieser Steg ist in der Mitte kaputt. Repariere ihn mit Schrott: Bau „Steg reparieren“ daneben.';
       case 'gangwayMended': return 'Du schraubst Schrott über die Lücke. Der Steg ist wieder ganz!';
       case 'lavaHot': return 'Viel zu heiß! Auf Lava kannst du nicht laufen. Leg Trittsteine über den Lavastrom.';

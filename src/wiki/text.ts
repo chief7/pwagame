@@ -96,6 +96,7 @@ export interface WikiWords {
     from: string;
     usedFor: string;
     fishing: string;
+    radio: string;
     goal: string;
     rawNote: string;
     toolNote: string;
@@ -171,6 +172,7 @@ const en: WikiWords = {
     glowcap: 'Glowcap', crystal: 'Crystal', lantern: 'Crystal lantern', scrap: 'Scrap metal', diesel: 'Diesel', mussels: 'Mussels', pack_frame: 'Pack frame',
     pickaxe: 'Pickaxe', shovel: 'Shovel', crowbar: 'Crowbar', iron_ore: 'Iron ore', coal: 'Coal', clay: 'Clay',
     spare_part: 'Spare part', steel_plate: 'Steel plate', vegetables: 'Vegetables',
+    solar_panel: 'Solar panel', cooker: 'Electric cooker', motor: 'Motor', fish_stew: 'Fish stew',
   },
   ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash', deck: 'rig decks' },
 
@@ -278,6 +280,7 @@ const en: WikiWords = {
     from: 'From',
     usedFor: 'Used for',
     fishing: 'fishing in the sea',
+    radio: 'ordered on the rig radio',
     goal: 'the island goal',
     rawNote: 'Raw: cook it at a campfire first.',
     toolNote: 'A tool stays in your bag and is never used up. You only need one.',
@@ -404,6 +407,7 @@ const en: WikiWords = {
         'Repair the old **drilling tower** (12 scrap, 2 rope): its pump gives 2 diesel every half day. Repair the old **fishing boat** at the dock (10 scrap, 6 wood, 4 rope), then walk into it to open the sea chart. Sail to islands 1, 2 and 3 to fetch wood, stone, food and more. A trip takes 6 hours and 2 diesel. The **hold** carries 60 heavy things, and every island stays as you left it.',
         'After the call for help, walk into the radio to order **one crate each day**: food, building materials or fuel. About 2 hours later a helicopter drops it on the helipad. Build a **platform** (6 scrap, 2 wood) at the edge of the crew platform for more room, and a **rain tank** (6 scrap) for water.',
         'Make a **pickaxe**, a **shovel** and a **crowbar** from scrap. Mine iron ore and coal on Pine Ridge, dig clay at the river of island 1, and open sealed crates with spare parts on islands 1 to 3. On the rig, build a **furnace** to smelt steel plates, a **greenhouse** for vegetables, a **water maker**, **fish traps**, and a bigger hold for the boat.',
+        'Then make the rig a home: the **rig habitat**. Order **special parts** on the radio and pay with materials: a **solar panel** (2 steel plates, 2 crystals), an **electric cooker** and a **motor**. Build the **solar station**, the **galley** and the **machine shop** on steel frames, in trips. Each one opens more: **lamp posts**, **fish stew**, and a **motor** that makes boat trips 3 hours and 1 diesel.',
       ],
     },
     goalTitle: 'Goal stages',
@@ -459,6 +463,7 @@ const de: WikiWords = {
     glowcap: 'Leuchtpilz', crystal: 'Kristall', lantern: 'Kristalllaterne', scrap: 'Schrott', diesel: 'Diesel', mussels: 'Muscheln', pack_frame: 'Kraxe',
     pickaxe: 'Spitzhacke', shovel: 'Schaufel', crowbar: 'Brecheisen', iron_ore: 'Eisenerz', coal: 'Kohle', clay: 'Lehm',
     spare_part: 'Ersatzteil', steel_plate: 'Stahlplatte', vegetables: 'Gemüse',
+    solar_panel: 'Solarmodul', cooker: 'Elektroherd', motor: 'Motor', fish_stew: 'Fischeintopf',
   },
   ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche', deck: 'Decks der Bohrinsel' },
 
@@ -566,6 +571,7 @@ const de: WikiWords = {
     from: 'Von',
     usedFor: 'Für',
     fishing: 'Angeln im Meer',
+    radio: 'per Funk auf der Bohrinsel bestellt',
     goal: 'das Inselziel',
     rawNote: 'Roh: Brate ihn zuerst am Lagerfeuer.',
     toolNote: 'Ein Werkzeug bleibt in deiner Tasche und geht nie kaputt. Du brauchst nur eins.',
@@ -692,6 +698,7 @@ const de: WikiWords = {
         'Repariere den alten **Bohrturm** (12 Schrott, 2 Seile): Seine Pumpe gibt jeden halben Tag 2 Diesel. Repariere das alte **Fischerboot** am Anleger (10 Schrott, 6 Holz, 4 Seile), dann lauf dagegen, um die Seekarte zu öffnen. Fahr zu den Inseln 1, 2 und 3 und hol Holz, Steine, Essen und mehr. Eine Fahrt dauert 6 Stunden und braucht 2 Diesel. Der **Laderaum** trägt 60 schwere Dinge, und jede Insel bleibt so, wie du sie verlassen hast.',
         'Nach dem Hilferuf lauf gegen das Funkgerät, um **jeden Tag eine Kiste** zu bestellen: Essen, Baumaterial oder Treibstoff. Etwa 2 Stunden später wirft ein Hubschrauber sie auf dem Landeplatz ab. Bau eine **Plattform** (6 Schrott, 2 Holz) am Rand der Mannschaftsplattform für mehr Platz, und einen **Regentank** (6 Schrott) für Wasser.',
         'Bau aus Schrott eine **Spitzhacke**, eine **Schaufel** und ein **Brecheisen**. Hack Eisenerz und Kohle auf dem Kiefernkamm, grab Lehm am Fluss von Insel 1 und öffne versiegelte Kisten mit Ersatzteilen auf den Inseln 1 bis 3. Bau auf der Bohrinsel einen **Schmelzofen** für Stahlplatten, ein **Gewächshaus** für Gemüse, eine **Wasseranlage**, **Fischreusen** und einen größeren Laderaum für das Boot.',
+        'Dann mach die Bohrinsel zu einem Zuhause: die **Wohnstation**. Bestell **Spezialteile** am Funkgerät und bezahl mit Material: ein **Solarmodul** (2 Stahlplatten, 2 Kristalle), einen **Elektroherd** und einen **Motor**. Bau die **Solarstation**, die **Kombüse** und die **Maschinenwerkstatt** auf Stahlgerüsten, in mehreren Gängen. Jedes Gebäude bringt Neues: **Laternenmasten**, **Fischeintopf** und einen **Motor**, mit dem eine Bootsfahrt 3 Stunden und 1 Diesel braucht.',
       ],
     },
     goalTitle: 'Schritte zum Ziel',

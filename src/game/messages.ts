@@ -1,8 +1,8 @@
 import type { AnimalKind } from './defs/animals';
 import type { ItemId } from './defs/items';
 import type { LevelId, StageId, StarId } from './defs/levels';
-import type { OrderId } from './game';
 import type { ObjectKind } from './defs/objects';
+import type { OrderId } from './defs/orders';
 import type { RoomId } from './defs/rooms';
 import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
@@ -58,6 +58,16 @@ export type Msg =
   | { key: 'orderedToday' }
   | { key: 'ordered'; order: OrderId }
   | { key: 'delivered'; order: OrderId }
+  /** A special part whose habitat building is not built yet; a special part the bag cannot pay for. */
+  | { key: 'orderLocked'; obj: ObjectKind }
+  | { key: 'needPrice' }
+  /** The rig habitat: a recipe that needs a building first, a second one of a building, a recipe next to an object, a building finished, the boat motor. */
+  | { key: 'needBuilding'; obj: ObjectKind }
+  | { key: 'oneBuilding'; obj: ObjectKind }
+  | { key: 'needNear'; obj: ObjectKind }
+  | { key: 'habitatBuilt'; obj: ObjectKind; built: number; of: number }
+  | { key: 'haveMotor' }
+  | { key: 'motorFitted' }
   /** A new platform cell; or no place for one in front of the explorer. */
   | { key: 'platformBuilt' }
   | { key: 'noDeckSpot' }
@@ -76,7 +86,7 @@ export type Msg =
   /** The boat's hold is full of heavy things. */
   | { key: 'holdFull' }
   /** Arrived by boat on this island (or the rig). */
-  | { key: 'voyage'; level: LevelId }
+  | { key: 'voyage'; level: LevelId; motor?: true }
   /** Walked into a broken gangway end on the oil rig: mend it with scrap. */
   | { key: 'gangwayBroken' }
   | { key: 'gangwayMended' }

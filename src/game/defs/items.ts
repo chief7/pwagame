@@ -12,7 +12,8 @@ export type ItemId =
   | 'glowcap' | 'crystal' | 'lantern'
   | 'scrap' | 'diesel' | 'mussels'
   | 'pack_frame'
-  | 'pickaxe' | 'shovel' | 'crowbar' | 'iron_ore' | 'coal' | 'clay' | 'spare_part' | 'steel_plate' | 'vegetables';
+  | 'pickaxe' | 'shovel' | 'crowbar' | 'iron_ore' | 'coal' | 'clay' | 'spare_part' | 'steel_plate' | 'vegetables'
+  | 'solar_panel' | 'cooker' | 'motor' | 'fish_stew';
 
 export interface Food {
   food?: number;
@@ -82,6 +83,12 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   steel_plate: { id: 'steel_plate', heavy: true },
   // From the greenhouse on the rig.
   vegetables: { id: 'vegetables', eat: { food: 15, water: 6 } },
+  // Special parts from the helicopter, for the habitat buildings and the boat motor.
+  solar_panel: { id: 'solar_panel' },
+  cooker: { id: 'cooker', heavy: true },
+  motor: { id: 'motor', heavy: true },
+  // Cooked in the galley: the most filling food there is.
+  fish_stew: { id: 'fish_stew', eat: { food: 60, water: 15, energy: 15 } },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
