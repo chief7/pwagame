@@ -53,7 +53,8 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'River', sprites: [...river(), ...riverBankSet(), ...bankSets(), ...riverMouthSet(), bridge('ns'), bridge('ew')] },
     { title: 'Stones', sprites: [boulder(), pebbles(), mossyStone()] },
     { title: 'Logs', sprites: [log(), logPile(), driftwood()] },
-    { title: 'Chests', sprites: [chestClosed(), chestOpen()] },
+    // The rig's chest with the rain jacket looks like any other chest.
+    { title: 'Chests', sprites: [chestClosed(), chestOpen(), chestClosed('jacket_chest')] },
     { title: 'Animals', sprites: animalSet() },
     { title: 'Items', sprites: [...itemIcons(), ...skillItemIcons(), ...caveItemIcons(), ...carryItemIcons()] },
     { title: 'Boat', sprites: [...boat(), ...boatAway()] },

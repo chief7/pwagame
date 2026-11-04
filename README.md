@@ -60,6 +60,21 @@ A preview build (`VITE_PREVIEW=<folder>`) keeps its save under
   bumping one shoos it away.
 - **Day and night:** a day is 240 turns. Nights are dark (you see less) and
   cold; a campfire, a shelter or a cave keeps you warm.
+- **Rain:** on most days a shower comes, always by day (9:00–20:00). Clouds
+  come an hour before, and the log says so. Out in the rain you get a little
+  cold (Warmth goes to 80, never to 0); a shelter, a hut or a campfire keeps
+  it off, and rain never puts a fire out. Rain also helps: you catch a little
+  water, plants grow back twice as fast, fish bite better and wasps stay in
+  their nest. On the snow of Pine Ridge it snows, on Ember Isle the rain cools
+  the hot ash, and on the oil rig some days bring a storm (colder, you see
+  less, and the boat waits at the dock).
+- **Clothes:** they work while they are in your bag, and your explorer wears
+  them. The leaf cape (8 leaves, 2 rope) keeps rain from making you cold, the
+  sun hat (4 leaves, 1 rope) makes the hot ash less thirsty, and the wool coat
+  (6 wool, 2 rope, at the workbench in your hut) keeps you warm at night and
+  on snow. Wool hangs on the thorny junipers of Pine Ridge, where the goats
+  pass. A chest on the oil rig holds an old rain jacket (dry and a little
+  warm).
 - **Gathering:** bump into things. Palms give coconuts and leaves, trees give
   a little wood by hand (and logs with a stone axe), berry bushes give
   berries; these regrow. Logs, pebbles, mushrooms and
@@ -179,6 +194,8 @@ stars.
   caves. There are no coconuts.
 - **Animals:** crabs, rabbits, squirrels and bats. Wild: boars, wasps, cave
   bears and mountain goats (they climb over the steps).
+- **Wool:** the goats leave tufts of wool on thorny junipers where the forest
+  meets the scree. Pick it for a wool coat.
 - **The way up:** a ring of rocky steps (build a ladder on one) and then a
   ring of ice walls (hang a climbing rope on one) go round the peak.
   Climbing costs a little Energy.
@@ -229,6 +246,10 @@ stars.
 - **Materials:** scrap metal from scrap piles, wood from old pallets, rope
   from old fishing nets, and diesel from old fuel drums.
 - **Animals:** only seagulls that snatch food.
+- **Weather:** some days bring a storm instead of rain: it is colder, you see
+  less, and the fishing boat stays at the dock until it is over. The radio's
+  weather report (after the call for help) tells you today's and tomorrow's
+  weather. A chest near the crew cabin holds an old rain jacket.
 - **Camp:** the crew cabin has a bed for a full rest and a stove to cook
   fish on.
 - **Broken gangways:** 2 to 4 gangways are broken in the middle. Build
@@ -317,6 +338,7 @@ src/
     needs.ts     the five needs and how they change each turn
     clock.ts     time of day, daylight, phases
     inventory.ts what the explorer carries
+    weather.ts   rain, clouds and storms from the seed, the island and the day
     worldgen.ts  island generation: beach, forest, rocky hills and caves (island 2: mountains, scree, snow; island 3: volcano, ash, lava), deep caves, bramble wall, river (lava flow), scenery
     riggen.ts    the oil rig (island 4): platforms, gangways, helipad, and what stands on the decks
     caves.ts     finds the deep caves (big caves with few ways in) from the tiles

@@ -8,6 +8,7 @@ import type { PathId, SkillId } from '../game/defs/skills';
 import type { OrderId } from '../game/defs/orders';
 import type { FloatWhat, Msg } from '../game/messages';
 import type { NeedId } from '../game/needs';
+import type { DayWeather, Weather } from '../game/weather';
 
 export type Lang = 'en' | 'de';
 
@@ -33,6 +34,14 @@ export interface Strings {
     forBuilding: string;
     /** Bag note for tools. */
     tool: string;
+    /** Bag note for clothes: what they do from the bag. */
+    wearNote: Record<'leaf_cape' | 'sun_hat' | 'wool_coat' | 'rain_jacket', string>;
+    /** The weather in the HUD (`snow`: rain on the snow of Pine Ridge). */
+    weather: Record<Weather | 'snow', string>;
+    /** The weather report in the Radio panel. */
+    weatherReport: string;
+    /** "Today: rain from 11:00 to 13:30." */
+    forecast(when: 'today' | 'tomorrow', day: DayWeather): string;
     buildHint: string;
     changeExplorer: string;
     newIsland: string;

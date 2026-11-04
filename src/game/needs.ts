@@ -28,6 +28,10 @@ export interface Conditions {
   cold?: number;
   /** Extra thirst out in the open (hot ash by day): Water drops this share faster, less in a shelter. */
   heat?: number;
+  /** Warm clothes (0..1): this share less of the cold out in the open (night, snow, rain). */
+  warm?: number;
+  /** Water caught out in the rain, each turn. */
+  drizzle?: number;
   /** How much faster Health comes back while asleep (a hut bed, a hearth); default 1. */
   heal?: number;
 }
@@ -49,7 +53,7 @@ const RATES = {
 export function warmthTarget(c: Conditions): number {
   if (c.nearFire) return 100;
   const night = 1 - c.daylight;
-  const exposure = 1 - c.shelter;
+  const exposure = (1 - c.shelter) * (1 - (c.warm ?? 0));
   return Math.max(0, 100 - exposure * (night * 95 + (c.cold ?? 0)));
 }
 
@@ -58,6 +62,7 @@ export function tickNeeds(n: Needs, c: Conditions): Needs {
   const slow = c.sleeping ? 0.5 : 1;
   n.food -= RATES.food * slow * (c.hunger ?? 1);
   n.water -= RATES.water * slow * (c.thirst ?? 1) * (1 + (c.heat ?? 0) * (1 - c.shelter));
+  n.water += c.drizzle ?? 0;
   n.energy += c.sleeping ? RATES.energySleep * (0.4 + 0.6 * c.shelter) : -RATES.energyAwake;
 
   const target = warmthTarget(c);

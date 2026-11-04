@@ -61,6 +61,7 @@ reducedMotion.addEventListener('change', () => {
 const ui = {
   needs: $('needs'),
   clock: $('clock'),
+  weather: $('weather'),
   shelter: $('shelter'),
   log: $('log'),
   bag: $<HTMLButtonElement>('btn-bag'),
@@ -212,6 +213,17 @@ function updateHud(): void {
   const phase = game.phase;
   const tide = game.tideKnown() ? ` · ${game.lowTide ? words.ui.lowTide : words.ui.highTide}` : '';
   ui.clock.textContent = `${words.clock(game.turn)}${phase === 'day' ? '' : ` · ${words.ui[phase]}`}${tide}`;
+  // Clouds, rain or a storm: an icon and a word next to the clock (rain on the snow is snow).
+  const weather = game.weather;
+  const snow = weather === 'rain' && game.map.get(x, y) === Tile.Snow;
+  const shown = snow ? 'snow' : weather;
+  ui.weather.hidden = weather === 'clear';
+  if (weather !== 'clear') {
+    const img = ui.weather.querySelector('img')!;
+    const src = icon(`ui_weather_${shown === 'clouds' ? 'cloud' : shown}`);
+    if (img.src !== src) img.src = src;
+    ui.weather.querySelector('span')!.textContent = words.ui.weather[shown];
+  }
   const obj = game.objectAt(x, y);
   ui.shelter.textContent = game.hutHere()
     ? words.ui.inShelter(game.hutHere()!.kind)
@@ -461,7 +473,7 @@ function renderSheet(): void {
       }
       const note = food
         ? (Object.entries(food) as [NeedId, number][]).map(([need, n]) => words.float(n, { need })).join(' · ')
-        : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : ITEMS[id].heavy ? `${words.ui.heavy} · ${words.ui.forBuilding}` : words.ui.forBuilding;
+        : ITEMS[id].wear ? words.ui.wearNote[id as keyof typeof words.ui.wearNote] : ITEMS[id].tool ? words.ui.tool : ITEMS[id].raw ? words.ui.raw : ITEMS[id].heavy ? `${words.ui.heavy} · ${words.ui.forBuilding}` : words.ui.forBuilding;
       rows.append(row(icon(`item_${id}`), words.itemStack(id, count), el('span', { className: 'row-note', textContent: note }), actions.childElementCount ? actions : undefined));
     }
   } else {
@@ -487,7 +499,7 @@ function renderSheet(): void {
       const name = makes > 1 ? `${words.recipes[id].name} ×${makes}` : words.recipes[id].name;
       const note = el('div', {}, [el('span', { className: 'row-note', textContent: description }), costs]);
       // Say why when it isn't just missing materials: a skill to learn, a fire to stand by.
-      const told = ['needSkill', 'needFire', 'needNear', 'oneHut', 'oneStore', 'rigOnly', 'holdMax', 'needBuilding', 'oneBuilding', 'haveMotor'];
+      const told = ['needSkill', 'needFire', 'needNear', 'oneHut', 'oneStore', 'rigOnly', 'holdMax', 'needBuilding', 'oneBuilding', 'haveMotor', 'needRoom'];
       if (problem && !site && told.includes(problem.key)) {
         note.append(el('span', { className: 'row-note locked', textContent: words.message(problem) }));
       }
@@ -607,6 +619,13 @@ function renderRadio(rows: HTMLElement): void {
     return;
   }
   rows.append(el('p', { className: 'empty', textContent: words.ui.radioNote }));
+  // The weather report: today and tomorrow on the rig.
+  rows.append(el('h3', { className: 'path', textContent: words.ui.weatherReport }));
+  const [today, tomorrow] = game.forecast();
+  for (const [when, day] of [['today', today], ['tomorrow', tomorrow]] as const) {
+    const picture = icon(`ui_weather_${day.kind === 'clear' ? 'sun' : day.kind}`);
+    rows.append(row(picture, words.ui.forecast(when, day), ''));
+  }
   const general = game.orderProblem();
   if (general) rows.append(el('p', { className: 'empty locked', textContent: words.message(general) }));
   for (const special of [false, true]) {

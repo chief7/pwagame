@@ -4,7 +4,7 @@ import { ITEMS, ITEM_IDS, type ItemId } from '../game/defs/items';
 import { LEVELS, type StageId } from '../game/defs/levels';
 import { OBJECTS, type Gather, type ObjectKind, type Yield } from '../game/defs/objects';
 import { RECIPES, RECIPE_IDS, type RecipeId } from '../game/defs/recipes';
-import { WORKSHOP_STOCK } from '../game/game';
+import { CLOTHES_STOCK, WORKSHOP_STOCK } from '../game/game';
 import { RIG_OBJECTS } from '../game/riggen';
 import { CAVE_OBJECTS, ISLET_OBJECTS, SCATTER } from '../game/worldgen';
 
@@ -21,10 +21,10 @@ export function objectIslands(kind: ObjectKind): number[] {
     const scatter = Object.values(SCATTER[level.biome]).flat().some(([k]) => k === kind);
     const islet = level.level === 1 && ISLET_OBJECTS.includes(kind);
     const goalMaterial = (level.biome === 'mountain' && kind === 'tree_spruce_snow') || (level.biome === 'volcano' && (kind === 'steam_vent' || kind === 'hot_spring'));
-    const stock = WORKSHOP_STOCK[level.level]?.some(([k]) => k === kind);
+    const stock = [WORKSHOP_STOCK, CLOTHES_STOCK].some((table) => table[level.level]?.some(([k]) => k === kind));
     // Things the explorer builds on the rig that can be gathered from.
     const rigBuilt = level.biome === 'rig' && (kind === 'greenhouse' || kind === 'fish_trap');
-    if (level.biome === 'rig' ? RIG_OBJECTS.includes(kind) || rigBuilt : scatter || islet || goalMaterial || stock || EVERYWHERE.includes(kind)) islands.push(level.level);
+    if (level.biome === 'rig' ? RIG_OBJECTS.includes(kind) || rigBuilt || stock : scatter || islet || goalMaterial || stock || EVERYWHERE.includes(kind)) islands.push(level.level);
   }
   return islands;
 }

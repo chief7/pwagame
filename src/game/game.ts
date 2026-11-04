@@ -16,6 +16,7 @@ import type { FloatWhat, Msg, WakeReason } from './messages';
 import { freshNeeds, LOW, tickNeeds, type NeedId, type Needs } from './needs';
 import { BRIDGE_SPAN, DIRS, distanceMap, reachWithBridges } from './pathing';
 import { Rng } from './rng';
+import { forecast, weatherAt, type DayWeather, type Weather } from './weather';
 import { generateWorld, WORLD_HEIGHT, WORLD_WIDTH } from './worldgen';
 
 const LOG_LIMIT = 100;
@@ -67,6 +68,15 @@ const LANTERN_SIGHT = 2;
 const SNOW_CHILL = 40;
 /** On island 3, Water drops up to this share faster out on the hot ash by day (see tickNeeds). */
 const ASH_HEAT = 0.5;
+/** Out in the rain, this much colder (less in a shelter; see warmthTarget). A storm is colder. */
+export const RAIN_CHILL = 20;
+export const STORM_CHILL = 30;
+/** Water the explorer catches each turn out in the rain. */
+export const RAIN_DRINK = 0.3;
+/** Fish bite better in the rain: this much more chance. */
+export const RAIN_BITE = 0.15;
+/** Cells less the explorer sees in a storm, out in the open. */
+const STORM_SIGHT = 2;
 /** How far lava lights the night round it. */
 const LAVA_LIGHT = 1;
 /** Energy it costs to climb onto a ladder or a climbing rope. */
@@ -137,6 +147,17 @@ export const WORKSHOP_STOCK: Partial<Record<LevelId, [ObjectKind, number][]>> = 
   2: [['ore_vein', 8], ['sealed_crate', 4]],
   3: [['sealed_crate', 4]],
 };
+/**
+ * What the weather brings, placed when the explorer first comes to an island
+ * (also one from before the weather): thorny junipers with wool on Pine
+ * Ridge, and the chest with the old rain jacket on the oil rig.
+ */
+export const CLOTHES_STOCK: Partial<Record<LevelId, [ObjectKind, number][]>> = {
+  2: [['thorn_bush_wool', 10]],
+  4: [['jacket_chest', 1]],
+};
+/** The rain jacket's chest stands this close to the crew cabin. */
+const JACKET_RANGE = 6;
 /** Sealed crates are at least this far from home. */
 const CRATE_DISTANCE = 12;
 /** The rig's storage container is this many cells wide (and 2 deep). */
@@ -145,9 +166,18 @@ export const STORAGE_WIDTH = 6;
 const STORAGE_REPLACES: ObjectKind[] = ['rig_container', 'life_ring'];
 /** Loose things the storage container may move to another cell when there is no other room. */
 const STORAGE_MOVES: ObjectKind[] = ['scrap_pile', 'pallet', 'old_net', 'chest_closed', 'chest_open', 'diesel_drums', 'diesel_drums_empty'];
-export const SAVE_VERSION = 14;
+export const SAVE_VERSION = 15;
 
 export type Tone = 'info' | 'good' | 'warn' | 'loot';
+
+/** A garment the explorer can wear on the body (see Wear in items.ts). */
+export type Garment = 'cape' | 'coat' | 'jacket';
+
+/** How the explorer looks in their clothes: one garment and maybe the sun hat. */
+export interface Outfit {
+  garment?: Garment;
+  hat?: boolean;
+}
 
 export interface LogEntry {
   msg: Msg;
@@ -334,6 +364,8 @@ export interface SaveData {
   boatMotor: boolean;
   /** Islands that got their ore veins, clay banks and sealed crates. */
   stocked: LevelId[];
+  /** Islands that got their junipers with wool, or the rain jacket's chest. */
+  clothesStocked: LevelId[];
 }
 
 export class Game {
@@ -371,6 +403,8 @@ export class Game {
   boatMotor = false;
   /** Islands that got their ore veins, clay banks and sealed crates. */
   private stocked = new Set<LevelId>();
+  /** Islands that got what CLOTHES_STOCK puts there. */
+  private clothesStocked = new Set<LevelId>();
   /** The adopted dog, or null before you find one. */
   dog: Dog | null = null;
   /** Cells where the explorer saw a cave bear on this island, at least BEAR_SPOT_GAP apart. */
@@ -429,6 +463,7 @@ export class Game {
       this.holdUpgrades = save.holdUpgrades;
       this.boatMotor = save.boatMotor;
       this.stocked = new Set(save.stocked);
+      this.clothesStocked = new Set(save.clothesStocked);
       this.animals = save.animals;
       this.player = save.player;
       this.home = save.home;
@@ -866,9 +901,15 @@ export class Game {
    * first time the explorer is here. Nothing may cut off part of the island.
    */
   private stockIsland(): void {
-    const stock = WORKSHOP_STOCK[this.level];
-    if (!stock || this.stocked.has(this.level)) return;
-    this.stocked.add(this.level);
+    for (const [table, done] of [[WORKSHOP_STOCK, this.stocked], [CLOTHES_STOCK, this.clothesStocked]] as const) {
+      const stock = table[this.level];
+      if (!stock || done.has(this.level)) continue;
+      done.add(this.level);
+      this.placeStock(stock);
+    }
+  }
+
+  private placeStock(stock: [ObjectKind, number][]): void {
     const { map } = this;
     const w = map.width;
     const near = (x: number, y: number, tile: Tile) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => map.get(x + dx, y + dy) === tile);
@@ -877,6 +918,10 @@ export class Game {
       clay_bank: (x, y) => (map.get(x, y) === Tile.Grass || map.get(x, y) === Tile.Sand) && near(x, y, Tile.River),
       sealed_crate: (x, y) => map.isFloor(x, y) && map.get(x, y) !== Tile.CaveFloor &&
         Math.max(Math.abs(x - this.home.x), Math.abs(y - this.home.y)) >= CRATE_DISTANCE,
+      // Where the forest meets the scree, the goats' way up the mountain.
+      thorn_bush_wool: (x, y) => (map.get(x, y) === Tile.Grass && near(x, y, Tile.Scree)) || (map.get(x, y) === Tile.Scree && near(x, y, Tile.Grass)),
+      jacket_chest: (x, y) => map.isFloor(x, y) && !this.nextToGangway(x, y) &&
+        Math.max(Math.abs(x - this.home.x), Math.abs(y - this.home.y)) <= JACKET_RANGE,
     };
     for (const [kind, count] of stock) {
       const fit = fits[kind]!;
@@ -896,8 +941,77 @@ export class Game {
     }
   }
 
+  /** Next to a gangway or a broken gangway end: a chest there could stand in the way. */
+  private nextToGangway(x: number, y: number): boolean {
+    return DIRS.some(([dx, dy]) => {
+      const o = this.objectAt(x + dx, y + dy);
+      return !!o && (!!OBJECTS[o.kind].overSea || !!OBJECTS[o.kind].broken);
+    });
+  }
+
   nearFire(x: number, y: number): boolean {
     return this.nearestFire(x, y) !== null;
+  }
+
+  // ---- Weather and clothes -------------------------------------------------------
+
+  /** The weather on this island now (see weather.ts). */
+  get weather(): Weather {
+    return weatherAt(this.seed, this.level, this.turn);
+  }
+
+  /** Rain (or a storm) is falling. */
+  get raining(): boolean {
+    const w = this.weather;
+    return w === 'rain' || w === 'storm';
+  }
+
+  /** Today's and tomorrow's weather on this island, for the weather report on the radio. */
+  forecast(): [DayWeather, DayWeather] {
+    return forecast(this.seed, this.level, this.turn);
+  }
+
+  /** What the clothes in the bag do: the best of each (see Wear in items.ts). */
+  wear(): { warm: number; dry: number; shade: number } {
+    const best = { warm: 0, dry: 0, shade: 0 };
+    for (const [id] of this.inventory.entries()) {
+      const w = ITEMS[id].wear;
+      if (!w) continue;
+      best.warm = Math.max(best.warm, w.warm ?? 0);
+      best.dry = Math.max(best.dry, w.dry ?? 0);
+      best.shade = Math.max(best.shade, w.shade ?? 0);
+    }
+    return best;
+  }
+
+  /**
+   * How the explorer looks in what they carry: one garment and the hat. The
+   * garment is the one that helps now: something dry in the rain, else the
+   * warmest one (the coat, then the jacket, then the cape).
+   */
+  outfit(): Outfit {
+    const has = (id: ItemId) => this.inventory.count(id) > 0;
+    const order: ItemId[] = this.raining ? ['rain_jacket', 'leaf_cape', 'wool_coat'] : ['wool_coat', 'rain_jacket', 'leaf_cape'];
+    const worn = order.find(has);
+    const shows = worn && ITEMS[worn].wear!.shows;
+    return { ...(shows && shows !== 'hat' && { garment: shows }), ...(has('sun_hat') && { hat: true }) };
+  }
+
+  /** Say when the weather changes (not while asleep: the explorer sleeps through it). */
+  private weatherNews(before: Weather): void {
+    const now = this.weather;
+    if (now === before || this.sleeping) return;
+    if (now === 'clear') {
+      this.message({ key: 'weather', w: 'clear', was: before }, 'info');
+      return;
+    }
+    const dry = this.wear().dry >= 1;
+    this.message({ key: 'weather', w: now, level: this.level, ...(dry && { dry: true as const }) }, now === 'clouds' ? 'info' : 'warn');
+  }
+
+  /** Rain waters the plants: whatever grows back grows back twice as fast. */
+  private rainOnPlants(): void {
+    for (const obj of this.objects.values()) if (obj.readyAt !== undefined && obj.readyAt > this.turn) obj.readyAt--;
   }
 
   /** The closest fire (or hearth) whose warmth reaches (x, y), or null if none does. */
@@ -951,7 +1065,8 @@ export class Game {
   get sightRadius(): number {
     const day = this.daylightAt(this.player.x, this.player.y);
     const extra = (this.has('night_eyes') ? NIGHT_EYES : 0) + (this.hasLantern ? LANTERN_SIGHT : 0);
-    return Math.round(4 + 4 * day + extra * (1 - day));
+    const storm = this.weather === 'storm' && !this.hutHere() ? STORM_SIGHT : 0;
+    return Math.round(4 + 4 * day + extra * (1 - day)) - storm;
   }
 
   has(skill: SkillId): boolean {
@@ -1037,6 +1152,7 @@ export class Game {
     if ('builds' in recipe && OBJECTS[recipe.builds].boatMotor && this.boatMotor) return { key: 'haveMotor' };
     if (!this.inventory.hasAll(this.recipeCost(id))) return { key: 'needMaterials' };
     if (recipe.atFire && !this.nearFire(this.player.x, this.player.y)) return { key: 'needFire' };
+    if (recipe.inRoom && !this.hasRoom(recipe.inRoom)) return { key: 'needRoom', room: recipe.inRoom };
     if (recipe.near && !this.nextTo(recipe.near)) return { key: 'needNear', obj: recipe.near };
     if ('builds' in recipe && !this.buildSpot(recipe.builds, recipe.onto)) {
       if (recipe.onto) return { key: 'noStep', obj: recipe.onto[0] };
@@ -1596,6 +1712,7 @@ export class Game {
   voyageProblem(to: LevelId): Msg | null {
     if (!this.boatNear()) return { key: 'noBoat' };
     if (to === this.level) return { key: 'hereAlready' };
+    if (this.weather === 'storm') return { key: 'stormWait' };
     if (this.rescueTo(to)) return null;
     const need = this.dieselFor(to);
     if (this.dieselAboard < need) return { key: 'needDiesel', n: need, ...(levelDef(to).biome !== 'rig' && { back: true as const }) };
@@ -2055,7 +2172,7 @@ export class Game {
   private fish(x: number, y: number): void {
     const p = this.player;
     this.emit({ type: 'cast', id: p.id, x: p.x, y: p.y, targetX: x, targetY: y });
-    if (!this.rng.chance(this.has('patient_angler') ? PATIENT_BITE_CHANCE : BITE_CHANCE)) {
+    if (!this.rng.chance((this.has('patient_angler') ? PATIENT_BITE_CHANCE : BITE_CHANCE) + (this.raining ? RAIN_BITE : 0))) {
       this.message({ key: 'noBite' }, 'info');
       return;
     }
@@ -2306,9 +2423,18 @@ export class Game {
   // ---- The rest of the turn ----------------------------------------------------------
 
   private endTurn(): void {
+    const weatherBefore = this.weather;
     this.turn++;
     const p = this.player;
     this.tide();
+    const weather = this.weather;
+    const wet = weather === 'rain' || weather === 'storm';
+    const wear = this.wear();
+    const tile = this.map.get(p.x, p.y);
+    const chill = (weather === 'storm' ? STORM_CHILL : wet ? RAIN_CHILL : 0) * (1 - wear.dry);
+    // Out in the rain the explorer catches a little water to drink (not in a cave or a shelter).
+    const drizzle = wet && !this.sleeping && this.shelterAt(p.x, p.y) < CAVE_SHELTER ? RAIN_DRINK : 0;
+    if (wet) this.rainOnPlants();
     tickNeeds(this.needs, {
       sleeping: this.sleeping,
       shelter: this.shelterAt(p.x, p.y),
@@ -2317,10 +2443,14 @@ export class Game {
       thirst: this.has('small_sips') ? SMALL_SIPS : 1,
       hunger: this.has('small_appetite') ? SMALL_APPETITE : 1,
       chill: this.has('thick_skin') ? THICK_SKIN : 1,
-      cold: this.map.get(p.x, p.y) === Tile.Snow ? SNOW_CHILL : 0,
-      heat: this.map.get(p.x, p.y) === Tile.Ash ? ASH_HEAT * this.daylight : 0,
+      cold: (tile === Tile.Snow ? SNOW_CHILL : 0) + chill,
+      // Rain cools the hot ash; the sun hat shades you.
+      heat: tile === Tile.Ash && !wet ? ASH_HEAT * this.daylight * (1 - wear.shade) : 0,
+      warm: wear.warm,
+      drizzle,
       heal: !this.hutHere() ? 1 : this.hasRoom('hearth') ? HEARTH_HEAL : BED_HEAL,
     });
+    this.weatherNews(weatherBefore);
     if (!this.sleeping) this.warnAboutNeeds();
 
     this.animalsActing = true;
@@ -2410,7 +2540,7 @@ export class Game {
         let all = 0;
         for (const obj of this.objects.values()) {
           if (obj.kind === 'chest_open') open++;
-          if (obj.kind === 'chest_open' || obj.kind === 'chest_closed') all++;
+          if (obj.kind === 'chest_open' || obj.kind === 'chest_closed' || obj.kind === 'jacket_chest') all++;
         }
         return { have: open, need: all };
       }
@@ -2596,7 +2726,7 @@ export class Game {
     const friendly = this.has('animal_friend');
     for (const a of this.visibleAnimals()) {
       const def = ANIMALS[a.kind];
-      if ((friendly && !def.wild) || this.asleep(a)) continue;
+      if ((friendly && !def.wild) || this.asleep(a) || (def.temper === 'chaser' && this.raining)) continue;
       const notice = this.noticeRange(a.kind);
       // A prowling bear comes after you as far as it notices you.
       const comes = def.temper === 'charger' || def.temper === 'chaser' || !!def.nocturnal;
@@ -2620,8 +2750,11 @@ export class Game {
       return;
     }
     if (this.asleep(a)) return;
+    // Wasps stay in their nest while it rains.
+    const sheltering = def.temper === 'chaser' && this.raining;
+    if (sheltering) a.chase = 0;
     const notice = this.noticeRange(a.kind);
-    const noticed = notice > 0 && dist() <= notice && this.map.isVisible(a.x, a.y);
+    const noticed = !sheltering && notice > 0 && dist() <= notice && this.map.isVisible(a.x, a.y);
     // Animal friends get no trouble from crabs and monkeys. Wild animals
     // still come for them, but notice them later (see noticeRange).
     const friendly = this.has('animal_friend') && !def.wild;
@@ -2894,6 +3027,7 @@ export class Game {
       holdUpgrades: this.holdUpgrades,
       boatMotor: this.boatMotor,
       stocked: [...this.stocked],
+      clothesStocked: [...this.clothesStocked],
     };
   }
 
@@ -2953,7 +3087,11 @@ export class Game {
     }
     if (data.v === 13) {
       // Version 13 had no rig habitat: the boat has no motor yet.
-      data = { ...data, v: SAVE_VERSION, boatMotor: false };
+      data = { ...data, v: 14, boatMotor: false };
+    }
+    if (data.v === 14) {
+      // Version 14 had no weather: each island gets its junipers or the jacket's chest when the explorer is there.
+      data = { ...data, v: SAVE_VERSION, clothesStocked: [] };
     }
     if (data.v !== SAVE_VERSION) throw new Error(`Unsupported save version ${data.v}`);
     return new Game(data.seed, data);

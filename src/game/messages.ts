@@ -6,6 +6,7 @@ import type { OrderId } from './defs/orders';
 import type { RoomId } from './defs/rooms';
 import type { SkillId } from './defs/skills';
 import type { NeedId } from './needs';
+import type { Weather } from './weather';
 
 // What the game wants to say, as data. The game layer never builds text:
 // the UI turns a Msg into words in the player's language (see src/i18n/),
@@ -148,6 +149,17 @@ export type Msg =
   | { key: 'landIsland'; level: LevelId }
   /** Stepped onto snow: it is cold up here. */
   | { key: 'snowCold' }
+  /**
+   * The weather changed: clouds come (rain soon), rain or a storm starts on
+   * this island, or it is clear again after `was`. `dry`: the explorer carries
+   * the leaf cape or the rain jacket.
+   */
+  | { key: 'weather'; w: 'clouds' | 'rain' | 'storm'; level: LevelId; dry?: true }
+  | { key: 'weather'; w: 'clear'; was: Weather }
+  /** The fishing boat stays at the dock while a storm blows. */
+  | { key: 'stormWait' }
+  /** This recipe is only made in the hut, at this room (the wool coat at the workbench). */
+  | { key: 'needRoom'; room: RoomId }
   /** Walked into a deep cave from outside: it is dark in there, unless you carry the crystal lantern. */
   | { key: 'caveEnter'; lantern?: true }
   /** Walked into a steep step: build `way` (a ladder, a climbing rope) on it to get up. */

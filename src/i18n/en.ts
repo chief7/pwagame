@@ -40,6 +40,11 @@ const ITEM: ItemWords<{ one: string; many: string; short: [string, string] }> = 
   cooker: { one: 'electric cooker', many: 'electric cookers', short: ['cooker', 'cookers'] },
   motor: { one: 'motor', many: 'motors', short: ['motor', 'motors'] },
   fish_stew: { one: 'bowl of fish stew', many: 'bowls of fish stew', short: ['stew', 'stews'] },
+  leaf_cape: { one: 'leaf cape', many: 'leaf capes', short: ['cape', 'capes'] },
+  sun_hat: { one: 'sun hat', many: 'sun hats', short: ['hat', 'hats'] },
+  wool: { one: 'tuft of wool', many: 'tufts of wool', short: ['wool', 'wool'] },
+  wool_coat: { one: 'wool coat', many: 'wool coats', short: ['coat', 'coats'] },
+  rain_jacket: { one: 'rain jacket', many: 'rain jackets', short: ['jacket', 'jackets'] },
 };
 
 /** Name, and what gathering from it looks like ("You shake the palm tree"). */
@@ -60,6 +65,8 @@ const OBJECT: ObjectWords<{ name: string; gather?: string }> = {
   log_pile: { name: 'pile of logs', gather: 'You take wood from the pile' },
   log_driftwood: { name: 'driftwood', gather: 'You pick up the driftwood' },
   chest_closed: { name: 'chest', gather: 'You open the chest' },
+  jacket_chest: { name: 'chest', gather: 'You open the chest' },
+  thorn_bush_wool: { name: 'thorny juniper', gather: 'You pick wool off the thorns' },
   chest_open: { name: 'empty chest' },
   spring: { name: 'spring' },
   campfire: { name: 'campfire' },
@@ -205,6 +212,11 @@ function itemList(items: [keyof typeof ITEM, number][]): string {
 /** What the goal of a stage's island is called: "boat", "beacon", "balloon". */
 const goalName = (stage: StageId) => ({ 1: 'boat', 2: 'beacon', 3: 'balloon', 4: 'radio room' })[stageLevel(stage)];
 
+/** "13:30", from minutes after midnight. */
+function hm(minutes: number): string {
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
 /** "17:00". */
 function time(turn: number): string {
   const m = Math.floor(minuteOfDay(turn));
@@ -231,6 +243,16 @@ export const en: Strings = {
     eat: 'Eat',
     forBuilding: 'For building',
     tool: 'A tool. Keep it in your bag.',
+    wearNote: {
+      leaf_cape: 'Clothes. In your bag, it keeps you dry: rain does not make you cold.',
+      sun_hat: 'Clothes. In your bag, it shades you: on hot ash you get thirsty more slowly.',
+      wool_coat: 'Clothes. In your bag, it keeps you warm at night and on snow.',
+      rain_jacket: 'Clothes. In your bag, it keeps you dry, and a little warm.',
+    },
+    weather: { clear: 'Clear', clouds: 'Clouds', rain: 'Rain', storm: 'Storm', snow: 'Snow' },
+    weatherReport: 'Weather report',
+    forecast: (when, day) => `${when === 'today' ? 'Today' : 'Tomorrow'}: ${
+      day.kind === 'clear' ? 'dry all day.' : `${day.kind === 'storm' ? 'a storm' : 'rain'} from ${hm(day.start)} to ${hm(day.end)}.`}`,
     buildHint: 'Buildings go in front of you.',
     changeExplorer: 'Change explorer',
     newIsland: 'New island',
@@ -433,6 +455,9 @@ export const en: Strings = {
     lamp_post: { name: 'Lamp post', description: 'An electric lamp for the decks. It lights 3 steps around it at night.' },
     fish_stew: { name: 'Fish stew', description: 'Stand next to the galley. A big hot meal: lots of Food, some Water and Energy.' },
     boat_motor: { name: 'Boat motor', description: 'Stand next to the fishing boat. With a motor, a trip takes 3 hours and 1 diesel.' },
+    leaf_cape: { name: 'Leaf cape', description: 'Big leaves tied together. Keep it in your bag, and rain does not make you cold.' },
+    sun_hat: { name: 'Sun hat', description: 'Woven from leaves. Keep it in your bag: on hot ash you get thirsty more slowly.' },
+    wool_coat: { name: 'Wool coat', description: 'Make it at the workbench in your hut. Keep it in your bag: it keeps you warm at night and on snow.' },
   },
   paths: { build: 'Building', explorer: 'Explorer', improve: 'Improving' },
   objectName: (kind) => cap(OBJECT[kind].name),
@@ -597,6 +622,26 @@ export const en: Strings = {
       case 'snatch': return `The cheeky ${ANIMAL[msg.animal].name} snatched ${itemCount(msg.item, 1)}!`;
       case 'cook': return `You cook over the fire and get ${itemCount(msg.item, 1)}. Smells great!`;
       case 'needFire': return 'Stand next to a campfire to cook.';
+      case 'needRoom': return 'Make this in your hut, at the workbench. Add the workshop room first.';
+      case 'stormWait': return 'A storm blows. The boat stays at the dock until it is over.';
+      case 'weather': {
+        if (msg.w === 'clear') return msg.was === 'storm' ? 'The storm is over.' : 'The rain stops.';
+        if (msg.w === 'clouds') {
+          return msg.dry
+            ? 'Dark clouds come in. Rain soon! Your clothes keep you dry.'
+            : 'Dark clouds come in. Rain soon! Find a roof or a fire, or make a leaf cape.';
+        }
+        if (msg.w === 'storm') {
+          return `A storm blows over the rig! You can see less, and the boat stays at the dock.${msg.dry ? ' Your clothes keep you dry.' : ' Stay near the cabin.'}`;
+        }
+        const start = {
+          1: 'It starts to rain. Plants grow faster, and fish bite better.',
+          2: 'It starts to rain. Up on the snow, it snows.',
+          3: 'It starts to rain. The rain cools the hot ash.',
+          4: 'Rain drums on the steel decks. Fish bite better.',
+        }[msg.level];
+        return `${start}${msg.dry ? ' You stay dry.' : ' Out here you get a little cold.'}`;
+      }
       case 'needSkill': return `Learn the skill “${en.skills[msg.skill].name}” first.`;
       case 'needPoints': return 'You need more skill points. Gather and build to earn them.';
       case 'skillPoint': return 'You feel more skilled! You got a skill point.';

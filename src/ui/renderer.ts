@@ -5,7 +5,7 @@ import { Tile, type GameMap } from '../game/map';
 import { rigLegAt } from '../game/riggen';
 import { hash2 } from '../sprites/pixel';
 import { bake, buildSprites, edgeTileName, mixedTile, type Sprite } from '../sprites';
-import { characterName, fishingName } from '../sprites/characters';
+import { dressed, dressedName, fishingName, fishingPose, outfitTag, type Facing, type Frame, type Outfit } from '../sprites/characters';
 import type { Animator } from './animator';
 
 export type Body = 'male' | 'female';
@@ -50,6 +50,8 @@ const HELI_HEIGHT = 3;
 const DROP_LET_GO = 0.55;
 /** Animals that flutter along with a little hop; the others walk with step frames. */
 const FLYERS = new Set(['bat', 'wasps']);
+/** A grey sky over the map: clouds, rain, a storm. */
+const WEATHER_TINT = { clouds: 'rgba(60, 70, 86, 0.08)', rain: 'rgba(60, 70, 86, 0.16)', storm: 'rgba(44, 52, 66, 0.26)' };
 /** Night tint; its alpha comes from how dark a cell is. */
 const NIGHT_RGB = '10, 16, 42';
 const NIGHT_MAX = 0.62;
@@ -256,7 +258,7 @@ export class Renderer {
     }
     if (!trip) actors.push({
       id: player.id,
-      name: anim.casting(player.id, now) ? fishingName(this.body, player.facing) : characterName(this.body, player.facing, playerPose.frame),
+      name: this.explorer(anim.casting(player.id, now), player.facing, playerPose.frame as Frame, game.outfit()),
       pose: { ...playerPose, hop: 0 },
       bob: playerPose.frame ? 0 : anim.idleBob(player.id, now),
     });
@@ -292,6 +294,7 @@ export class Renderer {
     }
 
     this.drawNight(game, o, x0, y0, x1, y1, playerPose);
+    this.drawWeather(game, o, x0, y0, x1, y1, fireFrame);
     this.drawHelicopters(anim, o, now, fireFrame);
 
     // Remembered cells dim; unknown cells stay hidden, even under overhanging crowns.
@@ -457,6 +460,41 @@ export class Renderer {
       if (sprite) this.sprites.set(name, (baked = { sprite, canvas: bake(sprite) }));
     }
     if (baked) this.ctx.drawImage(baked.canvas, sx, sy, this.cell, this.cell);
+  }
+
+  /** The explorer's sprite in their clothes, painted on first use (there are many outfits). */
+  private explorer(fishing: boolean, facing: Facing, frame: Frame, outfit: Outfit): string {
+    const name = fishing ? fishingName(this.body, facing) + outfitTag(outfit) : dressedName(this.body, facing, frame, outfit);
+    if (!this.sprites.has(name)) {
+      const sprite = fishing ? fishingPose(this.body, facing, outfit) : dressed(this.body, facing, frame, outfit);
+      this.sprites.set(name, { sprite, canvas: bake(sprite) });
+    }
+    return name;
+  }
+
+  /**
+   * Clouds grey the sky; rain (snow on the snow of Pine Ridge, a storm on the
+   * rig) falls over every cell in view, but not into caves or rock.
+   */
+  private drawWeather(game: Game, o: { x: number; y: number }, x0: number, y0: number, x1: number, y1: number, frame: number): void {
+    const weather = game.weather;
+    if (weather === 'clear') return;
+    const { ctx, cell, canvas } = this;
+    ctx.fillStyle = WEATHER_TINT[weather];
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (weather === 'clouds') return;
+    const { map } = game;
+    const n = (frame % 2) + 1;
+    const fall = weather === 'storm' ? `weather_storm_${n}` : `weather_rain_${n}`;
+    const snow = `weather_snow_${n}`;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!map.isVisible(x, y)) continue;
+        const tile = map.get(x, y);
+        if (tile === Tile.Rock || tile === Tile.CaveFloor) continue;
+        this.drawTile(tile === Tile.Snow ? snow : fall, o.x + x * cell, o.y + y * cell);
+      }
+    }
   }
 
   /** Draw a sprite bottom-centre on the cell at (sx, sy); `flash` draws its white silhouette. */

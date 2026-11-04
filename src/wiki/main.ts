@@ -7,7 +7,7 @@ import { OBJECTS, type ObjectKind, type Yield } from '../game/defs/objects';
 import { RECIPES, RECIPE_IDS } from '../game/defs/recipes';
 import { ROOMS, ROOM_IDS, hutSprite, type RoomId } from '../game/defs/rooms';
 import { PATHS, PATH_IDS, SKILLS, xpForPoints } from '../game/defs/skills';
-import { BARREL_DRINK, BED_HEAL, CAVE_REST, HEARTH_HEAL, OPEN_REST, WORKSHOP_ROPE } from '../game/game';
+import { BARREL_DRINK, BED_HEAL, CAVE_REST, HEARTH_HEAL, OPEN_REST, RAIN_BITE, RAIN_CHILL, RAIN_DRINK, STORM_CHILL, WORKSHOP_ROPE } from '../game/game';
 import { Tile } from '../game/map';
 import { NEED_IDS, tickNeeds, warmthTarget } from '../game/needs';
 import { isLang, LANGUAGES, preferredLang, setLang, t, type Lang } from '../i18n';
@@ -393,6 +393,22 @@ function animalsSection(): HTMLElement {
   ]);
 }
 
+function weatherSection(): HTMLElement {
+  const w = W.weather;
+  const pct = (v = 0) => Math.round(v * 100);
+  const clothes = (Object.keys(ITEMS) as ItemId[]).filter((id) => ITEMS[id].wear);
+  return section('weather', w.title, [
+    el('div', 'dog-sprites', ['ui_weather_cloud', 'ui_weather_rain', 'ui_weather_snow', 'ui_weather_storm'].map((n) => sprite(n, 3))),
+    ...w.paras(RAIN_CHILL, STORM_CHILL, RAIN_DRINK, pct(RAIN_BITE)).map(para),
+    el('div', 'dog-sprites', ['female_down_cape_hat', 'male_down_coat', 'female_down_jacket', 'male_down_hat'].map((n) => sprite(n, 3))),
+    para(w.clothes),
+    el('ul', undefined, clothes.map((id) => {
+      const wear = ITEMS[id].wear!;
+      return el('li', undefined, [sprite(`item_${id}`, 2), ` ${W.items[id]}: ${w.wear(pct(wear.warm), pct(wear.dry), pct(wear.shade))}`]);
+    })),
+  ]);
+}
+
 function dogSection(): HTMLElement {
   return section('dog', W.dog.title, [
     el('div', 'dog-sprites', [sprite('animal_dog', 3), el('span', 'arrow', ['→']), sprite('dog', 3), sprite('dog_rest', 3)]),
@@ -460,7 +476,7 @@ function render(lang: Lang): void {
   const play = Object.assign(el('a', 'play', [W.play, ' ▶']), { href: '../' });
 
   const sections = [
-    startSection(), togetherSection(), needsSection(), healthSection(), timeSection(), warmthSection(), campSection(),
+    startSection(), togetherSection(), needsSection(), healthSection(), timeSection(), warmthSection(), weatherSection(), campSection(),
     gatherSection(), itemsSection(), buildSection(), skillsSection(), animalsSection(), dogSection(),
     islandsSection(), tipsSection(),
   ];
