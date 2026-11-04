@@ -222,6 +222,155 @@ export function fishingPose(body: Body, facing: Facing): Sprite {
   return s;
 }
 
+// ---- Clothes ------------------------------------------------------------------------
+//
+// What the explorer carries shows on them: one garment on the body (the leaf
+// cape, the wool coat or the old rain jacket) and the palm sun hat on the
+// head. They are drawn into the same template rows, so every facing and step
+// frame gets them. Extra keys: L/G/D leaves, w/W coat, r/R scarf, o button,
+// u/y/Y straw, n hat band.
+
+export type Garment = 'cape' | 'coat' | 'jacket';
+
+export interface Outfit {
+  garment?: Garment;
+  hat?: boolean;
+}
+
+/** Rows to lay over the template: a space keeps the pixel below. Index = row number. */
+type Patch = Partial<Record<number, string>>;
+
+const HAT: Record<'down' | 'up' | 'right', Patch> = {
+  down: {
+    0: '.....kkkkkk.....',
+    1: '....kuyyyyYk....',
+    2: '....kyyyyyYk....',
+    3: '..kkknnnnnnkkk..',
+    4: '.kuyyyyyyyyyyYk.',
+    5: '..kk        kk..',
+  },
+  up: {
+    0: '.....kkkkkk.....',
+    1: '....kuyyyyYk....',
+    2: '....kyyyyyYk....',
+    3: '..kkknnnnnnkkk..',
+    4: '.kuyyyyyyyyyyYk.',
+    5: '..kk        kk..',
+  },
+  right: {
+    0: '......kkkkk.....',
+    1: '.....kuyyyYk....',
+    2: '.....kyyyyYk....',
+    3: '...kkknnnnnkkk..',
+    4: '..kuyyyyyyyyyYk.',
+    5: '..kk         k..',
+  },
+};
+
+const CAPE: Record<'down' | 'up' | 'right', Patch> = {
+  // Facing you: a collar of palm leaves, and the cape shows at both sides.
+  down: {
+    9: '.kLLGLGGLGGGDDk.',
+    10: 'kG            Dk',
+    11: 'kG            Dk',
+    12: 'kG            Dk',
+    13: '.kD          Dk.',
+    14: '..k          k..',
+  },
+  // From the back the cape covers the shirt, with a fringe of leaf tips.
+  up: {
+    9: '.kLLGLGGLGGGDDk.',
+    10: 'kLLGLGLGGGLGGDDk',
+    11: 'kLGLGGLGGGGGDDDk',
+    12: 'kGLGGGLGGGGDGDDk',
+    13: '.kGDk      kGDk.',
+  },
+  // From the side it hangs down the back.
+  right: {
+    9: '...kLLGLGGLGDk..',
+    10: '..kLD           ',
+    11: '..kGD           ',
+    12: '..kGD           ',
+    13: '...kD           ',
+    14: '....k           ',
+  },
+};
+
+/** The wool coat's scarf (the rain jacket has none). */
+const SCARF: Record<'down' | 'up' | 'right', Patch> = {
+  down: { 9: '    rrrrrrRR    ', 10: '         rR     ' },
+  up: { 9: '    rrrrrrRR    ' },
+  right: { 9: '     rrrrrR     ', 10: '     R          ' },
+};
+
+/** Buttons down the front of a coat or jacket. */
+const BUTTONS: Record<'down' | 'up' | 'right', Patch> = {
+  down: { 10: '       o        ', 12: '       o        ' },
+  up: {},
+  right: { 10: '          o     ' },
+};
+
+function applyPatch(rows: string[], patch: Patch): void {
+  for (const [y, text] of Object.entries(patch)) {
+    const row = Number(y);
+    rows[row] = [...rows[row]].map((ch, x) => (text![x] === ' ' ? ch : text![x])).join('');
+  }
+}
+
+/** A coat or jacket: the shirt, the arms (sleeves) and the top of the trousers take the coat colour. */
+function wearCoat(rows: string[]): void {
+  const swap: Record<number, Record<string, string>> = {
+    9: { c: 'w', C: 'W' },
+    10: { c: 'w', C: 'W', s: 'w', S: 'W' },
+    11: { c: 'w', C: 'W', s: 'w', S: 'W' },
+    12: { c: 'w', C: 'W', p: 'w', P: 'W' },
+  };
+  for (const [y, map] of Object.entries(swap)) {
+    const row = Number(y);
+    rows[row] = [...rows[row]].map((ch) => map[ch] ?? ch).join('');
+  }
+}
+
+export function outfitTag(outfit: Outfit): string {
+  return `${outfit.garment ? `_${outfit.garment}` : ''}${outfit.hat ? '_hat' : ''}`;
+}
+
+export function dressedName(body: Body, facing: Facing, frame: Frame, outfit: Outfit): string {
+  return characterName(body, facing, frame) + outfitTag(outfit);
+}
+
+/** The explorer in their clothes; with no clothes this is the plain character. */
+export function dressed(body: Body, facing: Facing, frame: Frame, outfit: Outfit, look: Look = LOOKS[body]): Sprite {
+  const name = dressedName(body, facing, frame, outfit);
+  if (facing === 'left') return dressed(body, 'right', frame, outfit, look).mirrored(name);
+  const rows = walkRows(body, facing, frame);
+  const g = outfit.garment;
+  if (g === 'coat' || g === 'jacket') {
+    wearCoat(rows);
+    applyPatch(rows, BUTTONS[facing]);
+    if (g === 'coat') applyPatch(rows, SCARF[facing]);
+  }
+  if (g === 'cape') applyPatch(rows, CAPE[facing]);
+  if (outfit.hat) applyPatch(rows, HAT[facing]);
+  const coat = g === 'jacket' ? [P.raincoat, P.raincoatShade] : [P.coatWool, P.coatWoolShade];
+  return fromRows(name, rows, {
+    ...keyFor(look),
+    L: P.leafLight, G: P.leaf, D: P.leafDark,
+    w: coat[0], W: coat[1], r: P.scarf, R: P.scarfShade, o: P.woodDeep,
+    u: P.strawLight, y: P.straw, Y: P.strawDark, n: P.leafDark,
+  });
+}
+
+/** Gallery set: both explorers in each outfit, standing, all four facings. */
+export function clothesSet(): Sprite[] {
+  const outfits: Outfit[] = [
+    { hat: true }, { garment: 'cape' }, { garment: 'coat' }, { garment: 'jacket' },
+    { garment: 'cape', hat: true }, { garment: 'coat', hat: true },
+  ];
+  const facings = ['down', 'up', 'right', 'left'] as const;
+  return (['male', 'female'] as const).flatMap((b) => outfits.flatMap((o) => facings.map((f) => dressed(b, f, 0, o))));
+}
+
 function setRow(rows: string[], y: number, x: number, text: string): void {
   rows[y] = rows[y].slice(0, x) + text + rows[y].slice(x + text.length);
 }

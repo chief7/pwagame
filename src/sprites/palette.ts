@@ -306,4 +306,29 @@ export const PALETTE = {
   washLavaDark: '#c8714a',
   washDeck: '#b8b9b2',
   washDeckDark: '#a5a79f',
+
+  // Weather: rain and snow over the map, clouds for the HUD.
+  rain: 'rgba(236, 246, 252, 0.95)',
+  rainSoft: 'rgba(220, 238, 250, 0.6)',
+  snowfall: 'rgba(255, 255, 255, 0.9)',
+  cloudLight: '#f2f4f6',
+  cloud: '#cfd6de',
+  cloudDark: '#a2adb9',
+  stormCloud: '#7d8896',
+  stormCloudDark: '#5a6472',
+  sun: '#f7d774',
+  sunLight: '#fff1b0',
+  sunRay: '#f2c14e',
+
+  // Clothes: wool from the goats of Pine Ridge, the wool coat, the old rain jacket.
+  wool: '#f3ece0',
+  woolShade: '#d8ccb6',
+  woolDark: '#b3a48a',
+  coatWool: '#d9c29a',
+  coatWoolShade: '#b09468',
+  scarf: '#d6334a',
+  scarfShade: '#9a2a32',
+  raincoat: '#f2c94c',
+  raincoatLight: '#ffe58a',
+  raincoatShade: '#c4961f',
 } as const;
