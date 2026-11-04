@@ -1,4 +1,5 @@
-import { characterSet } from './characters';
+import { characterSet, clothesSet } from './characters';
+import { clothesItemIcons, rainOverlay, snowOverlay, stormOverlay, thornBushes, weatherIcons } from './weather';
 import { animalSet, carryItemIcons, caveItemIcons, itemIcons, skillItemIcons } from './creatures';
 import {
   berryBush, berryBushEmpty, bramble, bush, fern, mushroom, treeApple, treeAppleBare, treeBirch, treeBroadleaf, treePine,
@@ -63,6 +64,8 @@ export function spriteGroups(): SpriteGroup[] {
     { title: 'Rig workshop', sprites: workshopSprites() },
     { title: 'Rig habitat', sprites: habitatSprites() },
     { title: 'Map', sprites: [mapIcon(), ...mapMarkers()] },
+    { title: 'Weather', sprites: [...rainOverlay(), ...snowOverlay(), ...stormOverlay(), ...weatherIcons()] },
+    { title: 'Clothes', sprites: [...clothesItemIcons(), ...thornBushes(), ...clothesSet()] },
   ];
 }
 
