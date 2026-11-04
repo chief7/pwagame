@@ -191,11 +191,11 @@ function line(s: Sprite, x0: number, y0: number, x1: number, y1: number, color: 
  * middle, the rod reaching out over the water it faces, the line and a
  * bobber. Wider and taller than the cell, so the rod reaches the next one.
  */
-export function fishingPose(body: Body, facing: Facing): Sprite {
-  const name = fishingName(body, facing);
-  if (facing === 'left') return fishingPose(body, 'right').mirrored(name);
+export function fishingPose(body: Body, facing: Facing, outfit: Outfit = {}): Sprite {
+  const name = fishingName(body, facing) + outfitTag(outfit);
+  if (facing === 'left') return fishingPose(body, 'right', outfit).mirrored(name);
   const s = new Sprite(name, 32, 24);
-  const stand = character(body, facing);
+  const stand = dressed(body, facing, 0, outfit);
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) s.set(x + 8, y + 8, stand.get(x, y));
   const rod = (i: number) => (i < 3 ? P.outline : i < 7 ? P.woodDeep : P.woodDark);
   const cord = () => P.fishingLine;

@@ -139,6 +139,8 @@ export interface WikiWords {
     paras: string[];
   };
   dog: { title: string; paras: string[] };
+  /** Numbers: the rain chill, the storm chill, Water per turn in the rain, the extra bite chance (%). */
+  weather: { title: string; paras: (chill: number, storm: number, drink: number, bite: number) => string[]; clothes: string; wear: (warm: number, dry: number, shade: number) => string };
   islands: {
     title: string;
     one: { title: string; paras: string[] };
@@ -173,6 +175,7 @@ const en: WikiWords = {
     pickaxe: 'Pickaxe', shovel: 'Shovel', crowbar: 'Crowbar', iron_ore: 'Iron ore', coal: 'Coal', clay: 'Clay',
     spare_part: 'Spare part', steel_plate: 'Steel plate', vegetables: 'Vegetables',
     solar_panel: 'Solar panel', cooker: 'Electric cooker', motor: 'Motor', fish_stew: 'Fish stew',
+    leaf_cape: 'Leaf cape', sun_hat: 'Sun hat', wool: 'Wool', wool_coat: 'Wool coat', rain_jacket: 'Rain jacket',
   },
   ground: { sand: 'beach', grass: 'forest', cave: 'caves', scree: 'scree', snow: 'snow', ash: 'ash', deck: 'rig decks' },
 
@@ -359,6 +362,18 @@ const en: WikiWords = {
       'Wild sense (a skill) shows in red where an animal would come after you. Animal friend makes wild animals notice you later, and stops crabs and monkeys.',
     ],
   },
+  weather: {
+    title: 'Rain and clothes',
+    paras: (chill, storm, drink, bite) => [
+      'On most days a **shower** comes, always in the day, between 9:00 and 20:00. An hour before, dark clouds come in, and the log tells you. The first day is always dry.',
+      `Out in the rain the Warmth target is **${chill} lower** (less in a shelter, and nothing in a hut or next to a fire). Rain alone never makes Warmth run out, and it never puts out a campfire.`,
+      `Rain also helps: you catch **${drink} Water** each turn out in the open, plants **grow back twice as fast**, fish bite **${bite}% more** often, and wasps stay in their nest.`,
+      'On Pine Ridge the rain falls as **snow** on the snowy peak. On Ember Isle, rain **cools the hot ash**, so you do not get thirsty faster. On the oil rig, some days bring a **storm** instead: it is colder (' + storm + ' lower), you see 2 cells less, and the fishing boat stays at the dock until it is over.',
+      'The **weather report** on the rig’s radio tells you today’s and tomorrow’s weather.',
+    ],
+    clothes: 'Clothes work while they are **in your bag**: you never have to put them on. Your explorer shows what helps most: the cape or the jacket in the rain, the coat when it is dry, and the sun hat always. Make the leaf cape and the sun hat anywhere. Pick **wool** from the thorny junipers where the forest of Pine Ridge meets the scree (the goats leave it there), and make the wool coat at the workbench in your hut. The rain jacket is in a chest on the oil rig.',
+    wear: (warm, dry, shade) => [warm && `${warm}% less cold`, dry && (dry === 100 ? 'no rain chill' : `${dry}% less rain chill`), shade && `${shade}% less thirst on hot ash`].filter(Boolean).join(', '),
+  },
   dog: {
     title: 'The dog',
     paras: [
@@ -464,6 +479,7 @@ const de: WikiWords = {
     pickaxe: 'Spitzhacke', shovel: 'Schaufel', crowbar: 'Brecheisen', iron_ore: 'Eisenerz', coal: 'Kohle', clay: 'Lehm',
     spare_part: 'Ersatzteil', steel_plate: 'Stahlplatte', vegetables: 'Gemüse',
     solar_panel: 'Solarmodul', cooker: 'Elektroherd', motor: 'Motor', fish_stew: 'Fischeintopf',
+    leaf_cape: 'Blätterumhang', sun_hat: 'Sonnenhut', wool: 'Wolle', wool_coat: 'Wollmantel', rain_jacket: 'Regenjacke',
   },
   ground: { sand: 'Strand', grass: 'Wald', cave: 'Höhlen', scree: 'Geröll', snow: 'Schnee', ash: 'Asche', deck: 'Decks der Bohrinsel' },
 
@@ -649,6 +665,18 @@ const de: WikiWords = {
       '**Wilde Tiere** sind die echte Gefahr. Sie leben weit weg von deinem Lager. Darum werden Entdecker weit weg von zu Hause ohnmächtig. Halte Abstand, oder halte Essen und Wasser hoch, damit du heilst.',
       'Spürsinn (ein Talent) zeigt rot, wo ein Tier dich verfolgen würde. Tierfreund sorgt dafür, dass wilde Tiere dich später bemerken, und hält Krabben und Affen fern.',
     ],
+  },
+  weather: {
+    title: 'Regen und Kleidung',
+    paras: (chill, storm, drink, bite) => [
+      'An den meisten Tagen kommt ein **Regenschauer**, immer am Tag, zwischen 9:00 und 20:00 Uhr. Eine Stunde vorher ziehen dunkle Wolken auf, und das Tagebuch sagt es dir. Der erste Tag ist immer trocken.',
+      `Draußen im Regen ist das Wärme-Ziel **${chill} niedriger** (weniger im Unterstand, gar nicht in der Hütte oder am Feuer). Regen allein macht deine Wärme nie ganz leer, und er löscht nie ein Lagerfeuer.`,
+      `Regen hilft auch: Draußen bekommst du jede Runde **${drink} Wasser**, Pflanzen **wachsen doppelt so schnell** nach, Fische beißen **${bite} % öfter**, und Wespen bleiben in ihrem Nest.`,
+      'Auf dem Kiefernkamm fällt der Regen auf dem verschneiten Gipfel als **Schnee**. Auf der Glutinsel **kühlt der Regen die heiße Asche**, dann bekommst du dort nicht schneller Durst. Auf der Bohrinsel kommt an manchen Tagen ein **Sturm**: Es ist kälter (' + storm + ' niedriger), du siehst 2 Felder weniger, und das Fischerboot bleibt am Steg, bis er vorbei ist.',
+      'Der **Wetterbericht** am Funkgerät der Bohrinsel sagt dir das Wetter von heute und morgen.',
+    ],
+    clothes: 'Kleidung wirkt, solange sie **in deiner Tasche** ist: Du musst sie nie anziehen. Dein Entdecker zeigt, was gerade am meisten hilft: den Umhang oder die Jacke im Regen, den Mantel, wenn es trocken ist, und den Sonnenhut immer. Blätterumhang und Sonnenhut baust du überall. **Wolle** zupfst du von den Dornwacholdern, wo der Wald des Kiefernkamms an das Geröll grenzt (die Ziegen lassen sie dort). Den Wollmantel machst du an der Werkbank in deiner Hütte. Die Regenjacke liegt in einer Truhe auf der Bohrinsel.',
+    wear: (warm, dry, shade) => [warm && `${warm} % weniger Kälte`, dry && (dry === 100 ? 'keine Kälte durch Regen' : `${dry} % weniger Kälte durch Regen`), shade && `${shade} % weniger Durst auf heißer Asche`].filter(Boolean).join(', '),
   },
   dog: {
     title: 'Der Hund',

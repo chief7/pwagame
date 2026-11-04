@@ -30,7 +30,8 @@ export type ObjectKind =
   | 'storage_container_0' | 'storage_container_1' | 'storage_container_2' | 'storage_container_3' | 'storage_container_4'
   | 'storage_container_5' | 'storage_container_back'
   | 'ore_vein' | 'clay_bank' | 'sealed_crate' | 'furnace' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade'
-  | 'solar_station_site' | 'galley_site' | 'machine_shop_site' | 'solar_station' | 'galley' | 'machine_shop' | 'lamp_post' | 'boat_motor';
+  | 'solar_station_site' | 'galley_site' | 'machine_shop_site' | 'solar_station' | 'galley' | 'machine_shop' | 'lamp_post' | 'boat_motor'
+  | 'thorn_bush_wool' | 'jacket_chest';
 
 export interface Yield {
   item: ItemId;
@@ -198,6 +199,11 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
     },
   }),
   chest_open: def({ kind: 'chest_open' }),
+  // A chest on the oil rig with an old rain jacket in it (it looks like any chest).
+  jacket_chest: def({
+    kind: 'jacket_chest',
+    gather: { yields: [{ item: 'rain_jacket', min: 1, max: 1 }, { item: 'rope', min: 1, max: 2 }], after: { becomes: 'chest_open' } },
+  }),
   spring: def({ kind: 'spring', drink: 35 }),
   campfire: def({ kind: 'campfire', warmthRadius: 2, lightRadius: 5, frames: ['campfire', 'campfire_2'] }),
   lean_to: def({ kind: 'lean_to', walkable: true, shelter: 0.6, rest: 75 }),
@@ -382,6 +388,11 @@ export const OBJECTS: Record<ObjectKind, ObjectDef> = {
   lamp_post: def({ kind: 'lamp_post', lightRadius: 3 }),
   boat_motor: def({ kind: 'boat_motor', boatMotor: true }),
   crane: def({ kind: 'crane', blocksSight: true }),
+  // Island 2: a low, prickly juniper. The goats brush past it and leave wool on the thorns.
+  thorn_bush_wool: def({
+    kind: 'thorn_bush_wool', depletedSprite: 'thorn_bush',
+    gather: { yields: [{ item: 'wool', min: 1, max: 2 }], after: { regrow: 200 } },
+  }),
   // The camp on the rig: a bed for a full rest, and a little stove to cook on.
   crew_cabin: def({ kind: 'crew_cabin', walkable: true, shelter: 1, rest: 100, warmthRadius: 0, lightRadius: 2 }),
   balloon_crashed: def({ kind: 'balloon_crashed' }),

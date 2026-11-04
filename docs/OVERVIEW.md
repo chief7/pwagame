@@ -207,7 +207,7 @@ Change per turn:
 | Need | Awake | Asleep |
 |---|---|---|
 | Food | −0.45 | −0.225 |
-| Water | −0.45 (up to ×1.5 on hot ash, see below) | −0.225 |
+| Water | −0.45 (up to ×1.5 on hot ash, see below); +0.3 out in the rain (see 4.26) | −0.225 |
 | Energy | −0.25 | +1.4 × (0.4 + 0.6 × shelter) |
 | Warmth | moves towards a target (see 4.3): +1.5 up, −0.6 down | same |
 | Health | −1 for each empty need (Food, Water, Energy, Warmth) | same |
@@ -259,10 +259,11 @@ Warmth moves towards a target value each turn:
 
 - Near a campfire (2 cells or less) or a hot spring (1 cell, `warmthRadius`
   1): target 100.
-- Else: target = 100 − (1 − shelter) × ((1 − daylight) × 95 + cold), at
-  least 0. `cold` is 40 on snow (`SNOW_CHILL`, island 2) and 0 elsewhere. So
-  open snow has a target of 60 by day and 0 at night. A hut or a campfire
-  still gives 100. Stepping onto snow logs `snowCold`.
+- Else: target = 100 − (1 − shelter) × (1 − warm) × ((1 − daylight) × 95 +
+  cold), at least 0. `cold` is 40 on snow (`SNOW_CHILL`, island 2) and 0
+  elsewhere, plus the rain chill (see 4.26). `warm` comes from warm clothes
+  (see 4.27). So open snow has a target of 60 by day and 0 at night. A hut or
+  a campfire still gives 100. Stepping onto snow logs `snowCold`.
 
 Shelter values:
 
@@ -1164,6 +1165,97 @@ flowchart LR
   shows a card under the goal card: "n of 3 buildings", each building with
   what it opens (its frame icon until it stands), and a hint.
 
+### 4.26 Weather: rain, snowfall and storms
+
+Each island has its own weather (`src/game/weather.ts`). Like the clock and
+the tide, it follows from the game's seed, the island and the day, so it
+needs no save data and stays the same after a reload. `game.weather` is
+`clear`, `clouds`, `rain` or `storm`; `game.raining` is true for rain and
+storms.
+
+- **The schedule.** `dayWeather(seed, level, day)` gives a day either clear
+  or one shower from `start` to `end` (minutes after midnight). Day 1 is
+  always clear. Showers start after 9:00 and end by 20:00, so rain only falls
+  by day. Clouds come `CLOUDS_BEFORE` (60 minutes) before a shower.
+
+  | Island | Rainy days | Shower | Storms |
+  |---|---|---|---|
+  | 1, 2 | 65% | 2–3 h | none |
+  | 3 | 50% | 1.5–2.5 h | none |
+  | 4 (the rig) | 60% | 2–3 h | half of the rainy days: 1–2 h |
+
+- **Cold.** In rain the Warmth target gets `RAIN_CHILL` (20) more `cold`, in a
+  storm `STORM_CHILL` (30), times (1 − `dry` of the clothes). Like all cold,
+  it counts × (1 − shelter), so a hut, a cave (half) and a campfire help.
+  Open ground by day goes to 80 (70 in a storm): rain alone never empties
+  Warmth. On the snow of Pine Ridge rain falls as snow (only the look and the
+  HUD word change), on top of `SNOW_CHILL`.
+- **Help.** Out in the rain (shelter below 0.5, awake) Water gets
+  `RAIN_DRINK` (+0.3) each turn (the `drizzle` condition). Every regrowing
+  object on the island gets 1 turn closer each rain turn, so it grows back
+  twice as fast (`rainOnPlants()`). The bite chance gets `RAIN_BITE` (+0.15).
+  Chasers (wasps) do not notice the explorer and stop chasing, and Wild
+  sense does not mark them.
+- **Hot ash.** In rain, the ash heat of island 3 is 0.
+- **Storms (the rig).** Out of the cabin, the view is `STORM_SIGHT` (2)
+  cells shorter. `voyageProblem()` gives `stormWait`: the boat stays at the
+  dock. The helicopter still comes.
+- **Messages.** When the weather changes (not while asleep), the log says
+  `weather` with `w` (`clouds`, `rain`, `storm`, the island's `level`, and
+  `dry` when the clothes keep the explorer dry) or `w: 'clear'` with `was`.
+  Rain never puts out a campfire.
+- **Weather report.** The Radio panel shows `game.forecast()`: today and
+  tomorrow, with the hours of the shower or storm.
+- **What the player sees.** The HUD shows an icon and a word next to the
+  clock (`ui_weather_cloud`, `_rain`, `_snow` on a snow cell, `_storm`).
+  The renderer greys the screen (`WEATHER_TINT`) and draws the 2-frame
+  overlays `weather_rain_*`, `weather_snow_*` (on snow cells) or
+  `weather_storm_*` over each visible cell that is not rock or cave floor.
+  With reduced motion, only the first frame shows.
+
+### 4.27 Clothes
+
+Clothes are items with a `wear` field (`Wear` in `items.ts`). They work while
+they are in the bag: there is no button to put them on. `game.wear()` takes
+the best `warm`, `dry` and `shade` of what the bag holds. They are `tool`
+items: the Build panel makes only one of each (`haveTool`).
+
+| Item | How to get it | `warm` | `dry` | `shade` | Shows as |
+|---|---|---|---|---|---|
+| Leaf cape | 8 leaves, 2 rope | | 1 | | cape |
+| Sun hat | 4 leaves, 1 rope | | | 0.6 | hat |
+| Wool coat | 6 wool, 2 rope, in the hut at the workbench (`inRoom: 'workshop'`) | 0.35 | | | coat |
+| Rain jacket | the chest `jacket_chest` on the rig (with 1–2 rope) | 0.15 | 1 | | jacket |
+
+- `warm` multiplies the exposure in `warmthTarget()`: (1 − shelter) × (1 −
+  warm). So with the wool coat, open ground at night goes to 38 (from 5) and
+  open snow by day to 74 (from 60).
+- `dry` removes that share of the rain and storm chill.
+- `shade` removes that share of the ash heat: at midday on open ash, Water
+  drops 0.54 a turn (from 0.675).
+- **Wool.** `CLOTHES_STOCK` puts 10 thorny junipers (`thorn_bush_wool`) on
+  Pine Ridge, on grass next to scree or on scree next to grass. Each gives
+  1–2 wool and grows back in 200 turns (`thorn_bush` meanwhile). The goats
+  leave the wool there; no animal is hurt.
+- **The rain jacket's chest** stands on a deck cell within `JACKET_RANGE` (6)
+  of home on the rig, not next to a gangway. It counts as a chest for the
+  Treasure hunter star.
+- Like `WORKSHOP_STOCK`, `CLOTHES_STOCK` is placed the first time the
+  explorer is on that island, also on an island from an older save
+  (`clothesStocked` in the save).
+- **On the explorer.** `game.outfit()` gives one garment and the hat. In the
+  rain the garment is the first of rain jacket, leaf cape, wool coat that
+  the bag holds; else the first of wool coat, rain jacket, leaf cape. The
+  hat shows whenever the bag holds it. `dressed()` in
+  `src/sprites/characters.ts` draws the clothes into the explorer's template
+  rows (the coat and jacket recolour the shirt, sleeves and top of the
+  trousers; the coat adds a scarf; the cape and hat are patches), so every
+  facing, step frame and the fishing pose get them. The renderer paints each
+  outfit sprite on first use (`<body>_<facing>[_walkN]_<garment>[_hat]`).
+  The gallery shows the standing poses (group "Clothes").
+- **Recipes in a room.** `inRoom` on a recipe locks it (`needRoom`) until
+  the explorer stands in a camp with that room (`game.hasRoom()`).
+
 ### 4.20 The islands
 
 This section brings together, for each island, what is on it and what its
@@ -1634,9 +1726,9 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
 
 | Type | Entries |
 |---|---|
-| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin, sulphur, diesel (rare goal materials); scrap metal (rig material); mussels (food: 12 food, 2 water); stone axe, fishing rod, crystal lantern, pack frame (tools). Heavy: wood, logs, stone, scrap, diesel |
-| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, hut frame, store crate, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (islands 1 to 3): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals). Island 4, the oil rig: gangway (2 directions), broken gangway end (4 directions), scrap pile (2–3 scrap), rusty container, fuel drums (2 diesel, then empty), wooden pallet (2–3 wood), old fishing net (1–2 rope), rain water tank (drink 35), mussel bed (2–3 mussels, regrows in 200 turns), life ring, derrick, deck crane, crew cabin (bed and stove), crashed balloon, radio room (site, aerial, power, ready), derrick (broken, then working: 2 diesel, refills in 120 turns), fishing boat (wreck, then repaired: sea chart and hold; with the motor), supply crate (from the radio, on the helipad), storage container (6 × 2 cells, the rig's store; see 4.21). Rig habitat: solar station, galley, machine shop (each with a frame), lamp post (see 4.25) |
-| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope, given in trips to its frame; one on each island), store crate (6 wood or 6 logs, 2 rope; one on each island), pack frame (4 wood, 3 rope; needs the skill), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope), stepping stones (8 stone; over lava), mend gangway (6 scrap; on a broken gangway end), platform (6 scrap, 2 wood; a new deck cell at the crew platform), rain tank (6 scrap), pickaxe, shovel, crowbar, furnace, smelt steel, greenhouse, water maker, fish trap, bigger hold (see 4.24), solar station, galley, machine shop, lamp post, fish stew, boat motor (see 4.25) |
+| Items | coconut, berries, mushroom, cooked fish, apple, glowcap (food; apple 12 food, 8 water; glowcap 6 food, 4 water, 15 energy); wood, logs, leaves, stone, fish, rope, crystal (materials; fish is raw; logs only from trees with the axe); tar, resin, sulphur, diesel (rare goal materials); scrap metal (rig material); mussels (food: 12 food, 2 water); stone axe, fishing rod, crystal lantern, pack frame (tools); wool (material); leaf cape, sun hat, wool coat, rain jacket (clothes, see 4.27). Heavy: wood, logs, stone, scrap, diesel |
+| Objects | 3 palms, broadleaf and pine trees, bush, berry bush, mushroom, 3 stones, stalagmite, 3 logs, chest (closed and open), spring, campfire, lean-to, hut, hut frame, store crate, bramble, bridge (2 directions), boat (wreck, hull, mast, sail, ready). Island 2: spruce, snowy spruce, birch (wood, 50% a leaf), apple tree (1–3 apples, regrows in 200 turns), fern (1–2 leaves, regrows in 90 turns), beacon (site, base, pyre, ready), rocky step and ladder, ice wall and climbing rope. Island 1 tide islet: sandbar (2 directions, dry and wet), old tar barrel (2 tar, then empty). Snowy spruces also give resin (50%). Island 3: stepping stones (2 directions), steam vent (1–2 sulphur, regrows in 150 turns), hot spring (drink 35, warms 1 cell), balloon (site, basket, envelope, ready). Deep caves (islands 1 to 3): glowcap clump (2–3 glowcaps, regrows in 160 turns, glows 1 cell), crystal cluster (1–2 crystals). Island 4, the oil rig: gangway (2 directions), broken gangway end (4 directions), scrap pile (2–3 scrap), rusty container, fuel drums (2 diesel, then empty), wooden pallet (2–3 wood), old fishing net (1–2 rope), rain water tank (drink 35), mussel bed (2–3 mussels, regrows in 200 turns), life ring, derrick, deck crane, crew cabin (bed and stove), crashed balloon, radio room (site, aerial, power, ready), derrick (broken, then working: 2 diesel, refills in 120 turns), fishing boat (wreck, then repaired: sea chart and hold; with the motor), supply crate (from the radio, on the helipad), storage container (6 × 2 cells, the rig's store; see 4.21). Rig habitat: solar station, galley, machine shop (each with a frame), lamp post (see 4.25). Clothes (see 4.27): thorny juniper on island 2 (1–2 wool, regrows in 200 turns), the rain jacket's chest on the rig |
+| Recipes | campfire (3 wood, 2 stone), lean-to (4 wood, 5 leaves), hut (24 logs, 12 wood, 30 leaves, 20 stone, 8 rope, given in trips to its frame; one on each island), store crate (6 wood or 6 logs, 2 rope; one on each island), pack frame (4 wood, 3 rope; needs the skill), stone axe (2 wood, 2 stone, 1 leaves), rope (2 leaves), bridge (3 logs, 2 wood, 3 leaves), fishing rod (3 wood, 2 leaves; needs the skill), cook a fish (1 fish; at a campfire), ladder (4 wood, 2 rope; on a rocky step), climbing rope (1 wood, 4 rope; on an ice wall), crystal lantern (3 crystals, 1 wood, 1 rope), stepping stones (8 stone; over lava), mend gangway (6 scrap; on a broken gangway end), platform (6 scrap, 2 wood; a new deck cell at the crew platform), rain tank (6 scrap), pickaxe, shovel, crowbar, furnace, smelt steel, greenhouse, water maker, fish trap, bigger hold (see 4.24), solar station, galley, machine shop, lamp post, fish stew, boat motor (see 4.25), leaf cape (8 leaves, 2 rope), sun hat (4 leaves, 1 rope), wool coat (6 wool, 2 rope; at the workbench in the hut) |
 | Hut rooms | workshop (12 wood, 6 stone, 2 rope), hearth (12 stone, 4 wood), rain barrel (8 wood, 3 rope) (see 4.19) |
 | Skills | Building: fishing rod, handy builder, rope maker, cartographer, pack frame. Explorer: small sips, small appetite, thick skin, night eyes, sure foot, strong back. Improving: green thumb, patient angler, animal friend, wild sense |
 | Levels | 1: repair the boat (hull, mast, sail, supplies). 2: build a signal beacon on the peak (stone base, wood pile, tinder). 3: repair the hot-air balloon on the crater rim (basket, balloon cloth, burner). 4: repair the radio room on the oil rig (aerial, generator, radio) |
@@ -1698,6 +1790,10 @@ needs an `animal_<kind>_sleep` sprite (and `_left`).
   band of its nearest side. The bands are the same functions that paint the
   sets. Scree and snow keep hard edges against rock and cave floor (cliffs).
 - The river has 2 frames (`river`, `river_2`), 220 ms each.
+- The explorer can wear clothes (see 4.27): `dressed()` draws them into the
+  same templates, and the renderer paints each outfit on first use.
+- Weather overlays (`weather_rain_*`, `weather_snow_*`, `weather_storm_*`)
+  are transparent 16 × 16 tiles in 2 frames, drawn over the map (see 4.26).
 - Characters have 4 facings × 3 frames (stand, step 1, step 2). The left
   facing is the right facing, mirrored. Each facing also has a fishing pose
   (`<body>_<facing>_fish`), shown while the `cast` event plays.
@@ -1786,8 +1882,10 @@ Auto-walk (travel and hold) stops when:
   (`safeSince`), warnings and the last 30 log lines. It is about 30 KB (15 KB on islands from before the larger
   size). The save keeps the island size, so old saves load their old,
   smaller island without brambles or river.
-- `SAVE_VERSION` is 14. **If you change the shape of the save, increase
-  `SAVE_VERSION`** and decide how to handle old saves. Version 14 added
+- `SAVE_VERSION` is 15. **If you change the shape of the save, increase
+  `SAVE_VERSION`** and decide how to handle old saves. Version 15 added
+  `clothesStocked`; version 14 saves load with none, and each island gets its
+  junipers or the jacket's chest when the explorer is there. Version 14 added
   `boatMotor`; version 13 saves load with no motor. Version 13 added
   `holdUpgrades` and `stocked`; version 12 saves load with 0 and none, and
   each island gets its workshop resources when the explorer is there.
@@ -1981,6 +2079,11 @@ Also run `npm run build` (typecheck and build) before you commit.
 | What a deep cave holds | `worldgen.ts` → `CAVE_GLOWCAPS`, `CAVE_CRYSTALS` | 3–5 glowcap clumps, 2–4 crystal clusters, 1 chest |
 | What counts as a deep cave | `caves.ts` → `DEEP_CAVE_CELLS`, `MAX_WAYS_IN` | 30 cells, 4 ways in |
 | Lantern | `game.ts` → `LANTERN_SIGHT`; `renderer.ts` → `LANTERN_LIGHT` | +2 cells of sight; light 0.85 next to the explorer |
+| Weather schedule | `weather.ts` → `ISLANDS`, `CLOUDS_BEFORE`, `FIRST_START`, `LAST_END` | see 4.26; clouds 60 minutes before; showers 9:00–20:00 |
+| Rain and storm | `game.ts` → `RAIN_CHILL`, `STORM_CHILL`, `RAIN_DRINK`, `RAIN_BITE`, `STORM_SIGHT` | 20, 30 cold; +0.3 Water; +0.15 bite chance; −2 cells |
+| Clothes | `items.ts` → `wear`; `recipes.ts` → `leaf_cape`, `sun_hat`, `wool_coat` | see 4.27 |
+| Junipers, the jacket's chest | `game.ts` → `CLOTHES_STOCK`, `JACKET_RANGE` | 10 on island 2; 1 on the rig, 6 cells from home |
+| Weather tint | `renderer.ts` → `WEATHER_TINT` | clouds 0.08, rain 0.16, storm 0.26 |
 
 ---
 
@@ -2037,6 +2140,16 @@ Also run `npm run build` (typecheck and build) before you commit.
 - Each deep cave adds a chest, so the Treasure hunter star needs more
   chests than before.
 - There is no sound.
+- Weather only happens on the island the explorer is on. Plants on the other
+  islands do not grow faster in their rain, and the needs on a boat trip do
+  not feel the weather.
+- The boat trip, the balloon and the explorer picker show the explorer
+  without clothes.
+- The explorer cannot take clothes off: what is in the bag works and shows.
+  Put clothes in a store crate to stop that.
+- The leaf cape is green, so on grass it is hard to see.
+- Rain falls over tall sprites too (palms, trees), also over the parts of
+  them that reach into the cell above.
 - Building the hut gives 94 XP at once (1 XP for each item), several skill
   points. This has not been tested with real play.
 - The hearth only counts as a fire on the hut's own cell: it does not warm

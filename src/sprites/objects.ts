@@ -131,8 +131,8 @@ const CHEST_KEY = {
   a: P.shadow,
 };
 
-export function chestClosed(): Sprite {
-  return fromRows('chest_closed', [
+export function chestClosed(name = 'chest_closed'): Sprite {
+  return fromRows(name, [
     '................',
     '................',
     '................',

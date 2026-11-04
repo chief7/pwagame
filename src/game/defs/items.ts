@@ -13,12 +13,28 @@ export type ItemId =
   | 'scrap' | 'diesel' | 'mussels'
   | 'pack_frame'
   | 'pickaxe' | 'shovel' | 'crowbar' | 'iron_ore' | 'coal' | 'clay' | 'spare_part' | 'steel_plate' | 'vegetables'
-  | 'solar_panel' | 'cooker' | 'motor' | 'fish_stew';
+  | 'solar_panel' | 'cooker' | 'motor' | 'fish_stew'
+  | 'leaf_cape' | 'sun_hat' | 'wool' | 'wool_coat' | 'rain_jacket';
 
 export interface Food {
   food?: number;
   water?: number;
   energy?: number;
+}
+
+/**
+ * Clothes: they work while they are in the bag (nobody has to put them on).
+ * With more than one, each value comes from the best of them.
+ */
+export interface Wear {
+  /** 0..1: this share less cold out in the open (night, snow, rain). */
+  warm?: number;
+  /** 0..1: this share less chill from rain and storms. */
+  dry?: number;
+  /** 0..1: this share less thirst on the hot ash. */
+  shade?: number;
+  /** How it shows on the explorer: a garment on the body, or the hat. */
+  shows: 'cape' | 'coat' | 'jacket' | 'hat';
 }
 
 export interface ItemDef {
@@ -36,6 +52,8 @@ export interface ItemDef {
    * island without any of them (an old save) does not ask the goal for it.
    */
   rareFrom?: ObjectKind[];
+  /** Clothes: what they do while the explorer carries them. */
+  wear?: Wear;
 }
 
 export const ITEMS: Record<ItemId, ItemDef> = {
@@ -89,6 +107,14 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   motor: { id: 'motor', heavy: true },
   // Cooked in the galley: the most filling food there is.
   fish_stew: { id: 'fish_stew', eat: { food: 60, water: 15, energy: 15 } },
+  // Clothes against the weather. You only need one of each, like a tool.
+  leaf_cape: { id: 'leaf_cape', tool: true, wear: { dry: 1, shows: 'cape' } },
+  sun_hat: { id: 'sun_hat', tool: true, wear: { shade: 0.6, shows: 'hat' } },
+  // Goats leave it on the thorny junipers of Pine Ridge.
+  wool: { id: 'wool' },
+  wool_coat: { id: 'wool_coat', tool: true, wear: { warm: 0.35, shows: 'coat' } },
+  // An old crew jacket from a chest on the oil rig.
+  rain_jacket: { id: 'rain_jacket', tool: true, wear: { dry: 1, warm: 0.15, shows: 'jacket' } },
 };
 
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];

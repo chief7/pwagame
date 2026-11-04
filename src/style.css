@@ -109,6 +109,14 @@ body {
   }
 }
 
+#weather img {
+  width: 16px;
+  height: 16px;
+  margin: 0 3px 0 4px;
+  vertical-align: -3px;
+  image-rendering: pixelated;
+}
+
 .status {
   display: flex;
   justify-content: space-between;

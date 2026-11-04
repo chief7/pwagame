@@ -1,5 +1,6 @@
 import type { ItemId } from './items';
 import type { ObjectKind } from './objects';
+import type { RoomId } from './rooms';
 import type { SkillId } from './skills';
 
 // Things the explorer can build from what they've gathered. A recipe either
@@ -8,7 +9,8 @@ import type { SkillId } from './skills';
 
 export type RecipeId = 'campfire' | 'lean_to' | 'hut' | 'store_crate' | 'pack_frame' | 'axe' | 'rope' | 'bridge' | 'fishing_rod' | 'cooked_fish' | 'ladder' | 'climbing_rope' | 'lantern' | 'lava_stones' | 'gangway' | 'platform' | 'rain_tank'
   | 'pickaxe' | 'shovel' | 'crowbar' | 'furnace' | 'smelt' | 'greenhouse' | 'water_maker' | 'fish_trap' | 'hold_upgrade'
-  | 'solar_station' | 'galley' | 'machine_shop' | 'lamp_post' | 'fish_stew' | 'boat_motor';
+  | 'solar_station' | 'galley' | 'machine_shop' | 'lamp_post' | 'fish_stew' | 'boat_motor'
+  | 'leaf_cape' | 'sun_hat' | 'wool_coat';
 
 export type Recipe = {
   id: RecipeId;
@@ -28,6 +30,8 @@ export type Recipe = {
   near?: ObjectKind;
   /** Only once this building stands on the island (the rig habitat). */
   needsBuilt?: ObjectKind;
+  /** Only inside the camp (the hut or the crew cabin) that has this room. */
+  inRoom?: RoomId;
   /** Only on the oil rig. */
   rigOnly?: true;
   /**
@@ -92,6 +96,11 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   lamp_post: { id: 'lamp_post', builds: 'lamp_post', cost: { scrap: 3 }, rigOnly: true, needsBuilt: 'solar_station' },
   fish_stew: { id: 'fish_stew', makes: 'fish_stew', cost: { fish: 1, vegetables: 2, mussels: 2 }, rigOnly: true, near: 'galley' },
   boat_motor: { id: 'boat_motor', builds: 'boat_motor', cost: { motor: 1, steel_plate: 2 }, rigOnly: true, needsBuilt: 'machine_shop' },
+  // Clothes against the weather (see Wear in items.ts): they work from the bag.
+  leaf_cape: { id: 'leaf_cape', makes: 'leaf_cape', cost: { leaves: 8, rope: 2 } },
+  sun_hat: { id: 'sun_hat', makes: 'sun_hat', cost: { leaves: 4, rope: 1 } },
+  // Knitted at the workbench in the hut, from the wool of Pine Ridge.
+  wool_coat: { id: 'wool_coat', makes: 'wool_coat', cost: { wool: 6, rope: 2 }, inRoom: 'workshop' },
 };
 
 export const RECIPE_IDS = Object.keys(RECIPES) as RecipeId[];

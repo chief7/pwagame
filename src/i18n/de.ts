@@ -61,6 +61,8 @@ function phrase(noun: Noun, c: Case, det: Det, adj = noun.adj): string {
 }
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+/** "13:30", from minutes after midnight. */
+const hm = (minutes: number) => `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}`;
 /** A noun with no article, as a heading: "Junge Palme", "Streunender Hund". */
 const name = (noun: Noun) => cap(phrase(noun, 'nom', 'a').replace(/^(ein|eine) /, ''));
 /** "in dem" → "im", "in das" → "ins", "an dem" → "am". */
@@ -103,6 +105,11 @@ const ITEM: ItemWords<CountNoun> = {
   cooker: { g: 'm', word: 'Elektroherd', plural: 'Elektroherde', short: ['Herd', 'Herde'] },
   motor: { g: 'm', word: 'Motor', plural: 'Motoren', short: ['Motor', 'Motoren'] },
   fish_stew: { g: 'f', word: 'Schüssel Fischeintopf', plural: 'Schüsseln Fischeintopf', short: ['Eintopf', 'Eintöpfe'] },
+  leaf_cape: { g: 'm', word: 'Blätterumhang', plural: 'Blätterumhänge', short: ['Umhang', 'Umhänge'] },
+  sun_hat: { g: 'm', word: 'Sonnenhut', plural: 'Sonnenhüte', short: ['Hut', 'Hüte'] },
+  wool: { g: 'n', word: 'Büschel Wolle', plural: 'Büschel Wolle', short: ['Wolle', 'Wolle'] },
+  wool_coat: { g: 'm', word: 'Wollmantel', plural: 'Wollmäntel', short: ['Mantel', 'Mäntel'] },
+  rain_jacket: { g: 'f', word: 'Regenjacke', plural: 'Regenjacken', short: ['Jacke', 'Jacken'] },
 };
 
 /** The noun, and what gathering from it looks like ("Du schüttelst die Palme"). */
@@ -123,6 +130,8 @@ const OBJECT: ObjectWords<Noun & { gather?: string }> = {
   log_pile: { g: 'm', word: 'Holzstapel', gather: 'Du nimmst Holz vom Stapel' },
   log_driftwood: { g: 'n', word: 'Treibholz', gather: 'Du hebst das Treibholz auf' },
   chest_closed: { g: 'f', word: 'Truhe', gather: 'Du öffnest die Truhe' },
+  jacket_chest: { g: 'f', word: 'Truhe', gather: 'Du öffnest die Truhe' },
+  thorn_bush_wool: { g: 'm', word: 'Dornwacholder', gather: 'Du zupfst Wolle von den Dornen' },
   chest_open: { g: 'f', word: 'Truhe', adj: 'leer' },
   spring: { g: 'f', word: 'Quelle' },
   campfire: { g: 'n', word: 'Lagerfeuer' },
@@ -320,6 +329,16 @@ export const de: Strings = {
     eat: 'Essen',
     forBuilding: 'Zum Bauen',
     tool: 'Ein Werkzeug. Behalte es in deiner Tasche.',
+    wearNote: {
+      leaf_cape: 'Kleidung. In deiner Tasche hält sie dich trocken: Regen macht dich nicht kalt.',
+      sun_hat: 'Kleidung. In deiner Tasche gibt sie dir Schatten: auf heißer Asche bekommst du langsamer Durst.',
+      wool_coat: 'Kleidung. In deiner Tasche hält sie dich nachts und auf Schnee warm.',
+      rain_jacket: 'Kleidung. In deiner Tasche hält sie dich trocken und ein wenig warm.',
+    },
+    weather: { clear: 'Klar', clouds: 'Wolken', rain: 'Regen', storm: 'Sturm', snow: 'Schnee' },
+    weatherReport: 'Wetterbericht',
+    forecast: (when, day) => `${when === 'today' ? 'Heute' : 'Morgen'}: ${
+      day.kind === 'clear' ? 'den ganzen Tag trocken.' : `${day.kind === 'storm' ? 'Sturm' : 'Regen'} von ${hm(day.start)} bis ${hm(day.end)} Uhr.`}`,
     buildHint: 'Gebäude entstehen vor dir.',
     changeExplorer: 'Figur wechseln',
     newIsland: 'Neue Insel',
@@ -522,6 +541,9 @@ export const de: Strings = {
     lamp_post: { name: 'Laternenmast', description: 'Eine elektrische Lampe für die Decks. Sie leuchtet nachts 3 Schritte weit.' },
     fish_stew: { name: 'Fischeintopf', description: 'Stell dich neben die Kombüse. Ein großes warmes Essen: viel Hunger weg, etwas Wasser und Energie.' },
     boat_motor: { name: 'Außenbordmotor', description: 'Stell dich neben das Fischerboot. Mit Motor dauert eine Fahrt 3 Stunden und braucht 1 Diesel.' },
+    leaf_cape: { name: 'Blätterumhang', description: 'Große Blätter, zusammengebunden. Behalte ihn in deiner Tasche, dann macht dich Regen nicht kalt.' },
+    sun_hat: { name: 'Sonnenhut', description: 'Aus Blättern geflochten. Behalte ihn in deiner Tasche: auf heißer Asche bekommst du langsamer Durst.' },
+    wool_coat: { name: 'Wollmantel', description: 'Mach ihn an der Werkbank in deiner Hütte. Behalte ihn in deiner Tasche: er hält dich nachts und auf Schnee warm.' },
   },
   paths: { build: 'Bauen', explorer: 'Entdecker', improve: 'Verbessern' },
   objectName: (kind) => name(OBJECT[kind]),
@@ -688,6 +710,26 @@ export const de: Strings = {
       case 'snatch': return `${cap(phrase(ANIMAL[msg.animal], 'nom', 'the', 'frech'))} hat dir ${itemCount(msg.item, 1)} stibitzt!`;
       case 'cook': return `Du brätst über dem Feuer und bekommst ${itemCount(msg.item, 1)}. Das duftet lecker!`;
       case 'needFire': return 'Stell dich neben ein Lagerfeuer, um zu braten.';
+      case 'needRoom': return 'Das machst du in deiner Hütte, an der Werkbank. Bau zuerst die Werkstatt an.';
+      case 'stormWait': return 'Ein Sturm weht. Das Boot bleibt am Steg, bis er vorbei ist.';
+      case 'weather': {
+        if (msg.w === 'clear') return msg.was === 'storm' ? 'Der Sturm ist vorbei.' : 'Der Regen hört auf.';
+        if (msg.w === 'clouds') {
+          return msg.dry
+            ? 'Dunkle Wolken ziehen auf. Bald regnet es! Deine Kleidung hält dich trocken.'
+            : 'Dunkle Wolken ziehen auf. Bald regnet es! Such dir ein Dach oder ein Feuer, oder bau einen Blätterumhang.';
+        }
+        if (msg.w === 'storm') {
+          return `Ein Sturm zieht über die Bohrinsel! Du siehst weniger, und das Boot bleibt am Steg.${msg.dry ? ' Deine Kleidung hält dich trocken.' : ' Bleib nahe an der Kabine.'}`;
+        }
+        const start = {
+          1: 'Es fängt an zu regnen. Pflanzen wachsen schneller, und die Fische beißen besser.',
+          2: 'Es fängt an zu regnen. Oben auf dem Schnee schneit es.',
+          3: 'Es fängt an zu regnen. Der Regen kühlt die heiße Asche.',
+          4: 'Regen trommelt auf die Stahldecks. Die Fische beißen besser.',
+        }[msg.level];
+        return `${start}${msg.dry ? ' Du bleibst trocken.' : ' Draußen wird dir ein wenig kalt.'}`;
+      }
       case 'needSkill': return `Lerne zuerst das Talent „${de.skills[msg.skill].name}“.`;
       case 'needPoints': return 'Du brauchst mehr Talentpunkte. Sammle und baue, um welche zu bekommen.';
       case 'skillPoint': return 'Du wirst geschickter! Du bekommst einen Talentpunkt.';
